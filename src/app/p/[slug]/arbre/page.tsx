@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Branch, buildTree, Descendants, toCard, type Tree } from "@/components/Tree";
+import { TreeNav } from "@/components/TreeNav";
 import { buttonClass } from "@/components/ui";
 import { getProfileBySlug, listPersons } from "@/lib/queries";
 import type { Person } from "@/lib/types";
@@ -76,58 +77,15 @@ export default async function TreePage({ params, searchParams }: PageProps<"/p/[
         </p>
       </header>
 
-      <form method="get" className="flex flex-wrap items-center gap-2">
-        <select key={rootId} className="field w-auto max-w-72" name="de" defaultValue={String(rootId)}>
-          {persons.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.displayName}
-              {p.birth_year ? ` (${p.birth_year})` : ""}
-            </option>
-          ))}
-        </select>
-        <select key={generations} className="field w-auto" name="gen" defaultValue={String(generations)}>
-          {GENERATIONS.map((g) => (
-            <option key={g} value={g}>
-              {g} générations
-            </option>
-          ))}
-        </select>
-        <button type="submit" className={buttonClass()}>
-          Afficher
-        </button>
-
-        {sosaRoot && sosaRoot.id !== rootId && (
-          <Link
-            href={`/p/${slug}/arbre?de=${sosaRoot.id}&gen=${generations}`}
-            className={buttonClass("ghost")}
-            title={`Revenir sur ${sosaRoot.displayName}`}
-          >
-            ↩ Revenir au G1
-          </Link>
-        )}
-
-        {spouses.length > 0 && (
-          <span className="ml-2 flex flex-wrap items-center gap-2 text-[13px] text-fg-subtle">
-            marié à
-            {spouses.map((s) => (
-              <Link
-                key={s.id}
-                href={`/p/${slug}/arbre?de=${s.id}&gen=${generations}`}
-                className="underline-offset-4 transition-colors hover:text-fg hover:underline"
-              >
-                {s.displayName}
-              </Link>
-            ))}
-          </span>
-        )}
-
-        <Link
-          href={`/p/${slug}/personnes/${rootId}`}
-          className="ml-auto text-[13px] text-fg-subtle underline-offset-4 transition-colors hover:text-fg hover:underline"
-        >
-          Ouvrir la carte de {root.displayName} →
-        </Link>
-      </form>
+      <TreeNav
+        slug={slug}
+        rootId={rootId}
+        rootName={root.displayName}
+        generations={generations}
+        sosaRoot={sosaRoot ? { id: sosaRoot.id, name: sosaRoot.displayName } : null}
+        spouses={spouses.map((s) => ({ id: s.id, name: s.displayName }))}
+        people={persons.map((p) => ({ id: p.id, name: p.displayName, year: p.birth_year }))}
+      />
 
       <div className="overflow-auto rounded-2xl border border-border bg-surface p-6 shadow-soft">
         <div className="flex w-fit items-center">

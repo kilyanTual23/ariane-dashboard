@@ -318,7 +318,15 @@ for (const { person, indi } of pairs) {
   verdicts.push(compare(person, indi));
 }
 
-const toArchive = verdicts.filter((v) => v.missing.length === 0 && v.facts >= 2);
+/* Archiver, c'est classer une carte dont la recherche est réellement complète (100 %)
+   et dont toutes les données figurent bien dans l'arbre Geneanet.
+   Une carte bloquée ou incomplète n'a pas toutes ses données et ne doit pas être archivée. */
+const isComplete = (person: Person) =>
+  person.status === "Complet" && person.completion.score === person.completion.total;
+
+const covered = verdicts.filter((v) => v.missing.length === 0 && v.facts >= 2);
+const toArchive = covered.filter((v) => isComplete(v.person));
+const notComplete = covered.filter((v) => !isComplete(v.person));
 const partial = verdicts.filter((v) => v.missing.length > 0);
 const thin = verdicts.filter((v) => v.missing.length === 0 && v.facts < 2);
 
@@ -329,8 +337,21 @@ const line = (v: Verdict) =>
     ? `manque côté arbre : ${v.missing.join(", ")}`
     : `${v.covered.length} donnée(s) confirmée(s)`);
 
-console.log(`✓ ${toArchive.length} carte(s) intégralement reportées — à archiver`);
+console.log(`✓ ${toArchive.length} carte(s) intégralement reportées et complètes — à archiver`);
 for (const v of toArchive) console.log("   " + line(v));
+
+if (notComplete.length) {
+  console.log(
+    `\n! ${notComplete.length} carte(s) présentes sur l'arbre mais non complètes (${notComplete.filter((v) => v.person.status === "Bloqué").length} bloquée(s), ${notComplete.filter((v) => v.person.status !== "Bloqué").length} en cours) — pas archivées`,
+  );
+  for (const v of notComplete) {
+    console.log(
+      "   " +
+        `${v.person.displayName} (${v.person.birth_year ?? "?"})`.padEnd(46) +
+        `${v.person.status} (${v.person.completion.score}/${v.person.completion.total} cases)`,
+    );
+  }
+}
 
 console.log(`\n~ ${partial.length} carte(s) présentes mais incomplètes dans l'arbre`);
 for (const v of partial) console.log("   " + line(v));
@@ -347,13 +368,30 @@ for (const i of absent.slice(0, 40)) {
 }
 if (absent.length > 40) console.log(`   … et ${absent.length - 40} autres`);
 
+const toArchiveIds = new Set(toArchive.map((v) => v.person.id));
+const toUnarchive = persons.filter((p) => p.geneanet_at && !toArchiveIds.has(p.id));
+if (toUnarchive.length) {
+  console.log(
+    `\n⚠ ${toUnarchive.length} carte(s) actuellement archivées alors qu'elles ne sont pas complètes :`,
+  );
+  for (const p of toUnarchive) {
+    console.log(
+      `   ${p.displayName} (${p.birth_year ?? "?"}) — ${p.status} (${p.completion.score}/${p.completion.total} cases)`,
+    );
+  }
+}
+
 if (apply) {
   const stamp = new Date().toISOString().slice(0, 19).replace("T", " ");
   const run = db.transaction(() => {
     for (const v of toArchive) updatePerson(v.person.id, { geneanet_at: stamp });
+    for (const p of toUnarchive) updatePerson(p.id, { geneanet_at: null });
   });
   run();
   console.log(`\n${toArchive.length} carte(s) archivées dans Ariane (reportées sur Geneanet).`);
+  if (toUnarchive.length) {
+    console.log(`${toUnarchive.length} carte(s) désarchivées car incomplètes.`);
+  }
 } else {
-  console.log("\n(simulation — ajoute --appliquer pour archiver ces cartes)");
+  console.log("\n(simulation — ajoute --appliquer pour archiver ces cartes et désarchiver les incomplètes)");
 }

@@ -30,15 +30,17 @@ export function computeStats(persons: Person[]) {
   const missingActs = [
     {
       label: "Actes de naissance",
-      missing: persons.filter((p) => !p.birth_source).length,
+      missing: persons.filter((p) => !p.birth_source && !p.birth_source_ignored).length,
     },
     {
       label: "Actes de mariage",
-      missing: persons.filter((p) => !p.unions[0]?.source).length,
+      missing: persons.filter(
+        (p) => !p.is_unmarried && p.unions.length > 0 && !p.unions[0]?.source && !p.unions[0]?.source_ignored,
+      ).length,
     },
     {
       label: "Actes de décès",
-      missing: persons.filter((p) => !p.death_source).length,
+      missing: persons.filter((p) => !p.is_living && !p.death_source && !p.death_source_ignored).length,
     },
   ];
 

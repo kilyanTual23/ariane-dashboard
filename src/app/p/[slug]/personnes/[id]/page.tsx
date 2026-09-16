@@ -13,7 +13,10 @@ import {
   deleteUnionAction,
   removeParentAction,
   saveUnionAction,
+  toggleLivingAction,
+  toggleUnmarriedAction,
 } from "@/app/actions";
+import { ActSlot } from "@/components/ActSlot";
 import { Disclosure } from "@/components/Disclosure";
 import { Inline, InlineSelect } from "@/components/Inline";
 import { monogram, SlotStrip } from "@/components/PersonCard";
@@ -42,9 +45,9 @@ function Slot({
   className?: string;
 }) {
   return (
-    <div className={`slot ${filled ? "" : "slot-empty"} ${className}`}>
+    <div className={`slot relative ${filled ? "" : "slot-empty"} ${className}`}>
       <span className="slot-label">{label}</span>
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden text-sm">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col text-sm">{children}</div>
     </div>
   );
 }
@@ -110,21 +113,63 @@ export default async function PersonPage({
     field,
   });
 
+  const currentIndex = persons.findIndex((p) => p.id === person.id);
+  const prevPerson = currentIndex > 0 ? persons[currentIndex - 1] : null;
+  const nextPerson = currentIndex >= 0 && currentIndex < persons.length - 1 ? persons[currentIndex + 1] : null;
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col">
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <Link
-          href={`/p/${slug}/personnes`}
-          className="inline-flex items-center gap-1.5 text-[13px] text-fg-subtle transition-colors hover:text-fg"
-        >
-          <span aria-hidden>←</span> Toutes les cartes
-        </Link>
-        <Link
-          href={`/p/${slug}/arbre?de=${person.id}`}
-          className="text-[13px] text-fg-subtle underline-offset-4 transition-colors hover:text-fg hover:underline"
-        >
-          Voir dans l’arbre →
-        </Link>
+      {/* Barre de navigation supérieure et saut séquentiel */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/p/${slug}/personnes`}
+            className="inline-flex items-center gap-1.5 text-[13px] text-fg-subtle transition-colors hover:text-fg"
+          >
+            <span aria-hidden>←</span> Toutes les cartes
+          </Link>
+          <span className="text-border">·</span>
+          <Link
+            href={`/p/${slug}/arbre?de=${person.id}`}
+            className="text-[13px] text-fg-subtle underline-offset-4 transition-colors hover:text-fg hover:underline"
+          >
+            Voir dans l’arbre →
+          </Link>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs">
+          {prevPerson ? (
+            <Link
+              href={`/p/${slug}/personnes/${prevPerson.id}`}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1 text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              title={`Précédent : ${prevPerson.displayName}`}
+            >
+              <span>←</span>
+              <span className="max-w-28 truncate">{prevPerson.displayName}</span>
+            </Link>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-lg border border-border/40 px-2.5 py-1 text-fg-subtle/50">
+              ← Début
+            </span>
+          )}
+          <span className="num px-1 text-fg-subtle">
+            {currentIndex + 1} / {persons.length}
+          </span>
+          {nextPerson ? (
+            <Link
+              href={`/p/${slug}/personnes/${nextPerson.id}`}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1 text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              title={`Suivant : ${nextPerson.displayName}`}
+            >
+              <span className="max-w-28 truncate">{nextPerson.displayName}</span>
+              <span>→</span>
+            </Link>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-lg border border-border/40 px-2.5 py-1 text-fg-subtle/50">
+              Fin →
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ---------------------------------------------------------- la carte */}
@@ -184,6 +229,44 @@ export default async function PersonPage({
                   </button>
                 </form>
               )}
+
+              {/* Statut de vie (vivant ou décédé) */}
+              <form action={toggleLivingAction} className="inline">
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="personId" value={person.id} />
+                <input type="hidden" name="isLiving" value={person.is_living ? "0" : "1"} />
+                <button
+                  type="submit"
+                  className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors ${
+                    person.is_living
+                      ? "border border-ok/30 bg-ok/10 font-medium text-ok"
+                      : "border border-border bg-surface text-fg-subtle hover:text-fg"
+                  }`}
+                  title={person.is_living ? "Marqué comme vivant — cliquer pour déclarer un décès" : "Cliquer pour marquer comme vivant(e)"}
+                >
+                  {person.is_living ? "💚 Vivant(e)" : "✝ Décédé(e)"}
+                </button>
+              </form>
+
+              {/* Statut d'union si aucun conjoint rattaché */}
+              {person.unions.length === 0 && (
+                <form action={toggleUnmarriedAction} className="inline">
+                  <input type="hidden" name="slug" value={slug} />
+                  <input type="hidden" name="personId" value={person.id} />
+                  <input type="hidden" name="isUnmarried" value={person.is_unmarried ? "0" : "1"} />
+                  <button
+                    type="submit"
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors ${
+                      person.is_unmarried
+                        ? "border border-border-strong bg-surface-3 font-medium text-fg"
+                        : "border border-border bg-surface text-fg-subtle hover:text-fg"
+                    }`}
+                    title={person.is_unmarried ? "Marqué comme célibataire — cliquer pour annuler" : "Cliquer pour marquer comme célibataire"}
+                  >
+                    {person.is_unmarried ? "👤 Célibataire" : "💍 Pas d'union"}
+                  </button>
+                </form>
+              )}
             </div>
           </div>
 
@@ -194,11 +277,47 @@ export default async function PersonPage({
           />
         </header>
 
-        <p className="mt-5 text-[15px] leading-relaxed text-fg-muted">
+        {/* Accès direct à la famille proche */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-surface-2/40 px-3 py-2 text-xs">
+          <span className="text-fg-subtle">Famille :</span>
+          {person.parents.length > 0 ? (
+            person.parents.map((p) => (
+              <Link
+                key={p.id}
+                href={`/p/${slug}/personnes/${p.id}`}
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 text-fg-muted transition-colors hover:border-border-strong hover:text-fg"
+              >
+                <span className="text-fg-subtle">{p.sex === "F" ? "♀ Mère :" : p.sex === "M" ? "♂ Père :" : "Parent :"}</span>
+                <span className="font-medium text-fg">{p.displayName}</span>
+              </Link>
+            ))
+          ) : (
+            <span className="italic text-fg-subtle">Parents non rattachés</span>
+          )}
+
+          {person.unions.filter((u) => u.spouse).map((u) => (
+            <Link
+              key={u.id}
+              href={`/p/${slug}/personnes/${u.spouse!.id}`}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 text-fg-muted transition-colors hover:border-border-strong hover:text-fg"
+            >
+              <span className="text-fg-subtle">💍 Conjoint :</span>
+              <span className="font-medium text-fg">{u.spouse!.displayName}</span>
+            </Link>
+          ))}
+
+          {person.children.length > 0 && (
+            <span className="ml-auto text-fg-subtle">
+              {person.children.length} enfant{person.children.length > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+
+        <p className="mt-4 text-[15px] leading-relaxed text-fg-muted">
           {summarize(person)}
         </p>
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px]">
           <span className="text-fg-subtle">
             <span className="num">
               {score}/{total}
@@ -227,9 +346,9 @@ export default async function PersonPage({
               />
               <button
                 type="submit"
-                className="text-fg underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-fg"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2.5 py-1 text-xs text-fg transition-colors hover:border-border-strong hover:bg-surface-3"
               >
-                mettre « {missing[0].toLowerCase()} » dans ma liste
+                <span>+ Mettre « {missing[0].toLowerCase()} » dans ma liste</span>
               </button>
             </form>
           )}
@@ -308,16 +427,14 @@ export default async function PersonPage({
                 fill
               />
             </Slot>
-            <Slot label="Acte" filled={!!person.birth_source}>
-              <Inline
-                slug={slug}
-                target={target("birth_source")}
-                value={person.birth_source}
-                placeholder="lien ou cote"
-                variant="source"
-                fill
-              />
-            </Slot>
+            <ActSlot
+              slug={slug}
+              personId={person.id}
+              actKind="birth"
+              label="Acte"
+              value={person.birth_source}
+              isIgnored={Boolean(person.birth_source_ignored)}
+            />
           </div>
 
           {person.unions.map((union) => (
@@ -373,92 +490,180 @@ export default async function PersonPage({
                     fill
                   />
                 </Slot>
-                <Slot label="Acte" filled={!!union.source}>
-                  <Inline
-                    slug={slug}
-                    target={{
-                      kind: "union",
-                      unionId: union.id,
-                      field: "source",
-                    }}
-                    value={union.source}
-                    placeholder="lien ou cote"
-                    variant="source"
-                    fill
-                  />
-                </Slot>
+                <ActSlot
+                  slug={slug}
+                  unionId={union.id}
+                  actKind="marriage"
+                  label="Acte"
+                  value={union.source}
+                  isIgnored={Boolean(union.source_ignored)}
+                />
               </div>
             </div>
           ))}
 
           {person.unions.length === 0 && (
-            <>
-              <GroupTitle>Mariage</GroupTitle>
-              <Disclosure label="+ ajouter un mariage">
-                <form
-                  action={saveUnionAction}
-                  className="grid gap-2 sm:grid-cols-2"
+            person.is_unmarried ? (
+              <div className="mt-4">
+                <GroupTitle
+                  aside={
+                    <form action={toggleUnmarriedAction}>
+                      <input type="hidden" name="slug" value={slug} />
+                      <input type="hidden" name="personId" value={person.id} />
+                      <input type="hidden" name="isUnmarried" value="0" />
+                      <button
+                        type="submit"
+                        className="text-[11px] text-fg-subtle underline hover:text-fg"
+                      >
+                        ajouter une union / modifier
+                      </button>
+                    </form>
+                  }
                 >
-                  <input type="hidden" name="slug" value={slug} />
-                  <input type="hidden" name="profileId" value={profile.id} />
-                  <input type="hidden" name="personId" value={person.id} />
-                  <PersonSelect
-                    name="spouseId"
-                    people={pickable}
-                    placeholder="Conjoint…"
-                  />
-                  <input className="field" name="date_raw" placeholder="Date" />
-                  <PlaceField name="place" places={places} />
-                  <input
-                    className="field"
-                    name="source"
-                    placeholder="Acte de mariage"
-                  />
-                  <button
-                    type="submit"
-                    className={buttonClass("primary", "sm:col-span-2")}
+                  Mariage
+                </GroupTitle>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2/60 p-3.5 text-xs text-fg-muted">
+                  <span className="flex items-center gap-2">
+                    <span>👤</span>
+                    <span>
+                      <strong className="font-medium text-fg">Célibataire / sans union</strong> — aucun acte de mariage requis, la carte est dispensée de ces critères.
+                    </span>
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <GroupTitle
+                  aside={
+                    <form action={toggleUnmarriedAction}>
+                      <input type="hidden" name="slug" value={slug} />
+                      <input type="hidden" name="personId" value={person.id} />
+                      <input type="hidden" name="isUnmarried" value="1" />
+                      <button
+                        type="submit"
+                        className="text-[11px] text-fg-subtle underline hover:text-fg"
+                        title="Marquer comme célibataire : retire les critères de mariage du calcul"
+                      >
+                        marquer célibataire (pas de mariage)
+                      </button>
+                    </form>
+                  }
+                >
+                  Mariage
+                </GroupTitle>
+                <Disclosure label="+ ajouter un mariage">
+                  <form
+                    action={saveUnionAction}
+                    className="grid gap-2 sm:grid-cols-2"
                   >
-                    Enregistrer le mariage
-                  </button>
-                </form>
-              </Disclosure>
-            </>
+                    <input type="hidden" name="slug" value={slug} />
+                    <input type="hidden" name="profileId" value={profile.id} />
+                    <input type="hidden" name="personId" value={person.id} />
+                    <PersonSelect
+                      name="spouseId"
+                      people={pickable}
+                      placeholder="Conjoint…"
+                    />
+                    <input className="field" name="date_raw" placeholder="Date" />
+                    <PlaceField name="place" places={places} />
+                    <input
+                      className="field"
+                      name="source"
+                      placeholder="Acte de mariage"
+                    />
+                    <button
+                      type="submit"
+                      className={buttonClass("primary", "sm:col-span-2")}
+                    >
+                      Enregistrer le mariage
+                    </button>
+                  </form>
+                </Disclosure>
+              </>
+            )
           )}
 
-          <GroupTitle>Décès</GroupTitle>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Slot label="Date" filled={!!person.death_date_raw}>
-              <Inline
-                slug={slug}
-                target={target("death_date_raw")}
-                value={person.death_date_raw}
-                placeholder="à remplir"
-                variant="date"
-                fill
-              />
-            </Slot>
-            <Slot label="Lieu" filled={!!person.death_place}>
-              <Inline
-                slug={slug}
-                target={target("death_place")}
-                value={person.death_place}
-                placeholder="à remplir"
-                variant="place"
-                places={places}
-                fill
-              />
-            </Slot>
-            <Slot label="Acte" filled={!!person.death_source}>
-              <Inline
-                slug={slug}
-                target={target("death_source")}
-                value={person.death_source}
-                placeholder="lien ou cote"
-                variant="source"
-                fill
-              />
-            </Slot>
-          </div>
+          {person.is_living ? (
+            <div className="mt-5">
+              <GroupTitle
+                aside={
+                  <form action={toggleLivingAction}>
+                    <input type="hidden" name="slug" value={slug} />
+                    <input type="hidden" name="personId" value={person.id} />
+                    <input type="hidden" name="isLiving" value="0" />
+                    <button
+                      type="submit"
+                      className="text-[11px] text-fg-subtle underline hover:text-fg"
+                    >
+                      déclarer un décès
+                    </button>
+                  </form>
+                }
+              >
+                Décès
+              </GroupTitle>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ok/30 bg-ok-soft/30 p-3.5 text-xs text-fg-muted">
+                <span className="flex items-center gap-2">
+                  <span className="text-ok">💚</span>
+                  <span>
+                    <strong className="font-medium text-fg">Personne vivante</strong> — aucun acte ni date de décès requis. Cette carte peut atteindre 100% de complétion.
+                  </span>
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5">
+              <GroupTitle
+                aside={
+                  <form action={toggleLivingAction}>
+                    <input type="hidden" name="slug" value={slug} />
+                    <input type="hidden" name="personId" value={person.id} />
+                    <input type="hidden" name="isLiving" value="1" />
+                    <button
+                      type="submit"
+                      className="text-[11px] text-ok underline hover:text-ok"
+                      title="Marquer comme vivant(e) : retire les critères de décès du calcul"
+                    >
+                      marquer comme vivant(e)
+                    </button>
+                  </form>
+                }
+              >
+                Décès
+              </GroupTitle>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Slot label="Date" filled={!!person.death_date_raw}>
+                  <Inline
+                    slug={slug}
+                    target={target("death_date_raw")}
+                    value={person.death_date_raw}
+                    placeholder="à remplir"
+                    variant="date"
+                    fill
+                  />
+                </Slot>
+                <Slot label="Lieu" filled={!!person.death_place}>
+                  <Inline
+                    slug={slug}
+                    target={target("death_place")}
+                    value={person.death_place}
+                    placeholder="à remplir"
+                    variant="place"
+                    places={places}
+                    fill
+                  />
+                </Slot>
+                <ActSlot
+                  slug={slug}
+                  personId={person.id}
+                  actKind="death"
+                  label="Acte"
+                  value={person.death_source}
+                  isIgnored={Boolean(person.death_source_ignored)}
+                />
+              </div>
+            </div>
+          )}
 
           <GroupTitle
             aside={

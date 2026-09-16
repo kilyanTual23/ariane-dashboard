@@ -1,0 +1,1984 @@
+0 HEAD
+1 SOUR Geneanet
+2 NAME GeneWeb
+2 VERS 7.0.0
+2 CORP Geneanet
+3 ADDR https://www.geneanet.org/
+2 DATA kilyantl.gwb
+1 DATE 16 SEP 2026
+2 TIME 19:26:26
+1 FILE base.ged.tmp
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+2 SOUR
+3 PAGE geneweb wiki notes: notes
+0 @I1@ INDI
+1 NAME Jérôme /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 14 MAY 1973
+2 PLAC Fougères, 35300, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR Connaissances de TUAL Kilyan
+1 OCCU Auxiliaire Ambulancier - Ex. Peintre
+1 FAMC @F1@
+1 FAMS @F2@
+1 SOUR Connaissances de TUAL Kilyan
+0 @I2@ INDI
+1 NAME Séverine /MALLE/
+1 SEX F
+1 BIRT
+2 DATE 31 MAR 1978
+2 PLAC Fougères, 35300, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR Connaissances de TUAL Kilyan
+1 OCCU Directrice d'une résidence pour personnes âgées
+1 FAMC @F3@
+1 FAMS @F2@
+1 SOUR Connaissances de TUAL Kilyan
+0 @I3@ INDI
+1 NAME Kilyan /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 23 OCT 2004
+2 PLAC Fougères, 35300, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR TUAL Kilyan
+1 OCCU Monteur Vidéo
+1 FAMC @F2@
+1 SOUR TUAL Kilyan
+0 @I4@ INDI
+1 NAME Joseph /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 03 JUN 1950
+1 OCCU Peintre
+1 FAMC @F4@
+1 FAMS @F1@
+0 @I5@ INDI
+1 NAME Claudine /HEUDRÉ/
+1 SEX F
+1 BIRT
+2 DATE 28 FEB 1952
+1 OCCU Bouchère
+1 FAMC @F5@
+1 FAMS @F1@
+0 @I6@ INDI
+1 NAME Christian /MALLE/
+1 SEX M
+1 BIRT
+2 DATE 20 APR 1955
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR Profil Facebook de MALLE Christian
+1 OCCU Fonctionnaire
+1 FAMC @F6@
+1 FAMS @F3@
+1 SOUR Connaissances de TUAL Kilyan
+0 @I7@ INDI
+1 NAME Brigitte /PELÉ/
+1 SEX F
+1 BIRT
+2 DATE 24 DEC 1957
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+1 OCCU Bénévole
+1 FAMC @F7@
+1 FAMS @F3@
+1 SOUR Connaissances de TUAL Kilyan
+0 @I8@ INDI
+1 NAME Jean Eugene Auguste /PELÉ/
+1 SEX M
+1 BIRT
+2 DATE 12 SEP 1934
+2 PLAC Fougères, Ille-Et-Vilaine, Bretagne, France
+2 SOUR Base des décès enregistrés par l'Insee depuis 1970
+1 DEAT
+2 DATE 24 SEP 2017
+2 PLAC Fougères, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://www.dansnoscoeurs.fr/jean-pele/2192931
+1 FAMS @F7@
+1 SOUR Base des décès enregistrés par l'Insee depuis 1970
+0 @I9@ INDI
+1 NAME Odette Francoise /BOUYGES/
+1 SEX F
+1 BIRT
+2 DATE 24 APR 1937
+2 PLAC Moustier-Ventadour, Corrèze, Nouvelle-Aquitaine, France
+2 SOUR Base des décès enregistrés par l'Insee depuis 1970
+1 DEAT
+2 DATE 05 NOV 1998
+2 PLAC Javené, Ille-Et-Vilaine, Bretagne, France
+2 SOUR Base des décès enregistrés par l'Insee depuis 1970
+1 FAMC @F8@
+1 FAMS @F7@
+1 SOUR Connaissances de la mère de TUAL Kilyan et avis de décès du mari : https://www.dansnoscoeurs.fr/jean-pele/2192931
+0 @I10@ INDI
+1 NAME Julien Jean Théodore Edouard /HEUDRÉ/
+1 SEX M
+1 BIRT
+2 DATE 27 APR 1920
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30
+1 DEAT
+2 DATE 28 MAR 1982
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30
+1 FAMC @F9@
+1 FAMS @F5@
+1 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30
+0 @I11@ INDI
+1 NAME Élisa /TUAL/
+1 SEX F
+1 BIRT
+2 DATE 21 NOV 2000
+2 PLAC Fougères, 35300, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR Connaissances de TUAL Kilyan
+1 OCCU Infirmière
+1 FAMC @F2@
+1 FAMS @F10@
+1 SOUR Connaissances de TUAL Kilyan
+0 @I12@ INDI
+1 NAME Simonne Henriette /BOUVIER/
+1 SEX F
+1 BIRT
+2 DATE 03 APR 1924
+2 PLAC Fougères, 35300, Ille-et-Vilaine, Bretagne, FRANCE
+2 NOTE au 95 Bd Edmond Roussin
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9v6/718635/20](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9v6/718635/20
+1 DEAT
+2 DATE 04 NOV 2010
+2 PLAC Fougères, 35300, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR https://www.dansnoscoeurs.fr/simone-tual/122589
+1 FAMC @F11@
+1 FAMS @F4@
+1 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9v6/718635/20](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9v6/718635/20
+0 @I13@ INDI
+1 NAME Joseph Hyacinthe Auguste Victor /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 02 MAR 1920
+2 PLAC (Luitré) Luitré-Dompierre, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht41ns1w17w/724506/3
+1 DEAT
+2 DATE 12 JAN 2000
+2 PLAC Fougères, Ille-et-Vilaine, Bretagne, France
+2 SOUR Base des décès enregistrés par l'Insee depuis 1970
+1 FAMC @F12@
+1 FAMS @F4@
+1 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht41ns1w17w/724506/3
+0 @I14@ INDI
+1 NAME Roger Constant François Joseph /MALLE/
+1 SEX M
+1 BIRT
+2 DATE 12 NOV 1923
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24
+1 DEAT
+2 DATE 11 JAN 1992
+2 PLAC Fougères, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR Base des décès enregistrés par l'Insee depuis 1970
+1 FAMC @F13@
+1 FAMS @F6@
+1 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24
+0 @I15@ INDI
+1 NAME Madeleine Berthe /GRINDEL/
+1 SEX F
+1 BIRT
+2 DATE 20 MAR 1925
+2 PLAC Le Havre, 76351, Seine-Maritime, Normandie, France
+2 NOTE 9 rue Guillaume le Conquérant
+3 CONT D'abord née BERTIN, légitimée par le mariage entre Raymond Joseph Alexa
+3 CONC ndre GRINDEL et Georgette Marie BERTIN
+2 SOUR Acte de naissance : https://drive.google.com/file/d/1w8vLpnLZGBRoaeR5X2H2TBAMe9URMX4L/view
+1 DEAT
+2 DATE 13 APR 1982
+2 PLAC Fougères, 35300, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24
+1 FAMC @F14@
+1 FAMS @F6@
+1 SOUR Acte de naissance : https://drive.google.com/file/d/1w8vLpnLZGBRoaeR5X2H2TBAMe9URMX4L/view
+0 @I16@ INDI
+1 NAME Anna Joséphine Constance Augustine /DAVY/
+1 SEX F
+1 BIRT
+2 DATE 23 MAY 1917
+2 PLAC La Bazouge-du-Désert, 35018, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht66t1g4xk8/716266/4](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht66t1g4xk8/716266/4
+1 DEAT
+2 DATE 05 DEC 2002
+2 PLAC Saint-Grégoire, 35278, Ille-et-Vilaine, Bretagne, France
+2 SOUR Base des décès enregistrés par l'Insee depuis 1970
+1 FAMC @F15@
+1 FAMS @F5@
+1 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht66t1g4xk8/716266/4](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht66t1g4xk8/716266/4
+0 @I17@ INDI
+1 NAME François Emmanuel Pierre Victor /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 19 NOV 1882
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdr7sqwhc0/47309/12
+1 DEAT
+2 DATE 14 FEB 1958
+2 PLAC Dompierre-du-Chemin, 35100, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdr7sqwhc0/47309/12
+1 OCCU Cultivateur
+1 FAMC @F16@
+1 FAMS @F12@
+1 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdr7sqwhc0/47309/12
+0 @I18@ INDI
+1 NAME Marie Rose /BOURCIER/
+1 SEX F
+1 BIRT
+2 DATE 09 DEC 1882
+2 PLAC Juvigné, 53123, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r10943michtk/f127?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-298&locale=fr
+1 DEAT Y
+1 OCCU Cultivatrice
+1 FAMC @F17@
+1 FAMS @F12@
+1 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r10943michtk/f127?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-298&locale=fr
+0 @I19@ INDI
+1 NAME François /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 31 JAN 1845
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance  : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdncjszsh2/47272/2
+1 DEAT
+2 DATE 11 JUL 1920
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht8sf7m3s2c/708703/3
+1 OCCU Cultivateur
+1 FAMC @F18@
+1 FAMS @F16@
+1 SOUR Acte de naissance  : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdncjszsh2/47272/2
+0 @I20@ INDI
+1 NAME Victoire Joséphine /BEZIEL/
+1 SEX F
+1 BIRT
+2 DATE 09 APR 1849
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtp8cz8z4pc/171770/5
+1 DEAT
+2 DATE 02 MAR 1930
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht8sf7m3scs/708712/11
+1 OCCU Cultivatrice
+1 FAMC @F19@
+1 FAMS @F16@
+1 SOUR Acte de naissance : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtp8cz8z4pc/171770/5
+0 @I21@ INDI
+1 NAME Jean-Marie Michel /BOURCIER/
+1 SEX M
+1 BIRT
+2 DATE 06 AUG 1845
+2 PLAC Juvigné, 53123, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r726154zc873sk/f263?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-289&locale=fr
+1 DEAT
+2 DATE 22 JAN 1897
+2 PLAC Ernée, 53096, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r9380dvupnlk/f11?context=ead2::FRAD053_2NUM200_D_F_RM_de-525&locale=fr
+1 OCCU Cultivateur
+1 FAMC @F20@
+1 FAMS @F17@
+1 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r726154zc873sk/f263?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-289&locale=fr
+0 @I22@ INDI
+1 NAME Rose /GABLIN/
+1 SEX F
+1 BIRT
+2 DATE 06 OCT 1858
+2 PLAC Juvigné, 53123, Mayenne, Pays de la Loire, France
+1 DEAT Y
+1 OCCU Cultivatrice
+1 FAMC @F21@
+1 FAMS @F17@
+1 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r1281uub04ok/f142?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-292&locale=fr
+0 @I23@ INDI
+1 NAME Joseph Jean Marie /HEUDRÉ/
+1 SEX M
+1 BIRT
+2 DATE 17 OCT 1888
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance de Joseph HEUDRE : [https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6thw/115756/12](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6thw/115756/12)
+1 DEAT
+2 DATE 07 JAN 1955
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+1 OCCU Tailleur de pierres
+1 FAMC @F22@
+1 FAMS @F9@
+1 SOUR Acte de naissance du fils Julien HEUDRÉ : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30 et Acte de naissance de Joseph HEUDRE : [https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6thw/115756/12](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6thw/115756/12)
+0 @I24@ INDI
+1 NAME Germaine Pascaline /GILBERT/
+1 SEX F
+1 BIRT
+2 DATE 25 FEB 1900
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance de Germaine Pascaline GILBERT : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6txf/115768/3](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6txf/115768/3
+1 DEAT
+2 DATE 31 MAR 1921
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR Avis de décès de Germaine Pascaline GILBERT : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht7d7wm6kr4/734379/4](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht7d7wm6kr4/734379/4
+1 OCCU Chaussonière
+1 FAMC @F23@
+1 FAMS @F9@
+1 SOUR Acte de naissance du fils Julien HEUDRÉ : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30
+0 @I25@ INDI
+1 NAME Joseph François /DAVY/
+1 SEX M
+1 BIRT
+2 DATE 29 FEB 1876
+2 PLAC Saint-Mars-sur-la-Futaie, 53238, Mayenne, Pays de la Loire, France
+2 SOUR Acte de naissance : https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r334u0look6k/f168?context=ead2::FRAD053_2NUM200_SAINTM_SAINTT_RM_de-129&locale=fr
+1 DEAT
+2 DATE 30 NOV 1950
+2 PLAC La Bazouge-du-Désert, 35018, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance : https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r334u0look6k/f168?context=ead2::FRAD053_2NUM200_SAINTM_SAINTT_RM_de-129&locale=fr
+1 OCCU Cultivateur
+1 FAMC @F24@
+1 FAMS @F15@
+1 SOUR Acte de naissance : https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r334u0look6k/f168?context=ead2::FRAD053_2NUM200_SAINTM_SAINTT_RM_de-129&locale=fr
+0 @I26@ INDI
+1 NAME Anna /BOIVENT/
+1 SEX F
+1 BIRT
+2 DATE 13 MAY 1874
+2 PLAC La Bazouge-du-Désert, 35018, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtrfj6q6vjq/124961/6
+1 DEAT
+2 DATE 21 JAN 1938
+2 PLAC La Bazouge-du-Désert, 35018, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht9cnp5n3v1/716326/16
+1 OCCU Cultivatrice
+1 FAMC @F25@
+1 FAMS @F15@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtrfj6q6vjq/124961/6
+0 @I27@ INDI
+1 NAME Joseph François Jean Marie /MALLE/
+1 SEX M
+1 BIRT
+2 DATE 21 JUL 1882
+2 PLAC Laignelet, 35138, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtwm37px4h9/107701/8
+1 DEAT Y
+1 OCCU Bottier
+1 FAMC @F26@
+1 FAMS @F13@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtwm37px4h9/107701/8
+0 @I28@ INDI
+1 NAME Marie Esther Joséphine /LE BARON/
+1 SEX F
+1 BIRT
+2 DATE 29 APR 1892
+2 PLAC Princé, 35232, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtnp5hqdwxs/167969/3
+1 DEAT
+2 DATE 30 JUL 1975
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtnp5hqdwxs/167969/3
+1 OCCU Laveuse / Verrière
+1 FAMC @F27@
+1 FAMS @F13@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtnp5hqdwxs/167969/3
+0 @I29@ INDI
+1 NAME Jean Marie Pierre Joseph /BOUVIER/
+1 SEX M
+1 BIRT
+2 DATE 15 APR 1898
+2 PLAC Saint-Sauveur-des-Landes, 35310, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtn5tb2t04q/130368/3
+1 DEAT
+2 DATE 08 SEP 1970
+2 PLAC Rennes, 35238, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtn5tb2t04q/130368/3
+1 OCCU Cultivateur
+1 FAMC @F28@
+1 FAMS @F11@
+1 SOUR Acte de naissance de la fille Simonne BOUVIER : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9v6/718635/20](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9v6/718635/20
+0 @I30@ INDI
+1 NAME Henriette Marie Joseph /FILLEUL/
+1 SEX F
+1 BIRT
+2 DATE 24 MAR 1902
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtz612jp38m/171432/3
+1 DEAT
+2 DATE 26 FEB 1978
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR Base des décès enregistrés par l'Insee depuis 1970
+1 OCCU Chaussonière
+1 FAMC @F29@
+1 FAMS @F11@
+1 SOUR Acte de naissance de la fille Simonne BOUVIER : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9v6/718635/20](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9v6/718635/20
+0 @I31@ INDI
+1 NAME Julien Ambroise Joseph /GILBERT/
+1 SEX M
+1 BIRT
+2 DATE 15 SEP 1867
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf93x3/115735/16
+1 DEAT
+2 DATE 09 FEB 1940
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR Arbre de Maguy GIEUX : Registre Etat Civil - Greffe - St Germain en Coglès - Copy - Archives Départementales
+1 OCCU Tailleur de pierres
+1 FAMC @F30@
+1 FAMS @F23@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf93x3/115735/16
+0 @I32@ INDI
+1 NAME Angélique Jeanne Marie /CORBIERE/
+1 SEX F
+1 BIRT
+2 DATE 16 SEP 1869
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf9406/115737/15
+1 DEAT
+2 DATE 03 SEP 1962
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf9406/115737/15
+1 OCCU Ménagère
+1 FAMC @F31@
+1 FAMS @F23@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf9406/115737/15
+0 @I33@ INDI
+1 NAME Joseph Julien Emmanuel /HEUDRÉ/
+1 SEX M
+1 BIRT
+2 DATE 20 JUN 1860
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf93pf/115728/10
+1 DEAT
+2 DATE 18 SEP 1897
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk6djhc42r/49614/19
+1 OCCU Cultivateur
+1 FAMC @F32@
+1 FAMS @F22@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf93pf/115728/10
+0 @I34@ INDI
+1 NAME Anne Marie Joséphine Emmanuelle /MOREL/
+1 SEX F
+1 BIRT
+2 DATE 31 DEC 1859
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf93n2/115727/19
+1 DEAT
+2 DATE 09 JUN 1944
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR Registre Etat Civil - Greffe - St Germain en Coglès - Copy - Archives Départementales
+1 OCCU Ménagère
+1 FAMC @F33@
+1 FAMS @F22@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf93n2/115727/19
+0 @I35@ INDI
+1 NAME Raymond Joseph Alexandre /GRINDEL/
+1 SEX M
+1 BIRT
+2 DATE 27 MAR 1904
+2 PLAC Etalleville, 76251, Seine-Maritime, Normandie, France
+2 SOUR https://www.archivesdepartementales76.net/ark:/50278/aa479cd9bb84dca773473c8768d69959/dao/0/7
+1 DEAT Y
+1 FAMC @F34@
+1 FAMS @F14@
+1 SOUR https://www.archivesdepartementales76.net/ark:/50278/aa479cd9bb84dca773473c8768d69959/dao/0/7
+0 @I36@ INDI
+1 NAME Georgette Marie /BERTIN/
+1 SEX F
+1 BIRT
+2 DATE 24 FEB 1905
+2 PLAC Rolleville, 76534, Seine-Maritime, Normandie, France
+2 SOUR https://www.archivesdepartementales76.net/ark:/50278/739ea346fae5240e8b03b799fded0c03/dao/0/4
+1 DEAT
+2 DATE 25 FEB 1995
+2 PLAC Montivilliers, 76447, Seine-Maritime, Normandie, France
+2 SOUR Base INSEE
+1 OCCU Journalière
+1 FAMC @F35@
+1 FAMS @F14@
+1 SOUR https://www.archivesdepartementales76.net/ark:/50278/739ea346fae5240e8b03b799fded0c03/dao/0/4
+0 @I37@ INDI
+1 NAME Jean Mary /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 30 AUG 1810
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtcjsxkttq8/47239/16
+1 DEAT
+2 DATE 26 NOV 1851
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de mariage du fils François
+1 OCCU Laboureur
+1 FAMC @F36@
+1 FAMS @F18@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtcjsxkttq8/47239/16
+0 @I38@ INDI
+1 NAME Perrinne /HAMARD/
+1 SEX F
+1 BIRT
+2 DATE 29 JUN 1808
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtcjsxkttnh/47237/10
+1 DEAT
+2 DATE 24 AUG 1881
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtx3ffbhhhp/47089/4
+1 OCCU Cultivatrice
+1 FAMC @F37@
+1 FAMS @F18@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtcjsxkttnh/47237/10
+0 @I39@ INDI
+1 NAME Julien /BEZIEL/
+1 SEX M
+1 BIRT
+2 DATE 14 DEC 1805
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtz612jp3wf/171450/2
+1 DEAT
+2 DATE 06 JUN 1866
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thth18933r61/171588/4
+1 OCCU Laboureur
+1 FAMC @F38@
+1 FAMS @F19@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtz612jp3wf/171450/2
+0 @I40@ INDI
+1 NAME Perrine /BRIAND/
+1 SEX F
+1 BIRT
+2 DATE 18 JUL 1821
+2 PLAC Lécousse, 35150, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thttqjq2d7s2/94171/9
+1 DEAT
+2 DATE 24 FEB 1885
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thth44j11g4q/171607/2
+1 OCCU Laboureuse
+1 FAMC @F39@
+1 FAMS @F19@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thttqjq2d7s2/94171/9
+0 @I41@ INDI
+1 NAME Joseph Marie /DAVY/
+1 SEX M
+1 BIRT
+2 DATE 13 FEB 1837
+2 PLAC Louvigné-du-Désert, 35162, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht02v6wxt2w/32324/4
+1 DEAT
+2 DATE 23 OCT 1893
+2 PLAC Pontmain, 53181, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r14427qg338k/f21?context=ead2::FRAD053_2NUM200_N_P_RM_de-1054&locale=fr
+1 OCCU Journalier
+1 FAMC @F40@
+1 FAMS @F24@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht02v6wxt2w/32324/4
+0 @I42@ INDI
+1 NAME Sophie /GOBBE/
+1 SEX F
+1 BIRT
+2 DATE 07 AUG 1846
+2 PLAC Landivy, 53125, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r700yubvh73k/f167?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-432&locale=fr
+1 DEAT
+2 DATE 05 MAR 1896
+2 PLAC Pontmain, 53181, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r14427qg338k/f59?context=ead2::FRAD053_2NUM200_N_P_RM_de-1054&locale=fr
+1 FAMC @F41@
+1 FAMS @F24@
+1 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r700yubvh73k/f167?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-432&locale=fr
+0 @I43@ INDI
+1 NAME Jean Pierre /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 05 JUN 1755
+2 PLAC Romagné, 35243, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6kn0/39034/20
+1 DEAT
+2 DATE 16 APR 1812
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thts1rn8qt63/47023/9
+1 OCCU Cultivateur
+1 FAMC @F42@
+1 FAMS @F36@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtz612jnghr/47126/2
+0 @I44@ INDI
+1 NAME Marie /GARANCHER/
+1 SEX F
+1 BIRT
+2 DATE 01 MAR 1767
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtqbzkh2jdp/46982/7
+1 DEAT
+2 DATE 20 OCT 1831
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thts1rn8qtjw/47039/7
+1 OCCU Cultivateur
+1 FAMC @F43@
+1 FAMS @F36@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtqbzkh2jdp/46982/7
+0 @I45@ INDI
+1 NAME Prosper Pierre /BOIVENT/
+1 SEX M
+1 BIRT
+2 DATE 28 JUN 1838
+2 PLAC Montours, 35191, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtqz612m7kj/128996/8
+1 DEAT
+2 DATE 08 MAR 1901
+2 PLAC Landéan, 35142, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtvhhmgrz05/55701/2
+1 OCCU Cultivateur
+1 FAMC @F44@
+1 FAMS @F25@
+0 @I46@ INDI
+1 NAME Joséphine Clémentine /DOUDARD/
+1 SEX F
+1 BIRT
+2 DATE 18 AUG 1839
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thttqjq2d5fk/49422/50
+1 DEAT
+2 DATE 09 OCT 1892
+2 PLAC La Bazouge-du-Désert, 35018, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/ththmgqnmvsn/124772/10
+1 OCCU Cultivatrice
+1 FAMC @F45@
+1 FAMS @F25@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thttqjq2d5fk/49422/50
+0 @I47@ INDI
+1 NAME Joseph Mathurin /HAMARD/
+1 SEX M
+1 DEAT Y
+1 FAMS @F37@
+0 @I48@ INDI
+1 NAME Jeanne /SIMON/
+1 SEX F
+1 DEAT Y
+1 FAMS @F37@
+0 @I49@ INDI
+1 NAME René /TUAL/
+1 SEX M
+1 BIRT
+2 DATE ABT 1730
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0cfxppzsj/39189/7
+1 DEAT
+2 DATE 31 MAY 1772
+2 PLAC Romagné, 35243, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0cfxppzsj/39189/7
+1 FAMS @F42@
+0 @I50@ INDI
+1 NAME Françoise /BOIVENT/
+1 SEX F
+1 BIRT
+2 DATE ABT 1727
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0cfxppzsj/39189/6
+1 DEAT
+2 DATE 22 MAY 1772
+2 PLAC Romagné, 35243, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0cfxppzsj/39189/6
+1 FAMS @F42@
+0 @I51@ INDI
+1 NAME Nicolas /GARANCHER/
+1 SEX M
+1 DEAT Y
+1 FAMS @F43@
+0 @I52@ INDI
+1 NAME Jeanne /COCQUELIN/
+1 SEX F
+1 DEAT Y
+1 FAMS @F43@
+0 @I53@ INDI
+1 NAME Joseph Pierre /HEUDRÉ/
+1 SEX M
+1 BIRT
+2 DATE 07 MAR 1824
+2 PLAC Romagné, 35243, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtbrv15fzmt/39540/6
+1 DEAT
+2 DATE 06 JAN 1907
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0cfxpq9tp/115341/2
+1 OCCU Cultivateur
+1 FAMC @F46@
+1 FAMS @F32@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtbrv15fzmt/39540/6
+0 @I54@ INDI
+1 NAME Marie Anne Justine /BRAYON/
+1 SEX F
+1 BIRT
+2 DATE 01 JUN 1829
+2 PLAC Parigné, 35215, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht8cz8wbsf6/84808/5
+1 DEAT
+2 DATE 11 JUN 1872
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtbg79cq55x/115617/10
+1 OCCU Cultivatrice
+1 FAMC @F47@
+1 FAMS @F32@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht8cz8wbsf6/84808/5
+0 @I55@ INDI
+1 NAME François /MOREL/
+1 SEX M
+1 BIRT
+2 DATE 26 APR 1819
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/ththt76hg83t/115687/10
+1 DEAT
+2 DATE 15 OCT 1894
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht7h44j2fzt/115540/10
+1 OCCU Tailleur de pierres
+1 FAMC @F48@
+1 FAMS @F33@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/ththt76hg83t/115687/10
+0 @I56@ INDI
+1 NAME Jeanne Perrine /PRODHOMME/
+1 SEX F
+1 BIRT
+2 DATE 10 SEP 1819
+2 PLAC Saint-Sauveur-des-Landes, 35310, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht5qfttghvr/130713/5
+1 DEAT
+2 DATE 19 FEB 1877
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht7d7wm4rkb/115523/3
+1 OCCU Journalière
+1 FAMC @F49@
+1 FAMS @F33@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht5qfttghvr/130713/5
+0 @I57@ INDI
+1 NAME ? /?/
+1 SEX M
+1 DEAT Y
+1 FAMS @F44@
+0 @I58@ INDI
+1 NAME Marie Perrine /BOIVENT/
+1 SEX F
+1 BIRT
+2 DATE ABT 1819
+1 DEAT Y
+1 FAMS @F44@
+0 @I59@ INDI
+1 NAME ? /?/
+1 SEX M
+1 DEAT Y
+1 FAMS @F45@
+0 @I60@ INDI
+1 NAME Marie /DOUDARD/
+1 SEX F
+1 DEAT Y
+1 FAMS @F45@
+0 @I61@ INDI
+1 NAME Jean Marie François /FILLEUL/
+1 SEX M
+1 BIRT
+2 DATE 1873
+1 FAMS @F29@
+0 @I62@ INDI
+1 NAME Marie Thérèse Bernardine Henriette Perrine Joseph /HUBERT/
+1 SEX F
+1 BIRT
+2 DATE 1874
+1 FAMS @F29@
+0 @I63@ INDI
+1 NAME Jean Marie /BOUVIER/
+1 SEX M
+1 BIRT
+2 DATE 1867
+1 DEAT Y
+1 FAMS @F28@
+0 @I64@ INDI
+1 NAME Anne Marie Jeanne /BESNIER/
+1 SEX F
+1 BIRT
+2 DATE 1874
+1 DEAT Y
+1 FAMS @F28@
+0 @I65@ INDI
+1 NAME François Marin /GOBBE/
+1 SEX M
+1 BIRT
+2 DATE 14 MAY 1812
+2 PLAC Désertines, 53091, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r703151z8hgl2k/f220?context=ead2::FRAD053_2NUM200_D_F_RM_de-151
+1 DEAT
+2 DATE 04 DEC 1901
+2 PLAC Landivy, 53125, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r11062ely1jk/f253?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-441&locale=fr
+1 OCCU Laboureur
+1 FAMC @F50@
+1 FAMS @F41@
+1 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r703151z8hgl2k/f220?context=ead2::FRAD053_2NUM200_D_F_RM_de-151
+0 @I66@ INDI
+1 NAME Marie Anne /BLANCHET/
+1 SEX F
+1 BIRT
+2 DATE 08 DEC 1812
+2 PLAC Landéan, 35142, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtvq83bmc19/55773/11
+1 DEAT
+2 DATE 03 APR 1870
+2 PLAC Saint-Mars-sur-la-Futaie, 53238, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r333mo8tz2uk/f212?context=ead2::FRAD053_2NUM200_SAINTM_SAINTT_RM_de-128&locale=fr
+1 FAMC @F51@
+1 FAMS @F41@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtvq83bmc19/55773/11
+0 @I67@ INDI
+1 NAME Jean Pierre /DAVY/
+1 SEX M
+1 BIRT
+2 DATE 16 DEC 1795
+2 PLAC Louvigné-du-Désert, 35162, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht98sf7n2rq/32393/12
+1 DEAT
+2 DATE 25 AUG 1864
+2 PLAC Saint-Brice-de-Landelles, 50452, Manche, Normandie, France
+2 SOUR https://www.archives-manche.fr/ark:57115/s005e6527ca3365b/5e6527cb192e9.fiche=arko_fiche_65772f033956c.moteur=arko_default_635b873d1f4a7
+1 OCCU Laboureur
+1 FAMC @F52@
+1 FAMS @F40@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht98sf7n2rq/32393/12
+0 @I68@ INDI
+1 NAME Perrine Françoise /CIMONNIER/
+1 SEX F
+1 BIRT
+2 DATE 23 APR 1800
+2 PLAC Louvigné-du-Désert, 35162, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht98sf7n2vv/32397/24
+1 DEAT
+2 DATE 22 JUL 1870
+2 PLAC La Bazouge-du-Désert, 35018, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtgb5mkng0s/124750/6
+1 OCCU Cultivatrice
+1 FAMC @F53@
+1 FAMS @F40@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht98sf7n2vv/32397/24
+0 @I69@ INDI
+1 NAME Joseph André /LE BARON/
+1 SEX M
+1 BIRT
+2 DATE ABT 1833
+1 DEAT
+2 DATE 27 JAN 1902
+2 PLAC Princé, 35232, Ille-et-Vilaine, Bretagne, France
+1 OCCU Journalier
+1 FAMS @F27@
+0 @I70@ INDI
+1 NAME Marie Sainte /MOUCHET/
+1 SEX F
+1 BIRT
+2 DATE ABT 1863
+1 DEAT Y
+1 OCCU Laveuse
+1 FAMS @F27@
+0 @I71@ INDI
+1 NAME François /BOUYGES/
+1 SEX M
+1 BIRT
+2 DATE 21 NOV 1893
+2 PLAC Moustier-Ventadour, Corrèze, Nouvelle-Aquitaine, France
+2 SOUR https://www.archives.correze.fr/ark:/69090/vf4hsbw3c1d0/6f2d76af-ad8b-4318-99c7-ea77c41d881e
+1 DEAT
+2 DATE 08 MAY 1954
+2 PLAC Darnets, 19070, Corrèze, Limousin, France
+1 FAMC @F54@
+1 FAMS @F8@
+1 SOUR https://www.archives.correze.fr/ark:/69090/vf4hsbw3c1d0/6f2d76af-ad8b-4318-99c7-ea77c41d881e
+0 @I72@ INDI
+1 NAME Madeleine /CROUZETTE/
+1 SEX F
+1 BIRT
+2 DATE 19 APR 1897
+2 PLAC Saint-Yrieix-le-Déjalat, 19249, Corrèze, Limousin, France
+2 SOUR https://www.archives.correze.fr/ark:/69090/gf5c74vkbnh1/d641f479-b623-4ea3-b9db-b2b5f070efb1
+1 DEAT
+2 DATE 22 DEC 1986
+2 PLAC La Guerche-de-Bretagne, 35125, Ille-et-Vilaine, Bretagne, France
+1 FAMC @F55@
+1 FAMS @F8@
+1 SOUR https://www.archives.correze.fr/ark:/69090/gf5c74vkbnh1/d641f479-b623-4ea3-b9db-b2b5f070efb1
+0 @I73@ INDI
+1 NAME Julien Jean Rose /GILBERT/
+1 SEX M
+1 BIRT
+2 DATE 10 JAN 1828
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/ththt76hg8d7/115696/1
+1 DEAT
+2 DATE 28 MAY 1897
+2 PLAC Parigné, 35215, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtqjq2bx5k4/84673/3
+1 OCCU Tailleur de pierres
+1 FAMC @F56@
+1 FAMS @F30@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/ththt76hg8d7/115696/1
+0 @I74@ INDI
+1 NAME Thérèse Victoire /BAZILLAIS/
+1 SEX F
+1 BIRT
+2 DATE 23 DEC 1835
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtrjdfn463f/49415/23
+1 DEAT
+2 DATE AFT 1897
+1 OCCU Ménagère
+1 FAMC @F57@
+1 FAMS @F30@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtrjdfn463f/49415/23
+0 @I75@ INDI
+1 NAME Jean André /CORBIERE/
+1 SEX M
+1 BIRT
+2 DATE 31 JAN 1844
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/ththx3ffczs6/115712/3
+1 DEAT
+2 DATE 21 JUL 1905
+2 PLAC Parigné, 35215, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht7sqv9tg6p/84454/5
+1 OCCU Tailleur de pierres
+1 FAMC @F58@
+1 FAMS @F31@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/ththx3ffczs6/115712/3
+0 @I76@ INDI
+1 NAME Marie Madeleine /NOURRY/
+1 SEX F
+1 BIRT
+2 DATE 08 JUL 1848
+2 PLAC Montours, 35191, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf95mc/128658/5
+1 DEAT
+2 DATE 01 MAR 1911
+2 PLAC Parigné, 35215, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht3xsj3z71b/727331/2
+1 OCCU Ménagère
+1 FAMC @F59@
+1 FAMS @F31@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtk98sf95mc/128658/5
+0 @I77@ INDI
+1 NAME Joseph /HEUDRÉ/
+1 SEX M
+1 DEAT Y
+1 FAMS @F46@
+0 @I78@ INDI
+1 NAME Jeanne /BERTIN/
+1 SEX F
+1 DEAT Y
+1 FAMS @F46@
+0 @I79@ INDI
+1 NAME Pierre /BRAYON/
+1 SEX M
+1 DEAT Y
+1 FAMS @F47@
+0 @I80@ INDI
+1 NAME Anne /BROUILLARD/
+1 SEX F
+1 DEAT Y
+1 FAMS @F47@
+0 @I81@ INDI
+1 NAME Pierre /MOREL/
+1 SEX M
+1 DEAT Y
+1 FAMS @F48@
+0 @I82@ INDI
+1 NAME Angélique /DUBREIL/
+1 SEX F
+1 DEAT Y
+1 FAMS @F48@
+0 @I83@ INDI
+1 NAME Pierre /PRODHOMME/
+1 SEX M
+1 DEAT Y
+1 FAMS @F49@
+0 @I84@ INDI
+1 NAME Perrine /DORY/
+1 SEX F
+1 DEAT Y
+1 FAMS @F49@
+0 @I85@ INDI
+1 NAME Julien /GILBERT/
+1 SEX M
+1 DEAT Y
+1 FAMS @F56@
+0 @I86@ INDI
+1 NAME Jeanne Françoise /PAQUET/
+1 SEX F
+1 DEAT Y
+1 FAMS @F56@
+0 @I87@ INDI
+1 NAME Toussaint Julien /BAZILLAIS/
+1 SEX M
+1 DEAT Y
+1 FAMS @F57@
+0 @I88@ INDI
+1 NAME Thérèse /DELAHAYE/
+1 SEX F
+1 DEAT Y
+1 FAMS @F57@
+0 @I89@ INDI
+1 NAME Jean /CORBIERE/
+1 SEX M
+1 DEAT Y
+1 FAMS @F58@
+0 @I90@ INDI
+1 NAME Angélique /COLIN/
+1 SEX F
+1 DEAT Y
+1 FAMS @F58@
+0 @I91@ INDI
+1 NAME Ambroise Louis /NOURRY/
+1 SEX M
+1 DEAT Y
+1 FAMS @F59@
+0 @I92@ INDI
+1 NAME Françoise Anne Jeanne /MORAND/
+1 SEX F
+1 DEAT Y
+1 FAMS @F59@
+0 @I93@ INDI
+1 NAME Pierre /DAVY/
+1 SEX M
+1 DEAT Y
+1 FAMS @F52@
+0 @I94@ INDI
+1 NAME Jeanne /EMELINE/
+1 SEX F
+1 DEAT Y
+1 FAMS @F52@
+0 @I95@ INDI
+1 NAME Jean Nicolas /CIMONNIER/
+1 SEX M
+1 DEAT Y
+1 FAMS @F53@
+0 @I96@ INDI
+1 NAME Perrine /BOISMARTEL/
+1 SEX F
+1 DEAT Y
+1 FAMS @F53@
+0 @I97@ INDI
+1 NAME François Joseph /GOBBE/
+1 SEX M
+1 DEAT Y
+1 FAMS @F50@
+0 @I98@ INDI
+1 NAME Julienne Louise /HAMON/
+1 SEX F
+1 DEAT Y
+1 FAMS @F50@
+0 @I99@ INDI
+1 NAME Pierre Gilles /BLANCHET/
+1 SEX M
+1 DEAT Y
+1 FAMS @F51@
+0 @I100@ INDI
+1 NAME Michelle Jeanne /LEPAUVRE/
+1 SEX F
+1 DEAT Y
+1 FAMS @F51@
+0 @I101@ INDI
+1 NAME François /BEZIEL/
+1 SEX M
+1 DEAT Y
+1 FAMS @F38@
+0 @I102@ INDI
+1 NAME Marguerite /GAUTRAIS/
+1 SEX F
+1 DEAT Y
+1 FAMS @F38@
+0 @I103@ INDI
+1 NAME Vincent /BRIAND/
+1 SEX M
+1 DEAT Y
+1 FAMS @F39@
+0 @I104@ INDI
+1 NAME Françoise /TUMOINE/
+1 SEX F
+1 DEAT Y
+1 FAMS @F39@
+0 @I105@ INDI
+1 NAME Félix Paul /BERTIN/
+1 SEX M
+1 FAMS @F35@
+0 @I106@ INDI
+1 NAME Berthe Alphonsine /PIQUENOT/
+1 SEX F
+1 FAMS @F35@
+0 @I107@ INDI
+1 NAME Albert Célestin Joseph /GRINDEL/
+1 SEX M
+1 BIRT
+2 DATE 23 AUG 1875
+2 PLAC Amfreville-les-Champs, 76006, Seine-Maritime, Normandie, France
+1 DEAT
+2 DATE 24 SEP 1913
+2 PLAC Le Havre, 76351, Seine-Maritime, Normandie, France
+2 SOUR https://avenio.lehavre.fr/4DCGI/WEB_RegistreVisuImgAppelExterne/239709_1EC87/ILUMP999
+1 OCCU Cultivateur
+1 FAMS @F34@
+1 SOUR https://www.archivesdepartementales76.net/ark:/50278/a7060eb547e51f3cbc1d6c2f1f373a19/dao/0/13
+0 @I108@ INDI
+1 NAME Blanche Alexandrine /FOUCHE/
+1 SEX F
+1 BIRT
+2 DATE 30 AUG 1883
+2 PLAC Bénesville, 76077, Seine-Maritime, Normandie, France
+2 SOUR https://www.archivesdepartementales76.net/ark:/50278/1aed799c3f9e9cb25ae09975038e1252/dao/0/8
+1 DEAT Y
+1 FAMS @F34@
+0 @I109@ INDI
+1 NAME Jean /BOUYGES/
+1 SEX M
+1 BIRT
+2 DATE 27 DEC 1860
+2 PLAC Moustier-Ventadour, Corrèze, Nouvelle-Aquitaine, France
+2 SOUR https://www.archives.correze.fr/ark:/69090/gflckxhs5t17/e6fa4fff-9c9a-4116-bc9c-d19b96de9275
+1 DEAT Y
+1 OCCU Cultivateur
+1 FAMC @F60@
+1 FAMS @F54@
+1 SOUR https://www.archives.correze.fr/ark:/69090/gflckxhs5t17/e6fa4fff-9c9a-4116-bc9c-d19b96de9275
+0 @I110@ INDI
+1 NAME Marie /PERRIER/
+1 SEX F
+1 BIRT
+2 DATE 01 MAY 1858
+2 PLAC Soudeilles, 19263, Corrèze, Limousin, France
+2 SOUR https://www.archives.correze.fr/ark:/69090/t2g4ksv0x3q5/3e965161-27d7-4fd8-8fa1-2f9f020d4896
+1 DEAT Y
+1 OCCU Cultivatrice
+1 FAMC @F61@
+1 FAMS @F54@
+0 @I111@ INDI
+1 NAME Auguste /CROUZETTE/
+1 SEX M
+1 DEAT Y
+1 FAMS @F55@
+0 @I112@ INDI
+1 NAME Françoise /LACROIX/
+1 SEX F
+1 DEAT Y
+1 FAMS @F55@
+0 @I113@ INDI
+1 NAME Bernard /BOUYGES/
+1 SEX M
+1 DEAT
+2 DATE 10 FEB 1882
+2 PLAC Moustier-Ventadour, Corrèze, Nouvelle-Aquitaine, France
+1 FAMS @F60@
+0 @I114@ INDI
+1 NAME Léonarde /TRANSOUTRE/
+1 SEX F
+1 DEAT
+2 DATE 14 MAR 1863
+1 FAMS @F60@
+0 @I115@ INDI
+1 NAME Antoine /PERRIER/
+1 SEX M
+1 DEAT
+2 DATE 12 JAN 1871
+2 PLAC Soudeilles, 19263, Corrèze, Limousin, France
+1 FAMS @F61@
+0 @I116@ INDI
+1 NAME Jeanne /CABREL/
+1 SEX F
+1 DEAT
+2 DATE 28 FEB 1875
+2 PLAC Soudeilles, 19263, Corrèze, Limousin, France
+1 FAMS @F61@
+0 @I117@ INDI
+1 NAME Pierre Romain /MALLE/
+1 SEX M
+1 BIRT
+2 DATE 30 MAR 1844
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht73n5tc92v/53645/4
+1 DEAT
+2 DATE 13 JAN 1901
+2 PLAC Landéan, 35142, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtvhhmgrz05/55701/2
+1 OCCU Cultivateur
+1 FAMC @F62@
+1 FAMS @F26@
+0 @I118@ INDI
+1 NAME Rosalie Perrine /BRAULT/
+1 SEX F
+1 BIRT
+2 DATE 08 MAR 1853
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtsqv9s602f/76922/4
+1 DEAT
+2 DATE 14 AUG 1914
+2 PLAC Landéan, 35142, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht80gb5qztd/721140/5
+1 OCCU Cultivateur
+1 FAMC @F63@
+1 FAMS @F26@
+0 @I119@ INDI
+1 NAME Pierre /BRAULT/
+1 SEX M
+1 DEAT Y
+1 FAMS @F63@
+0 @I120@ INDI
+1 NAME Marie /GESLIN/
+1 SEX F
+1 DEAT Y
+1 FAMS @F63@
+0 @I121@ INDI
+1 NAME Pierre Jean /MALLE/
+1 SEX M
+1 BIRT
+2 DATE 16 FEB 1804
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6v9z/115780/15
+1 DEAT
+2 DATE 26 JAN 1861
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtd7wm38zc2/53449/2
+1 FAMC @F64@
+1 FAMS @F62@
+0 @I122@ INDI
+1 NAME Victoire /SEIGNEUR/
+1 SEX F
+1 BIRT
+2 DATE 11 OCT 1818
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtsqv9s5zbt/76889/8
+1 DEAT
+2 DATE 17 SEP 1887
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0p2ngg74x/53475/6
+1 FAMC @F65@
+1 FAMS @F62@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtsqv9s5zbt/76889/8
+0 @I123@ INDI
+1 NAME Louis Emmanuel /GABLIN/
+1 SEX M
+1 BIRT
+2 DATE 25 AUG 1821
+2 PLAC Juvigné, 53123, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r1274u5507vk/f212?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-285&locale=fr
+1 DEAT
+2 DATE 03 SEP 1867
+2 PLAC Juvigné, 53123, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r12837ibqy9k/f127?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-294&locale=fr
+1 OCCU Laboureur
+1 FAMS @F21@
+1 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r1274u5507vk/f212?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-285&locale=fr
+0 @I124@ INDI
+1 NAME Jeanne Julienne /LEMETAYER/
+1 SEX F
+1 BIRT
+2 DATE 14 MAR 1824
+2 PLAC Juvigné, 53123, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r1275ju7mf7k/f78?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-286
+1 DEAT
+2 DATE 21 FEB 1888
+2 PLAC Juvigné, 53123, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r10944ln8llk/f150?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-299&locale=fr
+1 OCCU Cultivatrice
+1 FAMS @F21@
+1 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r1275ju7mf7k/f78?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-286
+0 @I125@ INDI
+1 NAME Pierre /BOURCIER/
+1 SEX M
+1 DEAT Y
+1 FAMS @F20@
+0 @I126@ INDI
+1 NAME Marie /PICHON/
+1 SEX F
+1 DEAT Y
+1 FAMS @F20@
+0 @I127@ INDI
+1 NAME Julien /MALLE/
+1 SEX M
+1 BIRT
+2 DATE ABT 1762
+2 PLAC Dompierre-du-Chemin, 35100, Ille-et-Vilaine, Bretagne, France
+1 DEAT
+2 DATE 10 SEP 1833
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0k6djjgxv/53421/5
+1 FAMS @F64@
+0 @I128@ INDI
+1 NAME Perrine /PANNIER/
+1 SEX F
+1 BIRT
+2 DATE 16 JUN 1762
+2 PLAC Luitré, 35163, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht9cnp5jss7/32461/18
+1 DEAT
+2 DATE 23 FEB 1825
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0k6djjgrz/53413/3
+1 FAMS @F64@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht9cnp5jss7/32461/18
+0 @I129@ INDI
+1 NAME Jean Marie Joseph René /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 07 SEP 1887
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0k6djmmwg/717350/2
+1 DEAT Y
+1 OCCU Cultivateur
+1 FAMC @F16@
+1 FAMS @F66@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdr7sqwhg4/47314/6
+0 @I130@ INDI
+1 NAME Thérèse Anne /MALLE/
+1 SEX F
+1 BIRT
+2 DATE 16 DEC 1885
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht866t1h7dd/53686/7
+1 DEAT
+2 DATE 06 DEC 1949
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+1 FAMC @F67@
+1 FAMS @F66@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht866t1h7dd/53686/7
+0 @I131@ INDI
+1 NAME Thérèse Anne Marie /TUAL/
+1 SEX F
+1 BIRT
+2 DATE 22 JAN 1914
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht59zw3vdb5/708687/2
+1 DEAT
+2 DATE 08 AUG 2011
+2 PLAC Liffré, 35152, Ille-et-Vilaine, Bretagne, France
+1 FAMC @F66@
+1 FAMS @F68@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht59zw3vdb5/708687/2
+0 @I132@ INDI
+1 NAME André Marcel Jean Louis /BOULANGER/
+1 SEX M
+1 FAMS @F68@
+0 @I133@ INDI
+1 NAME Jean Julien /MALLE/
+1 SEX M
+1 BIRT
+2 DATE 20 MAR 1800
+2 PLAC Lécousse, 35150, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtxgxd26m2b/94253/7
+1 DEAT
+2 DATE 02 FEB 1867
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0p2ngg6rd/53455/3
+1 OCCU Laboureur
+1 FAMC @F64@
+1 FAMS @F69@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtxgxd26m2b/94253/7
+0 @I134@ INDI
+1 NAME Angélique Marie /SEIGNEUR/
+1 SEX F
+1 BIRT
+2 DATE 22 NOV 1815
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtsn02v88fb/76886/11
+1 DEAT
+2 DATE AFT 1875
+1 OCCU Cultivatrice
+1 FAMC @F65@
+1 FAMS @F69@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtsn02v88fb/76886/11
+0 @I135@ INDI
+1 NAME Julien Jean /SEIGNEUR/
+1 SEX M
+1 BIRT
+2 DATE 19 FEB 1785
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtfj6q58d87/76648/10
+1 DEAT
+2 DATE 26 FEB 1853
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0p2ngg6gc/53441/4
+1 OCCU Cultivateur
+1 FAMS @F65@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtfj6q58d87/76648/10
+0 @I136@ INDI
+1 NAME Angélique Perrine Françoise /BOUDAN/
+1 SEX F
+1 BIRT
+2 DATE 24 NOV 1784
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtffbg7bns4/76577/15
+1 DEAT
+2 DATE 12 JAN 1855
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0p2ngg6hr/53443/3
+1 OCCU Cultivatrice
+1 FAMS @F65@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtffbg7bns4/76577/15
+0 @I137@ INDI
+1 NAME Joseph François /MALLE/
+1 SEX M
+1 BIRT
+2 DATE 08 JUL 1848
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht2v6wwr5nc/53649/5
+1 DEAT
+2 DATE 22 FEB 1903
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht5tb2rcxmb/76491/3
+1 FAMC @F69@
+1 FAMS @F67@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht2v6wwr5nc/53649/5
+0 @I138@ INDI
+1 NAME Françoise Perrine /BOISCOUREE/
+1 SEX F
+1 BIRT
+2 DATE 30 MAR 1852
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht73n5tc96c/53653/3
+1 DEAT Y
+1 OCCU Cultivateur
+1 FAMS @F67@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht73n5tc96c/53653/3
+0 @I139@ INDI
+1 NAME Jean Marie Pierre François /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 06 OCT 1919
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht8sf7m3s10/708702/3
+1 DEAT
+2 DATE 19 DEC 1980
+1 FAMC @F66@
+1 FAMS @F70@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht8sf7m3s10/708702/3
+0 @I140@ INDI
+1 NAME Florentine Joséphine Marie Henriette /SEIGNEUR/
+1 SEX F
+1 DEAT Y
+1 FAMS @F70@
+0 @I141@ INDI
+1 NAME Louis Joseph /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 13 MAR 1843
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdncjszsf9/47270/5
+1 DEAT
+2 DATE 13 MAR 1893
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+1 FAMC @F18@
+1 FAMS @F71@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdncjszsf9/47270/5
+0 @I142@ INDI
+1 NAME Jeanne /TURIAS/
+1 SEX F
+1 DEAT
+2 DATE 02 MAR 1906
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+1 FAMS @F71@
+0 @I143@ INDI
+1 NAME François Jean Marie /TUAL/
+1 SEX M
+1 BIRT
+2 DATE 20 AUG 1878
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdbrv16qg0/47305/8
+1 DEAT
+2 DATE 10 MAR 1948
+1 FAMC @F71@
+1 FAMS @F72@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtdbrv16qg0/47305/8
+0 @I144@ INDI
+1 NAME Marie Joséphine /THOMAS/
+1 SEX F
+1 BIRT
+2 DATE 23 SEP 1882
+2 PLAC La Selle-en-Luitré, 35324, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht7wm37rrjn/180092/5
+1 DEAT
+2 DATE 13 OCT 1962
+2 PLAC La Bazouge-du-Désert, 35018, Ille-et-Vilaine, Bretagne, France
+1 OCCU Cultivatrice
+1 FAMS @F72@
+1 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht7wm37rrjn/180092/5
+0 @I145@ INDI
+1 NAME Margot /MEIGNE/
+1 SEX F
+1 FAMS @F10@
+0 @I146@ INDI
+1 NAME Briac /TUAL--MEIGNE/
+1 SEX M
+1 BIRT
+2 DATE 28 MAY 2026
+2 PLAC Rennes, 35238, Ille-et-Vilaine, Bretagne, France
+1 FAMC @F10@
+0 @F1@ FAM
+1 MARR Y
+1 HUSB @I4@
+1 WIFE @I5@
+1 CHIL @I1@
+0 @F2@ FAM
+1 MARR
+2 DATE 2001
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I11@
+1 CHIL @I3@
+0 @F3@ FAM
+1 MARR Y
+1 HUSB @I6@
+1 WIFE @I7@
+1 CHIL @I2@
+0 @F4@ FAM
+1 MARR
+2 DATE 12 OCT 1946
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+2 NOTE Mariage avec: Joseph Hyacinthe Auguste Victor TUAL
+1 HUSB @I13@
+1 WIFE @I12@
+1 CHIL @I4@
+0 @F5@ FAM
+1 MARR
+2 DATE 14 FEB 1947
+2 PLAC Beaucé, 35021, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance de Julien HEUDRÉ : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9bh/718599/30
+1 HUSB @I10@
+1 WIFE @I16@
+1 CHIL @I5@
+0 @F6@ FAM
+1 MARR
+2 DATE 02 JUN 1949
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance de Madeleine GRINDEL : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24
+1 HUSB @I14@
+1 WIFE @I15@
+1 CHIL @I6@
+0 @F7@ FAM
+1 MARR Y
+1 HUSB @I8@
+1 WIFE @I9@
+1 CHIL @I7@
+0 @F12@ FAM
+1 MARR
+2 DATE 17 JAN 1910
+2 PLAC Dompierre-du-Chemin, 35100, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/gestionARK.asp?a=49933%2Fthtksn02zncj%2F714873%2F2
+1 HUSB @I17@
+1 WIFE @I18@
+1 CHIL @I13@
+0 @F16@ FAM
+1 MARR
+2 DATE 18 JUN 1880
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtf7m0chphb/171699/6
+1 HUSB @I19@
+1 WIFE @I20@
+1 CHIL @I17@
+1 CHIL @I129@
+0 @F17@ FAM
+1 MARR
+2 DATE 22 APR 1877
+2 PLAC Juvigné, 53123, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r1285k4ifr3k/f79?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-296&locale=fr
+1 HUSB @I21@
+1 WIFE @I22@
+1 CHIL @I18@
+0 @F9@ FAM
+1 MARR
+2 DATE 10 MAY 1919
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR Acte de naissance de Germaine Pascaline GILBERT : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6txf/115768/3](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtkd51c6txf/115768/3
+1 HUSB @I23@
+1 WIFE @I24@
+1 CHIL @I10@
+0 @F15@ FAM
+1 MARR
+2 DATE 30 APR 1901
+2 PLAC La Bazouge-du-Désert, 35018, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht76hdr9b92/124556/5
+1 HUSB @I25@
+1 WIFE @I26@
+1 CHIL @I16@
+0 @F13@ FAM
+1 MARR
+2 DATE 13 NOV 1911
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzkh18dkgk/718531/34
+1 HUSB @I27@
+1 WIFE @I28@
+1 CHIL @I14@
+0 @F11@ FAM
+1 MARR
+2 DATE 16 APR 1923
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtncjsxq949/720639/2
+1 HUSB @I29@
+1 WIFE @I30@
+1 CHIL @I12@
+0 @F23@ FAM
+1 MARR
+2 DATE 18 JAN 1889
+2 PLAC Parigné, 35215, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht8931zf2pw/84772/3
+1 HUSB @I31@
+1 WIFE @I32@
+1 CHIL @I24@
+0 @F22@ FAM
+1 MARR
+2 DATE 19 JAN 1888
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtbk3j9mw1j/115648/3
+1 HUSB @I33@
+1 WIFE @I34@
+1 CHIL @I23@
+0 @F14@ FAM
+1 MARR
+2 DATE 10 SEP 1926
+2 PLAC Le Havre, 76351, Seine-Maritime, Normandie, France
+2 SOUR Acte de naissance de la fille Madeleine : https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24](https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtzpc86b9r2/718629/24
+1 HUSB @I35@
+1 WIFE @I36@
+1 CHIL @I15@
+0 @F18@ FAM
+1 MARR
+2 DATE 23 JAN 1834
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtz612jngzp/47150/2
+1 HUSB @I37@
+1 WIFE @I38@
+1 CHIL @I141@
+1 CHIL @I19@
+0 @F19@ FAM
+1 MARR
+2 DATE 28 JAN 1842
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtz612jnh4x/47158/2
+1 HUSB @I39@
+1 WIFE @I40@
+1 CHIL @I20@
+0 @F24@ FAM
+1 MARR
+2 DATE 10 MAY 1875
+2 PLAC Pontmain, 53181, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r334u0look6k/f124?context=ead2::FRAD053_2NUM200_SAINTM_SAINTT_RM_de-129&locale=fr
+1 HUSB @I41@
+1 WIFE @I42@
+1 CHIL @I25@
+0 @F36@ FAM
+1 MARR
+2 DATE 11 JAN 1808
+2 PLAC Billé, 35025, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtz612jnghr/47126/2
+1 HUSB @I43@
+1 WIFE @I44@
+1 CHIL @I37@
+0 @F25@ FAM
+1 MARR
+2 DATE 02 JUN 1863
+2 PLAC La Bazouge-du-Désert, 35018, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtpvmcvg8bk/124846/5
+1 HUSB @I45@
+1 WIFE @I46@
+1 CHIL @I26@
+0 @F37@ FAM
+1 MARR Y
+1 HUSB @I47@
+1 WIFE @I48@
+1 CHIL @I38@
+0 @F42@ FAM
+1 MARR
+2 DATE 19 FEB 1754
+2 PLAC Lécousse, 35150, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht1zcrjfq5g/93683/4
+1 HUSB @I49@
+1 WIFE @I50@
+1 CHIL @I43@
+0 @F43@ FAM
+1 MARR Y
+1 HUSB @I51@
+1 WIFE @I52@
+1 CHIL @I44@
+0 @F32@ FAM
+1 MARR
+2 DATE 23 MAY 1857
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtbg79cq55x/115617/10
+1 HUSB @I53@
+1 WIFE @I54@
+1 CHIL @I33@
+0 @F33@ FAM
+1 MARR
+2 DATE 16 OCT 1855
+2 PLAC Saint-Germain-en-Coglès, 35273, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtbg79cq535/115615/6
+1 HUSB @I55@
+1 WIFE @I56@
+1 CHIL @I34@
+0 @F44@ FAM
+1 MARR Y
+1 HUSB @I57@
+1 WIFE @I58@
+1 CHIL @I45@
+0 @F45@ FAM
+1 MARR Y
+1 HUSB @I59@
+1 WIFE @I60@
+1 CHIL @I46@
+0 @F29@ FAM
+1 MARR Y
+1 HUSB @I61@
+1 WIFE @I62@
+1 CHIL @I30@
+0 @F28@ FAM
+1 MARR Y
+1 HUSB @I63@
+1 WIFE @I64@
+1 CHIL @I29@
+0 @F41@ FAM
+1 MARR
+2 DATE 09 MAY 1843
+2 PLAC Landéan, 35142, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thttb2rbq96r/56021/5
+1 HUSB @I65@
+1 WIFE @I66@
+1 CHIL @I42@
+0 @F40@ FAM
+1 MARR
+2 DATE 09 FEB 1827
+2 PLAC Louvigné-du-Désert, 35162, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtsqv9s5sxj/32204/1
+1 HUSB @I67@
+1 WIFE @I68@
+1 CHIL @I41@
+0 @F27@ FAM
+1 MARR Y
+1 HUSB @I69@
+1 WIFE @I70@
+1 CHIL @I28@
+0 @F8@ FAM
+1 MARR
+2 DATE 27 OCT 1917
+2 PLAC Darnets, 19070, Corrèze, Limousin, France
+2 SOUR https://www.archives.correze.fr/ark:/69090/p7k8b164mtq5/6f8a5acc-8f18-4c45-a8b5-96452f3de8b3
+1 HUSB @I71@
+1 WIFE @I72@
+1 CHIL @I9@
+0 @F30@ FAM
+1 MARR
+2 DATE 12 NOV 1855
+2 PLAC Fougeres, 35115, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtrbnzs8rkn/49278/43
+1 HUSB @I73@
+1 WIFE @I74@
+1 CHIL @I31@
+0 @F31@ FAM
+1 MARR
+2 DATE 07 AUG 1868
+2 PLAC Montours, 35191, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtpg4f4sc8j/128923/7
+1 HUSB @I75@
+1 WIFE @I76@
+1 CHIL @I32@
+0 @F46@ FAM
+1 MARR Y
+1 HUSB @I77@
+1 WIFE @I78@
+1 CHIL @I53@
+0 @F47@ FAM
+1 MARR Y
+1 HUSB @I79@
+1 WIFE @I80@
+1 CHIL @I54@
+0 @F48@ FAM
+1 MARR Y
+1 HUSB @I81@
+1 WIFE @I82@
+1 CHIL @I55@
+0 @F49@ FAM
+1 MARR Y
+1 HUSB @I83@
+1 WIFE @I84@
+1 CHIL @I56@
+0 @F56@ FAM
+1 MARR Y
+1 HUSB @I85@
+1 WIFE @I86@
+1 CHIL @I73@
+0 @F57@ FAM
+1 MARR Y
+1 HUSB @I87@
+1 WIFE @I88@
+1 CHIL @I74@
+0 @F58@ FAM
+1 MARR Y
+1 HUSB @I89@
+1 WIFE @I90@
+1 CHIL @I75@
+0 @F59@ FAM
+1 MARR Y
+1 HUSB @I91@
+1 WIFE @I92@
+1 CHIL @I76@
+0 @F52@ FAM
+1 MARR Y
+1 HUSB @I93@
+1 WIFE @I94@
+1 CHIL @I67@
+0 @F53@ FAM
+1 MARR Y
+1 HUSB @I95@
+1 WIFE @I96@
+1 CHIL @I68@
+0 @F50@ FAM
+1 MARR Y
+1 HUSB @I97@
+1 WIFE @I98@
+1 CHIL @I65@
+0 @F51@ FAM
+1 MARR Y
+1 HUSB @I99@
+1 WIFE @I100@
+1 CHIL @I66@
+0 @F38@ FAM
+1 MARR Y
+1 HUSB @I101@
+1 WIFE @I102@
+1 CHIL @I39@
+0 @F39@ FAM
+1 MARR Y
+1 HUSB @I103@
+1 WIFE @I104@
+1 CHIL @I40@
+0 @F35@ FAM
+1 MARR Y
+1 HUSB @I105@
+1 WIFE @I106@
+1 CHIL @I36@
+0 @F34@ FAM
+1 MARR
+2 DATE 19 JUL 1900
+2 PLAC Bénesville, 76077, Seine-Maritime, Normandie, France
+2 SOUR https://www.archivesdepartementales76.net/ark:/50278/a7060eb547e51f3cbc1d6c2f1f373a19/dao/0/13
+1 HUSB @I107@
+1 WIFE @I108@
+1 CHIL @I35@
+0 @F54@ FAM
+1 MARR
+2 DATE 12 JAN 1886
+2 PLAC Soudeilles, 19263, Corrèze, Limousin, France
+2 SOUR https://www.archives.correze.fr/ark:/69090/d69148w0rhvs/76943dd1-f4eb-4a32-90e1-2c27b95ecfff
+1 HUSB @I109@
+1 WIFE @I110@
+1 CHIL @I71@
+0 @F55@ FAM
+1 MARR Y
+1 HUSB @I111@
+1 WIFE @I112@
+1 CHIL @I72@
+0 @F60@ FAM
+1 MARR Y
+1 HUSB @I113@
+1 WIFE @I114@
+1 CHIL @I109@
+0 @F61@ FAM
+1 MARR Y
+1 HUSB @I115@
+1 WIFE @I116@
+1 CHIL @I110@
+0 @F26@ FAM
+1 MARR
+2 DATE 30 APR 1878
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtsj3txbhnm/76835/4
+1 HUSB @I117@
+1 WIFE @I118@
+1 CHIL @I27@
+0 @F63@ FAM
+1 MARR Y
+1 HUSB @I119@
+1 WIFE @I120@
+1 CHIL @I118@
+0 @F62@ FAM
+1 MARR
+2 DATE 02 FEB 1839
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht6wwpzhtrv/53530/4
+1 HUSB @I121@
+1 WIFE @I122@
+1 CHIL @I117@
+0 @F21@ FAM
+1 MARR
+2 DATE 28 OCT 1849
+2 PLAC Juvigné, 53123, Mayenne, Pays de la Loire, France
+2 SOUR https://archives.lamayenne.fr/archives-en-ligne/ark:/37963/r1279xmzcz5k/f235?context=ead2::FRAD053_2NUM200_I_LAV_RM_de-290&locale=fr
+1 HUSB @I123@
+1 WIFE @I124@
+1 CHIL @I22@
+0 @F20@ FAM
+1 MARR Y
+1 HUSB @I125@
+1 WIFE @I126@
+1 CHIL @I21@
+0 @F64@ FAM
+1 MARR
+2 DATE 18 AUG 1789
+2 PLAC Châtillon-en-Vendelais, 35072, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtmgqnkbxf6/123311/23
+1 HUSB @I127@
+1 WIFE @I128@
+1 CHIL @I133@
+1 CHIL @I121@
+0 @F66@ FAM
+1 MARR
+2 DATE 19 APR 1913
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht0k6djmmwg/717350/2
+1 HUSB @I129@
+1 WIFE @I130@
+1 CHIL @I131@
+1 CHIL @I139@
+0 @F68@ FAM
+1 MARR Y
+1 HUSB @I132@
+1 WIFE @I131@
+0 @F69@ FAM
+1 MARR
+2 DATE 02 FEB 1839
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht6wwpzhtrv/53530/3
+1 HUSB @I133@
+1 WIFE @I134@
+1 CHIL @I137@
+0 @F65@ FAM
+1 MARR
+2 DATE 27 JAN 1809
+2 PLAC La Chapelle-Janson, 35062, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/thtn5tb2snvx/76768/1
+1 HUSB @I135@
+1 WIFE @I136@
+1 CHIL @I134@
+1 CHIL @I122@
+0 @F67@ FAM
+1 MARR
+2 DATE 29 JAN 1875
+2 PLAC Fleurigné, 35112, Ille-et-Vilaine, Bretagne, France
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/tht1rn8pm6m4/53566/4
+1 HUSB @I137@
+1 WIFE @I138@
+1 CHIL @I130@
+0 @F70@ FAM
+1 MARR
+2 DATE 07 AUG 1945
+2 PLAC Laignelet, 35138, Ille-et-Vilaine, Bretagne, France
+1 HUSB @I139@
+1 WIFE @I140@
+0 @F71@ FAM
+1 MARR Y
+1 HUSB @I141@
+1 WIFE @I142@
+1 CHIL @I143@
+0 @F72@ FAM
+1 MARR
+2 DATE 25 OCT 1909
+2 PLAC Javené, 35133, Ille-et-Vilaine, Bretagne, FRANCE
+2 SOUR https://archives-en-ligne.ille-et-vilaine.fr/thot_internet/ark:/49933/ththdr7sv9zj/720594/6
+1 HUSB @I143@
+1 WIFE @I144@
+0 @F10@ FAM
+1 MARR Y
+1 HUSB @I145@
+1 WIFE @I11@
+1 CHIL @I146@
+0 TRLR
+

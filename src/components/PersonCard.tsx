@@ -22,6 +22,8 @@ export type CardPerson = {
   percent: number;
   missing: string[];
   publication: Publication;
+  isLiving?: boolean;
+  isUnmarried?: boolean;
 };
 
 /** Le monogramme tient lieu de portrait : deux lettres, rien de plus. */
@@ -31,8 +33,13 @@ export function monogram(given: string, surname: string) {
   return (a + b).toUpperCase() || "?";
 }
 
-export function lifeSpan(p: Pick<CardPerson, "birthYear" | "birthYearEstimated" | "deathYear">) {
+export function lifeSpan(
+  p: Pick<CardPerson, "birthYear" | "birthYearEstimated" | "deathYear"> & {
+    isLiving?: boolean;
+  },
+) {
   const birth = p.birthYear ? `${p.birthYearEstimated ? "~" : ""}${p.birthYear}` : "?";
+  if (p.isLiving) return `${birth} (vivant)`;
   const death = p.deathYear ? String(p.deathYear) : p.birthYear ? "?" : "?";
   return `${birth} – ${death}`;
 }
@@ -130,7 +137,7 @@ export function PersonCard({
           </span>
         ) : (
           <span className="flex items-center gap-1.5 text-fg-muted">
-            <span className={`size-1.5 rounded-full ${STATUS_DOT[person.status]}`} />
+            <span className={`size-1.5 rounded-full ${STATUS_DOT[person.status] ?? "bg-neutral"}`} />
             {person.status}
           </span>
         )}
@@ -173,7 +180,7 @@ export function PersonChip({
           </span>
         )}
         <span className="flex items-center gap-1.5 pr-4">
-          <span className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[person.status]}`} />
+          <span className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[person.status] ?? "bg-neutral"}`} />
           <span className="truncate text-[13px] font-medium leading-tight" title={person.name}>
             {person.name}
           </span>

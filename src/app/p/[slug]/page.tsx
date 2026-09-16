@@ -30,6 +30,8 @@ function toCard(p: Person): CardPerson {
     percent: p.completion.percent,
     missing: p.completion.missing,
     publication: publicationOf(p),
+    isLiving: Boolean(p.is_living),
+    isUnmarried: Boolean(p.is_unmarried),
   };
 }
 
@@ -38,20 +40,29 @@ function Tile({
   label,
   value,
   hint,
+  icon,
 }: {
   href: string;
   label: string;
   value: string;
   hint: string;
+  icon?: string;
 }) {
   return (
     <Link
       href={href}
-      className="flex flex-col rounded-2xl border border-border bg-surface px-5 py-4 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card"
+      className="group flex flex-col rounded-2xl border border-border bg-surface px-5 py-4 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card"
     >
-      <span className="text-xs text-fg-subtle">{label}</span>
-      <span className="num mt-1.5 text-[26px] leading-none tracking-tight">{value}</span>
-      <span className="mt-2 text-xs text-fg-muted">{hint}</span>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium uppercase tracking-wider text-fg-subtle">{label}</span>
+        {icon && (
+          <span className="text-base transition-transform group-hover:scale-110">
+            {icon}
+          </span>
+        )}
+      </div>
+      <span className="num mt-2 text-[28px] font-semibold leading-none tracking-tight">{value}</span>
+      <span className="mt-2.5 text-xs text-fg-muted">{hint}</span>
     </Link>
   );
 }
@@ -223,24 +234,28 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
           label="Cartes"
           value={String(stats.total)}
           hint={`${stats.total - stats.complete} à compléter`}
+          icon="👥"
         />
         <Tile
           href={`/p/${slug}/arbre`}
           label="Arbre"
           value={String(sosaCount)}
           hint="ancêtres numérotés · naviguer de proche en proche"
+          icon="🌳"
         />
         <Tile
           href={`/p/${slug}/taches`}
           label="Ma liste"
           value={String(openTasks.length)}
           hint={openTasks.length ? "recherches en attente" : "rien en attente"}
+          icon="📋"
         />
         <Tile
           href={`/p/${slug}/statistiques`}
           label="Chiffres"
           value={`${stats.avgCompletion} %`}
           hint="générations, actes manquants, communes"
+          icon="📊"
         />
       </div>
 
@@ -257,7 +272,7 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
               toutes les cartes →
             </Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {almost.map((person) => (
               <PersonCard key={person.id} slug={slug} person={toCard(person)} />
             ))}

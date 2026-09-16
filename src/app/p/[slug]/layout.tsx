@@ -31,7 +31,7 @@ export default async function ProfileLayout({ children, params }: LayoutProps<"/
           { href: `/p/${slug}/reglages`, label: "Réglages" },
         ]}
       />
-      <main className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">{children}</main>
+      <main className="mx-auto w-full max-w-[1750px] px-4 py-6 sm:px-8 sm:py-8">{children}</main>
     </>
   );
 }

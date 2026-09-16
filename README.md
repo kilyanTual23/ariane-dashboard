@@ -25,6 +25,17 @@ Une case vide est en pointillés : elle appelle à être remplie, et un clic suf
 pour le faire sur place (Entrée enregistre, Échap annule). Créer quelqu'un ne
 demande qu'un nom ; le reste se remplit au fil des trouvailles.
 
+**Complétion adaptative & dispenses d'actes.**
+- **Personnes vivantes** (`is_living`) : dispense automatique des critères de décès (date, lieu, acte), mention `(vivant)`.
+- **Célibataires / sans union** (`is_unmarried`) : dispense automatique des critères de mariage (date, lieu, acte).
+- **Actes introuvables ou inaccessibles** : un bouton `Ø Ignorer` permet de renseigner un motif (archives lacunaires, archives détruites, délai de communicabilité de 75/100 ans) pour ne pas pénaliser la fiche. Le total s'ajuste dynamiquement (ex: 10/10 = 100 %) et permet à la carte de passer en « Complet » sans actes fictifs.
+
+**Ajout rapide en langage naturel (NLP).**
+Sur la page d'ajout d'une personne, un champ d'analyse intelligente interprète directement les phrases libres en français (*« Kilyan TUAL né le 23 octobre 2004 à Fougères, marié à Julie Robert… »*), extrait tous les champs, détecte conjoint et parents, et prépare la carte en un clic.
+
+**Mémorisation des filtres et vues personnalisées.**
+Les filtres de recherche de la vue Cartes (statut, SOSA, lien de parenté, éléments manquants, tri) sont mémorisés automatiquement en local et synchronisés dans l'URL. Un sélecteur de vues permet de basculer instantanément sur des préréglages recommandés ou d'enregistrer ses propres combinaisons sous un nom personnalisé.
+
 **Les dates s'écrivent toutes pareil.** `19/11/1882`, `19 nov 1882`, `1882-11-19` sont
 réécrits en `19 novembre 1882` ; `v1880` et `~1880` en `vers 1880` ; `<1900` en
 `avant 1900` ; `>1925` en `après 1925`. Un aperçu sous le champ annonce ce qui sera
@@ -177,10 +188,14 @@ connu d'Ariane — date et lieu de naissance, de mariage, de décès — il vér
 figure à l'identique dans l'arbre publié. Les écritures de lieux sont rapprochées à
 la commune près (« Lieu-dit La Renardière, 35133 Billé » = « Billé »).
 
-Une carte n'est archivée que si **rien ne manque** et qu'elle porte au moins deux
-faits : un simple homonyme sans données ne compte pas. Le rapport liste aussi les
-cartes présentes mais incomplètes côté arbre (avec ce qui manque), celles trop
-maigres pour trancher, et les individus de l'arbre sans carte Ariane.
+Une carte n'est archivée que si elle est **réellement complète** (statut
+« Complet » avec 100 % des cases remplies), qu'elle porte au moins deux faits —
+un simple homonyme sans données ne compte pas — et que **toutes ses données
+figurent à l'identique dans l'arbre Geneanet**. Une carte bloquée ou encore en cours
+peut avoir des données sur Geneanet, mais ne sera pas archivée tant que la fiche
+n'est pas complète. Le rapport liste aussi les cartes présentes mais incomplètes
+côté arbre (avec ce qui manque), celles trop maigres pour trancher, et les
+individus de l'arbre sans carte Ariane.
 
 ## La vue kanban
 

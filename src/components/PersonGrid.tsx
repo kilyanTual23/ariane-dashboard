@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PersonCard, type CardPerson } from "@/components/PersonCard";
 import { buttonClass } from "@/components/ui";
@@ -40,36 +40,331 @@ function norm(v: string) {
     .toLowerCase();
 }
 
+export type FilterState = {
+  query: string;
+  status: string;
+  sosaOnly: boolean;
+  kinship: string;
+  missing: string;
+  publication: string;
+  sort: SortKey;
+  desc: boolean;
+  moreFilters?: boolean;
+};
+
+export type SavedView = {
+  id: string;
+  name: string;
+  isSystem?: boolean;
+  filters: FilterState;
+};
+
+export const SYSTEM_PRESETS: SavedView[] = [
+  {
+    id: "sosa-recherche",
+    name: "⭐ SOSA en recherche",
+    isSystem: true,
+    filters: {
+      query: "",
+      status: "En recherche",
+      sosaOnly: true,
+      kinship: "",
+      missing: "",
+      publication: "",
+      sort: "filled",
+      desc: true,
+      moreFilters: false,
+    },
+  },
+  {
+    id: "a-publier",
+    name: "📦 Prêts pour Geneanet",
+    isSystem: true,
+    filters: {
+      query: "",
+      status: "Complet",
+      sosaOnly: false,
+      kinship: "",
+      missing: "",
+      publication: "à mettre sur Geneanet",
+      sort: "name",
+      desc: false,
+      moreFilters: true,
+    },
+  },
+  {
+    id: "sosa-bloques",
+    name: "⚠️ SOSA bloqués",
+    isSystem: true,
+    filters: {
+      query: "",
+      status: "Bloqué",
+      sosaOnly: true,
+      kinship: "",
+      missing: "",
+      publication: "",
+      sort: "birth",
+      desc: false,
+      moreFilters: false,
+    },
+  },
+  {
+    id: "sans-naissance",
+    name: "📜 Acte de naissance manquant",
+    isSystem: true,
+    filters: {
+      query: "",
+      status: "",
+      sosaOnly: false,
+      kinship: "",
+      missing: "Acte de naissance",
+      publication: "",
+      sort: "name",
+      desc: false,
+      moreFilters: true,
+    },
+  },
+  {
+    id: "sans-mariage",
+    name: "💍 Acte de mariage manquant",
+    isSystem: true,
+    filters: {
+      query: "",
+      status: "",
+      sosaOnly: false,
+      kinship: "",
+      missing: "Acte de mariage",
+      publication: "",
+      sort: "name",
+      desc: false,
+      moreFilters: true,
+    },
+  },
+];
+
 export function PersonGrid({
   slug,
   people,
+  initialQuery,
   initialStatus,
+  initialSosaOnly,
+  initialKinship,
+  initialMissing,
   initialPublication,
+  initialSort,
+  initialDesc,
 }: {
   slug: string;
   people: GridPerson[];
+  initialQuery?: string;
   initialStatus?: string;
+  initialSosaOnly?: boolean;
+  initialKinship?: string;
+  initialMissing?: string;
   initialPublication?: string;
+  initialSort?: SortKey;
+  initialDesc?: boolean;
 }) {
-  const [query, setQuery] = useState("");
+  const storageKey = `ariane_cards_filters_${slug}`;
+  const presetsStorageKey = `ariane_cards_presets_${slug}`;
+
+  const [sosaOnly, setSosaOnly] = useState(initialSosaOnly ?? false);
+  const [query, setQuery] = useState(initialQuery ?? "");
   const [status, setStatus] = useState(initialStatus ?? "");
-  const [kinship, setKinship] = useState("");
-  const [missing, setMissing] = useState("");
+  const [kinship, setKinship] = useState(initialKinship ?? "");
+  const [missing, setMissing] = useState(initialMissing ?? "");
   const [publication, setPublication] = useState(initialPublication ?? "");
-  const [sort, setSort] = useState<SortKey>("name");
-  const [desc, setDesc] = useState(false);
+  const [sort, setSort] = useState<SortKey>(initialSort ?? "name");
+  const [desc, setDesc] = useState(initialDesc ?? false);
   const [moreFilters, setMoreFilters] = useState(false);
+
+  const [customPresets, setCustomPresets] = useState<SavedView[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("");
+  const [isSavingView, setIsSavingView] = useState(false);
+  const [newViewName, setNewViewName] = useState("");
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // 1. Hydratation initiale : restaurer les filtres depuis l'URL ou localStorage
+  useEffect(() => {
+    // Vues personnalisées sauvegardées
+    try {
+      const rawPresets = localStorage.getItem(presetsStorageKey);
+      if (rawPresets) {
+        setCustomPresets(JSON.parse(rawPresets));
+      }
+    } catch {}
+
+    // Vérifier si des filtres explicites sont déjà dans l'URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasUrlParams =
+      urlParams.has("q") ||
+      urlParams.has("statut") ||
+      urlParams.has("sosa") ||
+      urlParams.has("lien") ||
+      urlParams.has("manquant") ||
+      urlParams.has("publication") ||
+      urlParams.has("tri") ||
+      urlParams.has("ordre");
+
+    if (!hasUrlParams) {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const saved: Partial<FilterState> = JSON.parse(raw);
+          if (typeof saved.query === "string") setQuery(saved.query);
+          if (typeof saved.status === "string") setStatus(saved.status);
+          if (typeof saved.sosaOnly === "boolean") setSosaOnly(saved.sosaOnly);
+          if (typeof saved.kinship === "string") setKinship(saved.kinship);
+          if (typeof saved.missing === "string") setMissing(saved.missing);
+          if (typeof saved.publication === "string") setPublication(saved.publication);
+          if (typeof saved.sort === "string" && SORTS.some((s) => s.key === saved.sort)) {
+            setSort(saved.sort);
+          }
+          if (typeof saved.desc === "boolean") setDesc(saved.desc);
+          if (typeof saved.moreFilters === "boolean") setMoreFilters(saved.moreFilters);
+        }
+      } catch {}
+    }
+
+    setIsHydrated(true);
+  }, [slug, storageKey, presetsStorageKey]);
+
+  // 2. Mémorisation automatique : dès qu'un filtre change, sauvegarder dans localStorage et synchroniser l'URL
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const current: FilterState = {
+      query,
+      status,
+      sosaOnly,
+      kinship,
+      missing,
+      publication,
+      sort,
+      desc,
+      moreFilters,
+    };
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(current));
+    } catch {}
+
+    const params = new URLSearchParams();
+    if (query.trim()) params.set("q", query.trim());
+    if (status) params.set("statut", status);
+    if (sosaOnly) params.set("sosa", "1");
+    if (kinship) params.set("lien", kinship);
+    if (missing) params.set("manquant", missing);
+    if (publication) params.set("publication", publication);
+    if (sort && sort !== "name") params.set("tri", sort);
+    if (desc) params.set("ordre", "desc");
+
+    const qs = params.toString();
+    const targetUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", targetUrl);
+  }, [
+    isHydrated,
+    query,
+    status,
+    sosaOnly,
+    kinship,
+    missing,
+    publication,
+    sort,
+    desc,
+    moreFilters,
+    storageKey,
+  ]);
+
+  const resetAllFilters = () => {
+    setQuery("");
+    setStatus("");
+    setKinship("");
+    setMissing("");
+    setPublication("");
+    setSosaOnly(false);
+    setSort("name");
+    setDesc(false);
+    setSelectedPresetId("");
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {}
+    window.history.replaceState(null, "", window.location.pathname);
+  };
+
+  const applyPreset = (preset: SavedView) => {
+    setSelectedPresetId(preset.id);
+    setQuery(preset.filters.query ?? "");
+    setStatus(preset.filters.status ?? "");
+    setSosaOnly(Boolean(preset.filters.sosaOnly));
+    setKinship(preset.filters.kinship ?? "");
+    setMissing(preset.filters.missing ?? "");
+    setPublication(preset.filters.publication ?? "");
+    setSort(preset.filters.sort ?? "name");
+    setDesc(Boolean(preset.filters.desc));
+    if (preset.filters.kinship || preset.filters.missing || preset.filters.publication) {
+      setMoreFilters(true);
+    }
+  };
+
+  const handleSaveView = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const name = newViewName.trim();
+    if (!name) return;
+
+    const newView: SavedView = {
+      id: `custom_${Date.now()}`,
+      name,
+      isSystem: false,
+      filters: {
+        query,
+        status,
+        sosaOnly,
+        kinship,
+        missing,
+        publication,
+        sort,
+        desc,
+        moreFilters,
+      },
+    };
+
+    const updated = [...customPresets.filter((p) => p.name !== name), newView];
+    setCustomPresets(updated);
+    setSelectedPresetId(newView.id);
+    setNewViewName("");
+    setIsSavingView(false);
+
+    try {
+      localStorage.setItem(presetsStorageKey, JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleDeleteView = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = customPresets.filter((p) => p.id !== id);
+    setCustomPresets(updated);
+    if (selectedPresetId === id) setSelectedPresetId("");
+    try {
+      localStorage.setItem(presetsStorageKey, JSON.stringify(updated));
+    } catch {}
+  };
+
+  const hasActiveFilters = Boolean(
+    query.trim() || status || kinship || missing || publication || sosaOnly,
+  );
 
   const filtered = useMemo(() => {
     const q = norm(query.trim());
     const result = people.filter((p) => {
+      if (sosaOnly && !p.sosa) return false;
       if (status && p.status !== status) return false;
       if (kinship && (p.kinship ?? "") !== kinship) return false;
       if (missing && !p.missing.includes(missing)) return false;
       if (publication && p.publication !== publication) return false;
       if (!q) return true;
       return norm(
-        [p.name, p.place, p.deathPlace, p.occupation, p.spouse].filter(Boolean).join(" "),
+        [p.name, p.place, p.deathPlace, p.occupation, p.spouse, p.sosa ? `sosa ${p.sosa}` : ""].filter(Boolean).join(" "),
       ).includes(q);
     });
 
@@ -94,7 +389,7 @@ export function PersonGrid({
       const vb = value(b);
       return va === vb ? a.name.localeCompare(b.name, "fr") : dir * (va - vb);
     });
-  }, [people, query, status, kinship, missing, publication, sort, desc]);
+  }, [people, query, status, kinship, missing, publication, sosaOnly, sort, desc]);
 
   const exportCsv = () => {
     const header = [
@@ -112,7 +407,7 @@ export function PersonGrid({
         .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
         .join(","),
     );
-    const blob = new Blob(["﻿" + [header.join(","), ...lines].join("\n")], {
+    const blob = new Blob(["\ufeff" + [header.join(","), ...lines].join("\n")], {
       type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
@@ -123,15 +418,38 @@ export function PersonGrid({
     URL.revokeObjectURL(url);
   };
 
+  // Pre-calculated counts for quick tabs
+  const enRechercheCount = useMemo(() => people.filter((p) => p.status === "En recherche").length, [people]);
+  const completsCount = useMemo(() => people.filter((p) => p.status === "Complet").length, [people]);
+  const bloquésCount = useMemo(() => people.filter((p) => p.status === "Bloqué").length, [people]);
+  const sosaCount = useMemo(() => people.filter((p) => !!p.sosa).length, [people]);
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Barre supérieure : Recherche, filtres principaux et sélecteur de vue */}
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          className="field max-w-72 flex-1"
-          placeholder="Rechercher…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="relative max-w-72 flex-1">
+          <input
+            className="field w-full pl-8 pr-7"
+            placeholder="Rechercher (nom, lieu, métier, sosa)…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-fg-subtle">
+            🔍
+          </span>
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-1 text-xs text-fg-subtle transition-colors hover:text-fg"
+              title="Effacer la recherche"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
         <select className="field w-auto" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">Tous les statuts</option>
           {STATUSES.map((s) => (
@@ -140,6 +458,7 @@ export function PersonGrid({
             </option>
           ))}
         </select>
+
         <select
           className="field w-auto"
           value={sort}
@@ -155,39 +474,161 @@ export function PersonGrid({
             </option>
           ))}
         </select>
+
         <button
           type="button"
           onClick={() => setDesc((d) => !d)}
-          className="rounded-lg px-1.5 py-1 text-xs text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
-          title={desc ? "Ordre décroissant" : "Ordre croissant"}
+          className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+          title={desc ? "Ordre décroissant (cliquer pour inverser)" : "Ordre croissant (cliquer pour inverser)"}
         >
-          {desc ? "↓" : "↑"}
+          {desc ? "↓ Décroissant" : "↑ Croissant"}
         </button>
+
         <button
           type="button"
           onClick={() => setMoreFilters((v) => !v)}
-          className="text-xs text-fg-subtle underline-offset-4 transition-colors hover:text-fg hover:underline"
+          className="rounded-lg border border-border/80 px-2.5 py-1.5 text-xs text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
         >
-          {moreFilters ? "moins de filtres" : "plus de filtres"}
+          {moreFilters ? "Moins de filtres ▲" : "Plus de filtres ▼"}
         </button>
-        <span className="num text-xs text-fg-subtle">
+
+        {/* Sélecteur de vues / préréglages */}
+        <select
+          className="field w-auto text-xs font-medium"
+          value={selectedPresetId}
+          onChange={(e) => {
+            const id = e.target.value;
+            if (!id) {
+              setSelectedPresetId("");
+              return;
+            }
+            const allPresets = [...SYSTEM_PRESETS, ...customPresets];
+            const found = allPresets.find((p) => p.id === id);
+            if (found) applyPreset(found);
+          }}
+        >
+          <option value="">📁 Vues enregistrées…</option>
+          <optgroup label="Recommandées">
+            {SYSTEM_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </optgroup>
+          {customPresets.length > 0 && (
+            <optgroup label="Mes vues enregistrées">
+              {customPresets.map((p) => (
+                <option key={p.id} value={p.id}>
+                  📌 {p.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+
+        <span className="num ml-1 text-xs text-fg-subtle">
           {filtered.length} / {people.length}
         </span>
-        <Link
-          href={`/p/${slug}/personnes?vue=kanban`}
-          className={buttonClass("ghost", "ml-auto")}
-        >
-          Vue kanban
-        </Link>
-        <Link href={`/p/${slug}/personnes/nouvelle`} className={buttonClass("primary")}>
-          Nouvelle carte
-        </Link>
+
+        <div className="ml-auto flex items-center gap-3">
+          <div className="inline-flex items-center rounded-xl border border-border bg-surface-2 p-0.5 text-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface px-3 py-1.5 font-medium text-fg shadow-xs">
+              <span>⊞</span> Grille
+            </span>
+            <Link
+              href={`/p/${slug}/personnes?vue=kanban`}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-fg-muted transition-colors hover:text-fg"
+            >
+              <span>▥</span> Tableau
+            </Link>
+          </div>
+          <Link href={`/p/${slug}/personnes/nouvelle`} className={buttonClass("primary")}>
+            + Nouvelle carte
+          </Link>
+        </div>
       </div>
 
+      {/* Onglets rapides de filtrage */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-border/60 pb-2 text-xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatus("");
+            setSosaOnly(false);
+          }}
+          className={`rounded-lg px-2.5 py-1 transition-colors ${
+            !status && !sosaOnly
+              ? "bg-surface-3 font-medium text-fg"
+              : "text-fg-muted hover:bg-surface-2 hover:text-fg"
+          }`}
+        >
+          Toutes ({people.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStatus("En recherche");
+            setSosaOnly(false);
+          }}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition-colors ${
+            status === "En recherche" && !sosaOnly
+              ? "bg-surface-3 font-medium text-fg"
+              : "text-fg-muted hover:bg-surface-2 hover:text-fg"
+          }`}
+        >
+          <span className="size-1.5 rounded-full bg-accent" />
+          En recherche ({enRechercheCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStatus("Complet");
+            setSosaOnly(false);
+          }}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition-colors ${
+            status === "Complet" && !sosaOnly
+              ? "bg-surface-3 font-medium text-fg"
+              : "text-fg-muted hover:bg-surface-2 hover:text-fg"
+          }`}
+        >
+          <span className="size-1.5 rounded-full bg-ok" />
+          Complets ({completsCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStatus("Bloqué");
+            setSosaOnly(false);
+          }}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition-colors ${
+            status === "Bloqué" && !sosaOnly
+              ? "bg-surface-3 font-medium text-fg"
+              : "text-fg-muted hover:bg-surface-2 hover:text-fg"
+          }`}
+        >
+          <span className="size-1.5 rounded-full bg-warn" />
+          Bloqués ({bloquésCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSosaOnly((s) => !s);
+          }}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition-colors ${
+            sosaOnly
+              ? "bg-fg font-medium text-accent-fg"
+              : "text-fg-muted hover:bg-surface-2 hover:text-fg"
+          }`}
+        >
+          <span>⭐ SOSA uniquement ({sosaCount})</span>
+        </button>
+      </div>
+
+      {/* Filtres avancés dépliables */}
       {moreFilters && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-2/60 p-3">
           <select
-            className="field w-auto"
+            className="field w-auto bg-surface"
             value={kinship}
             onChange={(e) => setKinship(e.target.value)}
           >
@@ -199,7 +640,7 @@ export function PersonGrid({
             ))}
           </select>
           <select
-            className="field w-auto"
+            className="field w-auto bg-surface"
             value={publication}
             onChange={(e) => setPublication(e.target.value)}
           >
@@ -211,7 +652,7 @@ export function PersonGrid({
             ))}
           </select>
           <select
-            className="field w-auto"
+            className="field w-auto bg-surface"
             value={missing}
             onChange={(e) => setMissing(e.target.value)}
           >
@@ -222,18 +663,186 @@ export function PersonGrid({
               </option>
             ))}
           </select>
-          <button type="button" onClick={exportCsv} className={buttonClass("ghost", "text-xs")}>
-            Exporter la sélection en CSV
+          <button type="button" onClick={exportCsv} className={buttonClass("ghost", "text-xs ml-auto")}>
+            Exporter la sélection en CSV (↓)
           </button>
         </div>
       )}
 
+      {/* Badges de filtres actifs & Actions de sauvegarde */}
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/70 bg-surface-2/40 px-3 py-2 text-xs">
+          <span className="text-fg-subtle">Filtres actifs :</span>
+          {query && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 text-fg">
+              « {query} »
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="text-fg-subtle hover:text-fg"
+                title="Supprimer ce filtre"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          {status && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 text-fg">
+              Statut : {status}
+              <button
+                type="button"
+                onClick={() => setStatus("")}
+                className="text-fg-subtle hover:text-fg"
+                title="Supprimer ce filtre"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          {sosaOnly && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 text-fg">
+              SOSA uniquement
+              <button
+                type="button"
+                onClick={() => setSosaOnly(false)}
+                className="text-fg-subtle hover:text-fg"
+                title="Supprimer ce filtre"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          {kinship && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 text-fg">
+              Lien : {kinship}
+              <button
+                type="button"
+                onClick={() => setKinship("")}
+                className="text-fg-subtle hover:text-fg"
+                title="Supprimer ce filtre"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          {publication && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 text-fg">
+              Publication : {publication}
+              <button
+                type="button"
+                onClick={() => setPublication("")}
+                className="text-fg-subtle hover:text-fg"
+                title="Supprimer ce filtre"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          {missing && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 text-fg">
+              Sans {missing.toLowerCase()}
+              <button
+                type="button"
+                onClick={() => setMissing("")}
+                className="text-fg-subtle hover:text-fg"
+                title="Supprimer ce filtre"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+
+          {/* Indicateur de mémorisation automatique */}
+          <span
+            className="inline-flex items-center gap-1 rounded-md border border-ok/30 bg-ok-soft/60 px-2 py-0.5 text-[11px] font-medium text-ok"
+            title="Vos filtres restent actifs automatiquement même en quittant la page ou en visitant une fiche."
+          >
+            <span>✓</span> Mémorisés
+          </span>
+
+          <button
+            type="button"
+            onClick={resetAllFilters}
+            className="ml-1 text-fg-subtle underline underline-offset-2 transition-colors hover:text-fg"
+          >
+            Tout effacer
+          </button>
+
+          {/* Enregistrer la sélection en vue personnalisée */}
+          <div className="ml-auto flex items-center gap-2">
+            {!isSavingView ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSavingView(true);
+                  setNewViewName("");
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg shadow-xs"
+                title="Enregistrer ces filtres pour les retrouver dans la liste des vues"
+              >
+                <span>💾</span> Enregistrer cette vue…
+              </button>
+            ) : (
+              <form onSubmit={handleSaveView} className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={newViewName}
+                  onChange={(e) => setNewViewName(e.target.value)}
+                  placeholder="Nom de la vue…"
+                  className="field h-6 w-36 px-2 text-xs py-0 bg-surface"
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={!newViewName.trim()}
+                  className="rounded bg-fg px-2 py-0.5 text-xs font-medium text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  Sauvegarder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSavingView(false)}
+                  className="rounded px-1.5 py-0.5 text-xs text-fg-subtle hover:text-fg"
+                >
+                  ✕
+                </button>
+              </form>
+            )}
+
+            {selectedPresetId && customPresets.some((p) => p.id === selectedPresetId) && (
+              <button
+                type="button"
+                onClick={(e) => handleDeleteView(selectedPresetId, e)}
+                className="inline-flex items-center gap-1 rounded-lg border border-danger/30 bg-surface px-2 py-1 text-xs text-danger transition-colors hover:bg-danger/10"
+                title="Supprimer définitivement cette vue personnalisée"
+              >
+                <span>🗑️</span> Supprimer
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Grille ou état vide */}
       {filtered.length === 0 ? (
-        <p className="py-16 text-center text-sm text-fg-muted">
-          Aucune carte ne correspond à ces filtres.
-        </p>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
+          <span className="text-3xl">🔍</span>
+          <h3 className="mt-3 font-medium text-fg">Aucune carte trouvée</h3>
+          <p className="mt-1 text-sm text-fg-muted">
+            Aucune personne ne correspond aux critères sélectionnés.
+          </p>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className={`mt-4 ${buttonClass()}`}
+            >
+              Réinitialiser tous les filtres
+            </button>
+          )}
+        </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((person) => (
             <PersonCard key={person.id} slug={slug} person={person} />
           ))}

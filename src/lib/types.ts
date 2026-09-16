@@ -52,11 +52,19 @@ export type PersonRow = {
   birth_year_estimated: number;
   birth_place: string | null;
   birth_source: string | null;
+  /** 1 si l'acte de naissance est ignoré (ex: introuvable, inaccessible, lacune) */
+  birth_source_ignored: number;
   death_date_raw: string | null;
   death_date_iso: string | null;
   death_year: number | null;
   death_place: string | null;
   death_source: string | null;
+  /** 1 si l'acte de décès est ignoré (ex: introuvable, inaccessible, lacune) */
+  death_source_ignored: number;
+  /** 1 si la personne est vivante (dispense des actes et dates de décès) */
+  is_living: number;
+  /** 1 si la personne est célibataire / sans union (dispense des actes et dates de mariage) */
+  is_unmarried: number;
   proximity_year: number | null;
   /** Date du report sur Geneanet ; renseignée, la carte est archivée. */
   geneanet_at: string | null;
@@ -76,6 +84,8 @@ export type UnionRow = {
   year: number | null;
   place: string | null;
   source: string | null;
+  /** 1 si l'acte de mariage est ignoré (ex: introuvable, inaccessible, lacune) */
+  source_ignored: number;
   notes: string | null;
   created_at: string;
 };

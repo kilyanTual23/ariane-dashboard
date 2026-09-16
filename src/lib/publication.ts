@@ -10,11 +10,11 @@ export type Publication = "en cours" | "à mettre sur Geneanet" | "archivée";
 export const PUBLICATIONS: Publication[] = ["en cours", "à mettre sur Geneanet", "archivée"];
 
 export function publicationOf(person: {
-  status: Status;
+  status: Status | string;
   geneanet_at: string | null;
 }): Publication {
   if (person.geneanet_at) return "archivée";
-  if (person.status === "Complet" || person.status === "Bloqué") return "à mettre sur Geneanet";
+  if (person.status === "Complet") return "à mettre sur Geneanet";
   return "en cours";
 }
 

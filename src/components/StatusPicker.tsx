@@ -62,7 +62,7 @@ export function StatusPicker({
           pending ? "opacity-50" : ""
         }`}
       >
-        <span className={`size-2 rounded-full ${STATUS_DOT[status]}`} />
+        <span className={`size-2 rounded-full ${STATUS_DOT[status] ?? "bg-neutral"}`} />
         {status}
         <span className="text-[10px] text-fg-subtle">▾</span>
       </button>

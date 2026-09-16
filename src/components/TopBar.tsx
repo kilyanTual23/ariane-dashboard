@@ -28,7 +28,7 @@ export function TopBar({
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-5 py-2.5 sm:px-8">
+      <div className="mx-auto flex w-full max-w-[1750px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-8">
         <Link
           href="/"
           className="inline-flex shrink-0 items-center gap-2 text-[13px] font-medium tracking-tight transition-opacity hover:opacity-60"

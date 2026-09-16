@@ -131,10 +131,38 @@ export async function setPersonField(input: {
       break;
     }
     case "occupation":
-    case "birth_source":
-    case "death_source":
     case "notes": {
       patch[field] = value || null;
+      break;
+    }
+    case "birth_source": {
+      patch.birth_source = value || null;
+      if (value && (value.startsWith("http") || value.startsWith("www"))) {
+        patch.birth_source_ignored = 0;
+      }
+      break;
+    }
+    case "death_source": {
+      patch.death_source = value || null;
+      if (value && (value.startsWith("http") || value.startsWith("www"))) {
+        patch.death_source_ignored = 0;
+      }
+      break;
+    }
+    case "birth_source_ignored": {
+      patch.birth_source_ignored = value === "1" || value === "true" ? 1 : 0;
+      break;
+    }
+    case "death_source_ignored": {
+      patch.death_source_ignored = value === "1" || value === "true" ? 1 : 0;
+      break;
+    }
+    case "is_living": {
+      patch.is_living = value === "1" || value === "true" ? 1 : 0;
+      break;
+    }
+    case "is_unmarried": {
+      patch.is_unmarried = value === "1" || value === "true" ? 1 : 0;
       break;
     }
     case "proximity_year": {
@@ -159,7 +187,7 @@ export async function setPersonField(input: {
 export async function setUnionField(input: {
   slug: string;
   unionId: number;
-  field: "date_raw" | "place" | "source";
+  field: "date_raw" | "place" | "source" | "source_ignored";
   value: string;
 }) {
   const value = input.value.trim();
@@ -168,8 +196,14 @@ export async function setUnionField(input: {
     q.updateUnion(input.unionId, { date_raw: d.canonical, date_iso: d.iso, year: d.year });
   } else if (input.field === "place") {
     q.updateUnion(input.unionId, { place: normalizePlace(value) });
+  } else if (input.field === "source_ignored") {
+    q.updateUnion(input.unionId, { source_ignored: value === "1" || value === "true" ? 1 : 0 });
   } else {
-    q.updateUnion(input.unionId, { source: value || null });
+    const patch: q.UnionInput = { source: value || null };
+    if (value && (value.startsWith("http") || value.startsWith("www"))) {
+      patch.source_ignored = 0;
+    }
+    q.updateUnion(input.unionId, patch);
   }
   refreshProfile(input.slug);
 }
@@ -191,6 +225,177 @@ export async function quickCreatePersonAction(fd: FormData) {
   });
   refreshProfile(slug);
   redirect(`/p/${slug}/personnes/${id}`);
+}
+
+/**
+ * Création intelligente depuis une phrase en langage naturel :
+ * Extrait la personne principale, ses dates, lieux, son métier, ainsi que
+ * son conjoint, son mariage et ses parents s'ils sont mentionnés.
+ */
+export async function smartCreatePersonAction(fd: FormData) {
+  const slug = str(fd, "slug");
+  const profileId = num(fd, "profileId");
+  const text = str(fd, "text");
+  if (!slug || !profileId || !text) return;
+
+  const { parseGenealogyText } = await import("@/lib/nlp-genealogy");
+  const parsed = parseGenealogyText(text);
+
+  const bDate = parseDateInput(parsed.primary.birthDateRaw);
+  const dDate = parseDateInput(parsed.primary.deathDateRaw);
+
+  const primaryBirthPlace = normalizePlace(str(fd, "primary_birth_place") ?? parsed.primary.birthPlace);
+  const primaryDeathPlace = normalizePlace(str(fd, "primary_death_place") ?? parsed.primary.deathPlace);
+
+  const isLivingInput = num(fd, "primary_is_living");
+  const isLiving = isLivingInput !== null
+    ? isLivingInput
+    : (parsed.primary.deathDateRaw || parsed.primary.deathPlace ? 0 : (bDate.year && bDate.year >= 1925 ? 1 : 0));
+
+  const isUnmarriedInput = num(fd, "primary_is_unmarried");
+  const isUnmarried = isUnmarriedInput !== null
+    ? isUnmarriedInput
+    : (parsed.spouse || parsed.marriage ? 0 : 0);
+
+  const primaryId = q.createPerson(profileId, {
+    given_names: parsed.primary.givenNames || parsed.primary.fullName,
+    surname: parsed.primary.surname || "",
+    sex: parsed.primary.sex,
+    status: "En recherche",
+    occupation: parsed.primary.occupation,
+    is_living: isLiving,
+    is_unmarried: isUnmarried,
+    birth_date_raw: bDate.canonical ?? parsed.primary.birthDateRaw,
+    birth_date_iso: bDate.iso,
+    birth_year: bDate.year ?? parsed.primary.birthYear,
+    birth_place: primaryBirthPlace,
+    death_date_raw: dDate.canonical ?? parsed.primary.deathDateRaw,
+    death_date_iso: dDate.iso,
+    death_year: dDate.year ?? parsed.primary.deathYear,
+    death_place: primaryDeathPlace,
+  });
+
+  // 2. Conjoint et Union si présents
+  if (parsed.spouse && (parsed.spouse.givenNames || parsed.spouse.surname)) {
+    const sBDate = parseDateInput(parsed.spouse.birthDateRaw);
+    const spouseBirthPlace = normalizePlace(str(fd, "spouse_birth_place") ?? parsed.spouse.birthPlace);
+    const sIsLivingInput = num(fd, "spouse_is_living");
+    const sIsLiving = sIsLivingInput !== null
+      ? sIsLivingInput
+      : (sBDate.year && sBDate.year >= 1925 ? 1 : 0);
+
+    const spouseId = q.createPerson(profileId, {
+      given_names: parsed.spouse.givenNames || parsed.spouse.fullName,
+      surname: parsed.spouse.surname || "",
+      sex: parsed.spouse.sex,
+      status: "En recherche",
+      is_living: sIsLiving,
+      is_unmarried: 0,
+      birth_date_raw: sBDate.canonical ?? parsed.spouse.birthDateRaw,
+      birth_date_iso: sBDate.iso,
+      birth_year: sBDate.year ?? parsed.spouse.birthYear,
+      birth_place: spouseBirthPlace,
+    });
+
+    const mDate = parseDateInput(parsed.marriage?.dateRaw);
+    const marriagePlace = normalizePlace(str(fd, "marriage_place") ?? parsed.marriage?.place);
+
+    q.createUnion(profileId, {
+      partner1_id: primaryId,
+      partner2_id: spouseId,
+      date_raw: mDate.canonical ?? parsed.marriage?.dateRaw ?? null,
+      date_iso: mDate.iso,
+      year: mDate.year ?? parsed.marriage?.year ?? null,
+      place: marriagePlace,
+    });
+  }
+
+  // 3. Parents si mentionnés
+  if (parsed.parents?.father && (parsed.parents.father.givenNames || parsed.parents.father.surname)) {
+    const fatherId = q.createPerson(profileId, {
+      given_names: parsed.parents.father.givenNames || parsed.parents.father.fullName,
+      surname: parsed.parents.father.surname || "",
+      sex: "M",
+      status: "En recherche",
+    });
+    q.addParent(fatherId, primaryId);
+  }
+
+  if (parsed.parents?.mother && (parsed.parents.mother.givenNames || parsed.parents.mother.surname)) {
+    const motherId = q.createPerson(profileId, {
+      given_names: parsed.parents.mother.givenNames || parsed.parents.mother.fullName,
+      surname: parsed.parents.mother.surname || "",
+      sex: "F",
+      status: "En recherche",
+    });
+    q.addParent(motherId, primaryId);
+  }
+
+  q.recomputeSosa(profileId);
+  refreshProfile(slug);
+  redirect(`/p/${slug}/personnes/${primaryId}`);
+}
+
+export async function toggleLivingAction(fd: FormData) {
+  const slug = str(fd, "slug");
+  const personId = num(fd, "personId");
+  const isLiving = num(fd, "isLiving") ?? 0;
+  if (!slug || !personId) return;
+  q.updatePerson(personId, { is_living: isLiving });
+  refreshProfile(slug);
+}
+
+export async function toggleUnmarriedAction(fd: FormData) {
+  const slug = str(fd, "slug");
+  const personId = num(fd, "personId");
+  const isUnmarried = num(fd, "isUnmarried") ?? 0;
+  if (!slug || !personId) return;
+  q.updatePerson(personId, { is_unmarried: isUnmarried });
+  refreshProfile(slug);
+}
+
+/**
+ * Ignorer ou rétablir l'exigence d'un acte (naissance, mariage, décès).
+ * Permet de marquer un acte comme introuvable, inaccessible ou lacunaire
+ * sans bloquer la complétion à 100% de la fiche.
+ */
+export async function toggleActIgnoredAction(fd: FormData) {
+  const slug = str(fd, "slug");
+  const personId = num(fd, "personId");
+  const unionId = num(fd, "unionId");
+  const actKind = str(fd, "actKind"); // "birth" | "death" | "marriage"
+  const ignored = num(fd, "ignored") ?? 1;
+  const reason = str(fd, "reason");
+
+  if (!slug) return;
+
+  if (actKind === "birth" && personId) {
+    const patch: q.PersonInput = { birth_source_ignored: ignored };
+    if (ignored && reason) {
+      patch.birth_source = reason;
+    } else if (!ignored && (reason === "clear" || !reason)) {
+      patch.birth_source = null;
+    }
+    q.updatePerson(personId, patch);
+  } else if (actKind === "death" && personId) {
+    const patch: q.PersonInput = { death_source_ignored: ignored };
+    if (ignored && reason) {
+      patch.death_source = reason;
+    } else if (!ignored && (reason === "clear" || !reason)) {
+      patch.death_source = null;
+    }
+    q.updatePerson(personId, patch);
+  } else if (actKind === "marriage" && unionId) {
+    const patch: q.UnionInput = { source_ignored: ignored };
+    if (ignored && reason) {
+      patch.source = reason;
+    } else if (!ignored && (reason === "clear" || !reason)) {
+      patch.source = null;
+    }
+    q.updateUnion(unionId, patch);
+  }
+
+  refreshProfile(slug);
 }
 
 export async function deletePersonAction(fd: FormData) {

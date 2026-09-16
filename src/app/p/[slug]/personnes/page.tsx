@@ -12,7 +12,17 @@ export default async function PersonsPage({
   searchParams,
 }: PageProps<"/p/[slug]/personnes">) {
   const { slug } = await params;
-  const { statut, publication, vue } = await searchParams;
+  const sp = await searchParams;
+  const statut = typeof sp.statut === "string" ? sp.statut : undefined;
+  const publication = typeof sp.publication === "string" ? sp.publication : undefined;
+  const vue = typeof sp.vue === "string" ? sp.vue : undefined;
+  const q = typeof sp.q === "string" ? sp.q : undefined;
+  const sosa = sp.sosa === "1" || sp.sosa === "true";
+  const lien = typeof sp.lien === "string" ? sp.lien : undefined;
+  const manquant = typeof sp.manquant === "string" ? sp.manquant : undefined;
+  const tri = typeof sp.tri === "string" ? sp.tri : undefined;
+  const ordre = typeof sp.ordre === "string" ? sp.ordre : undefined;
+
   const profile = getProfileBySlug(slug);
   if (!profile) notFound();
 
@@ -37,6 +47,8 @@ export default async function PersonsPage({
     publication: publicationOf(p),
     spouse: p.unions[0]?.spouse?.displayName ?? null,
     marriageYear: p.unions[0]?.year ?? null,
+    isLiving: Boolean(p.is_living),
+    isUnmarried: Boolean(p.is_unmarried),
   }));
 
   const complete = people.filter((p) => p.score === p.total).length;
@@ -60,8 +72,14 @@ export default async function PersonsPage({
         <PersonGrid
           slug={slug}
           people={people}
-          initialStatus={typeof statut === "string" ? statut : undefined}
-          initialPublication={typeof publication === "string" ? publication : undefined}
+          initialQuery={q}
+          initialStatus={statut}
+          initialSosaOnly={sosa}
+          initialKinship={lien}
+          initialMissing={manquant}
+          initialPublication={publication}
+          initialSort={tri as any}
+          initialDesc={ordre === "desc"}
         />
       )}
     </div>

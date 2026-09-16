@@ -26,6 +26,11 @@ function create(): Database.Database {
 function ensureColumns(db: Database.Database) {
   const additions: [table: string, column: string, type: string][] = [
     ["persons", "geneanet_at", "TEXT"],
+    ["persons", "is_living", "INTEGER NOT NULL DEFAULT 0"],
+    ["persons", "is_unmarried", "INTEGER NOT NULL DEFAULT 0"],
+    ["persons", "birth_source_ignored", "INTEGER NOT NULL DEFAULT 0"],
+    ["persons", "death_source_ignored", "INTEGER NOT NULL DEFAULT 0"],
+    ["unions", "source_ignored", "INTEGER NOT NULL DEFAULT 0"],
   ];
   for (const [table, column, type] of additions) {
     const columns = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(

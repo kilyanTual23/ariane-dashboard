@@ -120,7 +120,7 @@ export default async function StatsPage({ params }: PageProps<"/p/[slug]/statist
             items={stats.byStatus.map((s) => ({
               label: s.status,
               value: s.count,
-              tone: STATUS_DOT[s.status],
+              tone: STATUS_DOT[s.status] ?? "bg-neutral",
               title: `${s.count} personne(s) — ${s.status}`,
             }))}
           />

@@ -184,11 +184,15 @@ export type PersonInput = Partial<
     | "birth_year_estimated"
     | "birth_place"
     | "birth_source"
+    | "birth_source_ignored"
     | "death_date_raw"
     | "death_date_iso"
     | "death_year"
     | "death_place"
     | "death_source"
+    | "death_source_ignored"
+    | "is_living"
+    | "is_unmarried"
     | "proximity_year"
     | "geneanet_at"
     | "notes"
@@ -210,11 +214,15 @@ const PERSON_FIELDS: (keyof PersonInput)[] = [
   "birth_year_estimated",
   "birth_place",
   "birth_source",
+  "birth_source_ignored",
   "death_date_raw",
   "death_date_iso",
   "death_year",
   "death_place",
   "death_source",
+  "death_source_ignored",
+  "is_living",
+  "is_unmarried",
   "proximity_year",
   "geneanet_at",
   "notes",
@@ -288,15 +296,23 @@ export function removeParent(parentId: number, childId: number) {
 export type UnionInput = Partial<
   Pick<
     UnionRow,
-    "partner1_id" | "partner2_id" | "date_raw" | "date_iso" | "year" | "place" | "source" | "notes"
+    | "partner1_id"
+    | "partner2_id"
+    | "date_raw"
+    | "date_iso"
+    | "year"
+    | "place"
+    | "source"
+    | "source_ignored"
+    | "notes"
   >
 >;
 
 export function createUnion(profileId: number, input: UnionInput): number {
   const info = db
     .prepare(
-      `INSERT INTO unions (profile_id, partner1_id, partner2_id, date_raw, date_iso, year, place, source, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO unions (profile_id, partner1_id, partner2_id, date_raw, date_iso, year, place, source, source_ignored, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       profileId,
@@ -307,6 +323,7 @@ export function createUnion(profileId: number, input: UnionInput): number {
       input.year ?? null,
       input.place ?? null,
       input.source ?? null,
+      input.source_ignored ?? 0,
       input.notes ?? null,
     );
   return Number(info.lastInsertRowid);

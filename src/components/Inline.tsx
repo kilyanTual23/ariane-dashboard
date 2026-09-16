@@ -98,9 +98,9 @@ export function Inline({
   const parsed = variant === "date" ? parseDateInput(draft) : null;
 
   const localMatches: Suggestion[] =
-    variant === "place" && draft.trim().length >= 2
+    variant === "place"
       ? (places ?? [])
-          .filter((p) => p.toLowerCase().includes(draft.trim().toLowerCase()))
+          .filter((p) => !draft.trim() || p.toLowerCase().includes(draft.trim().toLowerCase()))
           .slice(0, 5)
           .map((p) => ({ value: p, hint: "déjà utilisé" }))
       : [];
@@ -178,7 +178,7 @@ export function Inline({
 
     return (
       <span
-        className={`relative block w-full align-top ${fill ? "" : "max-w-md"} ${className}`}
+        className={`relative ${variant === "place" ? "z-30" : ""} block w-full align-top ${fill ? "" : "max-w-md"} ${className}`}
       >
         <input {...shared} className="field" />
 
@@ -195,7 +195,7 @@ export function Inline({
         )}
 
         {variant === "place" && suggestions.length > 0 && (
-          <ul className="absolute left-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl border border-border bg-surface p-1 shadow-pop">
+          <ul className="absolute left-0 top-full z-50 mt-1 max-h-60 w-full min-w-72 overflow-y-auto rounded-2xl border border-border bg-surface p-1 shadow-pop">
             {suggestions.map((s, i) => (
               <li key={`${s.value}-${i}`}>
                 <button

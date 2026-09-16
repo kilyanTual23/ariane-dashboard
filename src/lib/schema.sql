@@ -28,12 +28,16 @@ CREATE TABLE IF NOT EXISTS persons (
   birth_year_estimated INTEGER NOT NULL DEFAULT 0,
   birth_place     TEXT,
   birth_source    TEXT,
+  birth_source_ignored INTEGER NOT NULL DEFAULT 0,
 
   death_date_raw  TEXT,
   death_date_iso  TEXT,
   death_year      INTEGER,
   death_place     TEXT,
   death_source    TEXT,
+  death_source_ignored INTEGER NOT NULL DEFAULT 0,
+  is_living       INTEGER NOT NULL DEFAULT 0,
+  is_unmarried    INTEGER NOT NULL DEFAULT 0,
 
   proximity_year  INTEGER,           -- année qui situe la personne (aide à la recherche)
   geneanet_at     TEXT,              -- date du report sur Geneanet : la carte est archivée
@@ -56,6 +60,7 @@ CREATE TABLE IF NOT EXISTS unions (
   year         INTEGER,
   place        TEXT,
   source       TEXT,
+  source_ignored INTEGER NOT NULL DEFAULT 0,
   notes        TEXT,
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
