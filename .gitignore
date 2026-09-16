@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Base de données locale : seuls les fichiers temporaires de SQLite sont ignorés,
+# ariane.db reste versionnable si tu veux en garder un historique.
+/data/*.db-wal
+/data/*.db-shm

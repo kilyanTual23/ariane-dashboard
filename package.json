@@ -6,21 +6,30 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "import": "tsx scripts/import-notion.ts",
+    "verify": "tsx scripts/verify-import.ts",
+    "migrate:status": "tsx scripts/migrate-status.ts",
+    "audit": "tsx scripts/audit-import.ts",
+    "geneanet": "tsx scripts/match-geneanet.ts"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "csv-parse": "^7.0.2",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }
