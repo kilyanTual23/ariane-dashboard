@@ -1,10 +1,61 @@
 import type { Person } from "./types";
 import { STATUSES } from "./types";
 
-/** « Billé, Bretagne, France » → « Billé ». */
+const KNOWN_REGIONS_COUNTRIES = new Set([
+  "france", "belgique", "suisse", "canada", "bretagne", "normandie", "pays de la loire",
+  "nouvelle-aquitaine", "occitanie", "auvergne-rhône-alpes", "île-de-france", "ile-de-france",
+  "grand est", "hauts-de-france", "bourgogne-franche-comté", "centre-val de loire",
+  "provence-alpes-côte d'azur", "corse"
+]);
+
+/** « Billé, Bretagne, France » → « Billé » ; « Lieu-dit..., 35133 Billé, France » → « Billé ». */
 export function commune(place?: string | null): string | null {
-  const first = (place ?? "").split(",")[0]?.trim();
-  return first || null;
+  if (!place) return null;
+  const clean = place.trim();
+  if (!clean) return null;
+
+  // 1. Arrondissements parisiens / lyonnais / marseillais
+  if (/arrondissement/i.test(clean)) {
+    if (/paris/i.test(clean) || /75\d{3}/.test(clean)) return "Paris";
+    if (/lyon/i.test(clean) || /69\d{3}/.test(clean)) return "Lyon";
+    if (/marseille/i.test(clean) || /13\d{3}/.test(clean)) return "Marseille";
+    return "Paris";
+  }
+
+  // 2. Présence d'un code postal suivi du nom de ville (ex: '35133 Billé', '76600 Le Havre')
+  const cpCityMatch = clean.match(/\b\d{5}\s+([A-Za-zÀ-ÖØ-öø-ÿ\s'-]+?)(?:,|$)/);
+  if (cpCityMatch && cpCityMatch[1].trim()) {
+    return cpCityMatch[1].trim();
+  }
+
+  const parts = clean.split(",").map((s) => s.trim()).filter(Boolean);
+  if (parts.length === 1) {
+    return parts[0].replace(/^\d{5}\s+/, "").trim();
+  }
+
+  // Si le premier élément ressemble à une adresse ou un lieu-dit spécifique
+  const first = parts[0];
+  const isAddressOrLieuDit =
+    /^(?:lieu-dit|rue|boulevard|bd|avenue|av\.|chemin|allée|impasse|route|place|hameau|manoir|château)\b/i.test(first) ||
+    /^\d+\s+/i.test(first);
+
+  if (isAddressOrLieuDit && parts.length > 1) {
+    const second = parts[1].replace(/^\d{5}\s+/, "").trim();
+    if (second && !KNOWN_REGIONS_COUNTRIES.has(second.toLowerCase())) {
+      return second;
+    }
+  }
+
+  // Si format 'Lieu-dit, Commune, Région, France' (ex: 'La Haute Cosvinière, Billé, Bretagne, France')
+  if (parts.length >= 3) {
+    const p1 = parts[1].toLowerCase();
+    const p2 = parts[2].toLowerCase();
+    if (KNOWN_REGIONS_COUNTRIES.has(p2) && !KNOWN_REGIONS_COUNTRIES.has(p1)) {
+      return parts[1];
+    }
+  }
+
+  return parts[0];
 }
 
 export function generationOf(sosa?: number | null): number | null {

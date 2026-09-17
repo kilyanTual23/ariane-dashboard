@@ -202,3 +202,4 @@ export function detectAllAnomalies(persons: Person[]): Anomaly[] {
   }
   return list;
 }
+

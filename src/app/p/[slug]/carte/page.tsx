@@ -27,3 +27,4 @@ export default async function MapPage({ params }: PageProps<"/p/[slug]/carte">) 
     </div>
   );
 }
+
