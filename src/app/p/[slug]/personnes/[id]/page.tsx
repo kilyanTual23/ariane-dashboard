@@ -85,15 +85,17 @@ export default async function PersonPage({
   params,
 }: PageProps<"/p/[slug]/personnes/[id]">) {
   const { slug, id } = await params;
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const persons = listPersons(profile.id);
+  const [persons, places] = await Promise.all([
+    listPersons(profile.id),
+    listPlaces(profile.id),
+  ]);
   const person: Person | undefined = persons.find((p) => p.id === Number(id));
   if (!person) notFound();
 
-  const sources = listSources(person.id);
-  const places = listPlaces(profile.id);
+  const sources = await listSources(person.id);
   const pickable: PickerPerson[] = persons
     .filter((p) => p.id !== person.id)
     .map((p) => ({

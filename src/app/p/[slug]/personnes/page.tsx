@@ -23,10 +23,11 @@ export default async function PersonsPage({
   const tri = typeof sp.tri === "string" ? sp.tri : undefined;
   const ordre = typeof sp.ordre === "string" ? sp.ordre : undefined;
 
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const people: GridPerson[] = listPersons(profile.id).map((p) => ({
+  const rawPersons = await listPersons(profile.id);
+  const people: GridPerson[] = rawPersons.map((p) => ({
     id: p.id,
     name: p.displayName,
     given: p.given_names,

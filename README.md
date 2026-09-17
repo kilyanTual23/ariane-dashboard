@@ -4,12 +4,22 @@ Application locale pour recenser les trouvailles : plusieurs **profils de recher
 (un arbre indépendant par profil), une fiche par personne où tout se saisit sur place,
 une liste de travail et quelques chiffres.
 
-Tout vit sur ta machine : Next.js + SQLite (`data/ariane.db`).
+Base de données connectée en temps réel au cloud via **Turso (libSQL)** avec repli local SQLite : chaque action saisie dans l'application s'enregistre immédiatement dans le cloud et reste synchronisée quel que soit l'ordinateur utilisé.
 
 ## Démarrer
 
 ```bash
 npm install     # une seule fois
+```
+
+Crée un fichier `.env.local` (voir `.env.example`) avec les clés d'accès Turso :
+```env
+TURSO_DATABASE_URL=libsql://ariane-db-kilyantual23.aws-eu-west-1.turso.io
+TURSO_AUTH_TOKEN=ton_token_turso
+```
+
+Puis lance le serveur :
+```bash
 npm run dev     # http://localhost:3000
 ```
 

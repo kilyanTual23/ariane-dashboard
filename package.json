@@ -12,9 +12,11 @@
     "migrate:status": "tsx scripts/migrate-status.ts",
     "audit": "tsx scripts/audit-import.ts",
     "geneanet": "tsx scripts/match-geneanet.ts",
-    "db:save": "tsx scripts/checkpoint.ts"
+    "db:save": "tsx scripts/checkpoint.ts",
+    "migrate:turso": "tsx scripts/migrate-to-turso.ts"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "better-sqlite3": "^13.0.3",
     "csv-parse": "^7.0.2",
     "next": "16.3.5",

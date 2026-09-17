@@ -11,10 +11,10 @@ export const dynamic = "force-dynamic";
 
 export default async function StatsPage({ params }: PageProps<"/p/[slug]/statistiques">) {
   const { slug } = await params;
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const persons = listPersons(profile.id);
+  const persons = await listPersons(profile.id);
   const stats = computeStats(persons);
   const components = computeComponents(persons);
   const toPublish = persons.filter((p) => publicationOf(p) === "à mettre sur Geneanet").length;

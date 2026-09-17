@@ -35,7 +35,7 @@ function refreshProfile(slug: string) {
 export async function createProfileAction(fd: FormData) {
   const name = str(fd, "name");
   if (!name) return;
-  const profile = q.createProfile(name, str(fd, "description"));
+  const profile = await q.createProfile(name, str(fd, "description"));
   revalidatePath("/");
   redirect(`/p/${profile.slug}`);
 }
@@ -44,7 +44,7 @@ export async function updateProfileAction(fd: FormData) {
   const id = num(fd, "profileId");
   const slug = str(fd, "slug");
   if (!id || !slug) return;
-  q.updateProfile(id, {
+  await q.updateProfile(id, {
     name: str(fd, "name") ?? undefined,
     description: str(fd, "description"),
   });
@@ -56,14 +56,14 @@ export async function setRootPersonAction(fd: FormData) {
   const id = num(fd, "profileId");
   const slug = str(fd, "slug");
   if (!id || !slug) return;
-  q.updateProfile(id, { root_person_id: num(fd, "rootPersonId") });
+  await q.updateProfile(id, { root_person_id: num(fd, "rootPersonId") });
   refreshProfile(slug);
 }
 
 export async function deleteProfileAction(fd: FormData) {
   const id = num(fd, "profileId");
   if (!id) return;
-  q.deleteProfile(id);
+  await q.deleteProfile(id);
   revalidatePath("/");
   redirect("/");
 }
@@ -176,11 +176,11 @@ export async function setPersonField(input: {
       return;
   }
 
-  q.updatePerson(personId, patch);
+  await q.updatePerson(personId, patch);
   // Le sexe départage père (2n) et mère (2n+1) : la numérotation doit suivre.
   if (field === "sex") {
-    const profileId = q.profileIdOfPerson(personId);
-    if (profileId) q.recomputeSosa(profileId);
+    const profileId = await q.profileIdOfPerson(personId);
+    if (profileId) await q.recomputeSosa(profileId);
   }
   refreshProfile(slug);
 }
@@ -195,17 +195,17 @@ export async function setUnionField(input: {
   const value = input.value.trim();
   if (input.field === "date_raw") {
     const d = parseDateInput(value);
-    q.updateUnion(input.unionId, { date_raw: d.canonical, date_iso: d.iso, year: d.year });
+    await q.updateUnion(input.unionId, { date_raw: d.canonical, date_iso: d.iso, year: d.year });
   } else if (input.field === "place") {
-    q.updateUnion(input.unionId, { place: normalizePlace(value) });
+    await q.updateUnion(input.unionId, { place: normalizePlace(value) });
   } else if (input.field === "source_ignored") {
-    q.updateUnion(input.unionId, { source_ignored: value === "1" || value === "true" ? 1 : 0 });
+    await q.updateUnion(input.unionId, { source_ignored: value === "1" || value === "true" ? 1 : 0 });
   } else {
     const patch: q.UnionInput = { source: value || null };
     if (value && (value.startsWith("http") || value.startsWith("www"))) {
       patch.source_ignored = 0;
     }
-    q.updateUnion(input.unionId, patch);
+    await q.updateUnion(input.unionId, patch);
   }
   refreshProfile(input.slug);
 }
@@ -219,7 +219,7 @@ export async function quickCreatePersonAction(fd: FormData) {
 
   const { splitName } = await import("@/lib/names");
   const { given_names, surname } = splitName(fullName);
-  const id = q.createPerson(profileId, {
+  const id = await q.createPerson(profileId, {
     given_names,
     surname,
     sex: inferSex(given_names),
@@ -259,7 +259,7 @@ export async function smartCreatePersonAction(fd: FormData) {
     ? isUnmarriedInput
     : (parsed.spouse || parsed.marriage ? 0 : 0);
 
-  const primaryId = q.createPerson(profileId, {
+  const primaryId = await q.createPerson(profileId, {
     given_names: parsed.primary.givenNames || parsed.primary.fullName,
     surname: parsed.primary.surname || "",
     sex: parsed.primary.sex,
@@ -286,7 +286,7 @@ export async function smartCreatePersonAction(fd: FormData) {
       ? sIsLivingInput
       : (sBDate.year && sBDate.year >= 1925 ? 1 : 0);
 
-    const spouseId = q.createPerson(profileId, {
+    const spouseId = await q.createPerson(profileId, {
       given_names: parsed.spouse.givenNames || parsed.spouse.fullName,
       surname: parsed.spouse.surname || "",
       sex: parsed.spouse.sex,
@@ -302,7 +302,7 @@ export async function smartCreatePersonAction(fd: FormData) {
     const mDate = parseDateInput(parsed.marriage?.dateRaw);
     const marriagePlace = normalizePlace(str(fd, "marriage_place") ?? parsed.marriage?.place);
 
-    q.createUnion(profileId, {
+    await q.createUnion(profileId, {
       partner1_id: primaryId,
       partner2_id: spouseId,
       date_raw: mDate.canonical ?? parsed.marriage?.dateRaw ?? null,
@@ -314,26 +314,26 @@ export async function smartCreatePersonAction(fd: FormData) {
 
   // 3. Parents si mentionnés
   if (parsed.parents?.father && (parsed.parents.father.givenNames || parsed.parents.father.surname)) {
-    const fatherId = q.createPerson(profileId, {
+    const fatherId = await q.createPerson(profileId, {
       given_names: parsed.parents.father.givenNames || parsed.parents.father.fullName,
       surname: parsed.parents.father.surname || "",
       sex: "M",
       status: "En recherche",
     });
-    q.addParent(fatherId, primaryId);
+    await q.addParent(fatherId, primaryId);
   }
 
   if (parsed.parents?.mother && (parsed.parents.mother.givenNames || parsed.parents.mother.surname)) {
-    const motherId = q.createPerson(profileId, {
+    const motherId = await q.createPerson(profileId, {
       given_names: parsed.parents.mother.givenNames || parsed.parents.mother.fullName,
       surname: parsed.parents.mother.surname || "",
       sex: "F",
       status: "En recherche",
     });
-    q.addParent(motherId, primaryId);
+    await q.addParent(motherId, primaryId);
   }
 
-  q.recomputeSosa(profileId);
+  await q.recomputeSosa(profileId);
   refreshProfile(slug);
   redirect(`/p/${slug}/personnes/${primaryId}`);
 }
@@ -343,7 +343,7 @@ export async function toggleLivingAction(fd: FormData) {
   const personId = num(fd, "personId");
   const isLiving = num(fd, "isLiving") ?? 0;
   if (!slug || !personId) return;
-  q.updatePerson(personId, { is_living: isLiving });
+  await q.updatePerson(personId, { is_living: isLiving });
   refreshProfile(slug);
 }
 
@@ -352,7 +352,7 @@ export async function toggleUnmarriedAction(fd: FormData) {
   const personId = num(fd, "personId");
   const isUnmarried = num(fd, "isUnmarried") ?? 0;
   if (!slug || !personId) return;
-  q.updatePerson(personId, { is_unmarried: isUnmarried });
+  await q.updatePerson(personId, { is_unmarried: isUnmarried });
   refreshProfile(slug);
 }
 
@@ -378,7 +378,7 @@ export async function toggleActIgnoredAction(fd: FormData) {
     } else if (!ignored && (reason === "clear" || !reason)) {
       patch.birth_source = null;
     }
-    q.updatePerson(personId, patch);
+    await q.updatePerson(personId, patch);
   } else if (actKind === "death" && personId) {
     const patch: q.PersonInput = { death_source_ignored: ignored };
     if (ignored && reason) {
@@ -386,7 +386,7 @@ export async function toggleActIgnoredAction(fd: FormData) {
     } else if (!ignored && (reason === "clear" || !reason)) {
       patch.death_source = null;
     }
-    q.updatePerson(personId, patch);
+    await q.updatePerson(personId, patch);
   } else if (actKind === "marriage" && unionId) {
     const patch: q.UnionInput = { source_ignored: ignored };
     if (ignored && reason) {
@@ -394,7 +394,7 @@ export async function toggleActIgnoredAction(fd: FormData) {
     } else if (!ignored && (reason === "clear" || !reason)) {
       patch.source = null;
     }
-    q.updateUnion(unionId, patch);
+    await q.updateUnion(unionId, patch);
   }
 
   refreshProfile(slug);
@@ -405,8 +405,8 @@ export async function deletePersonAction(fd: FormData) {
   const personId = num(fd, "personId");
   const profileId = num(fd, "profileId");
   if (!slug || !personId || !profileId) return;
-  q.deletePerson(personId);
-  q.recomputeSosa(profileId);
+  await q.deletePerson(personId);
+  await q.recomputeSosa(profileId);
   refreshProfile(slug);
   redirect(`/p/${slug}/personnes`);
 }
@@ -420,7 +420,7 @@ export async function markGeneanetAction(fd: FormData) {
   const personId = num(fd, "personId");
   if (!slug || !personId) return;
   const done = str(fd, "done") === "1";
-  q.updatePerson(personId, {
+  await q.updatePerson(personId, {
     geneanet_at: done ? new Date().toISOString().slice(0, 19).replace("T", " ") : null,
   });
   refreshProfile(slug);
@@ -438,8 +438,8 @@ export async function movePersonAction(input: {
   const { slug, personId, column } = input;
 
   if (column === "Classées") {
-    const current = q.getPersonRow(personId);
-    q.updatePerson(personId, {
+    const current = await q.getPersonRow(personId);
+    await q.updatePerson(personId, {
       geneanet_at: new Date().toISOString().slice(0, 19).replace("T", " "),
       status:
         current && (current.status === "Complet" || current.status === "Bloqué")
@@ -447,7 +447,7 @@ export async function movePersonAction(input: {
           : "Complet",
     });
   } else if ((STATUSES as readonly string[]).includes(column)) {
-    q.updatePerson(personId, { status: column as Status, geneanet_at: null });
+    await q.updatePerson(personId, { status: column as Status, geneanet_at: null });
   } else {
     return;
   }
@@ -460,7 +460,7 @@ export async function quickStatusAction(fd: FormData) {
   const personId = num(fd, "personId");
   const status = str(fd, "status") as Status | null;
   if (!slug || !personId || !status) return;
-  q.updatePerson(personId, { status });
+  await q.updatePerson(personId, { status });
   refreshProfile(slug);
 }
 
@@ -481,7 +481,7 @@ async function resolveOrCreatePerson(
   const { splitName } = await import("@/lib/names");
   const { given_names, surname } = splitName(name);
   if (!given_names && !surname) return null;
-  return q.createPerson(profileId, {
+  return await q.createPerson(profileId, {
     given_names,
     surname,
     sex: inferSex(given_names),
@@ -500,8 +500,8 @@ export async function addParentAction(fd: FormData) {
     str(fd, "parentIdName"),
   );
   if (!parentId) return;
-  q.addParent(parentId, childId);
-  q.recomputeSosa(profileId);
+  await q.addParent(parentId, childId);
+  await q.recomputeSosa(profileId);
   refreshProfile(slug);
 }
 
@@ -516,8 +516,8 @@ export async function addChildAction(fd: FormData) {
     str(fd, "childIdName"),
   );
   if (!childId) return;
-  q.addParent(parentId, childId);
-  q.recomputeSosa(profileId);
+  await q.addParent(parentId, childId);
+  await q.recomputeSosa(profileId);
   refreshProfile(slug);
 }
 
@@ -527,8 +527,8 @@ export async function removeParentAction(fd: FormData) {
   const childId = num(fd, "childId");
   const parentId = num(fd, "parentId");
   if (!slug || !profileId || !childId || !parentId) return;
-  q.removeParent(parentId, childId);
-  q.recomputeSosa(profileId);
+  await q.removeParent(parentId, childId);
+  await q.recomputeSosa(profileId);
   refreshProfile(slug);
 }
 
@@ -549,7 +549,7 @@ export async function saveUnionAction(fd: FormData) {
 
   const unionId = num(fd, "unionId");
   if (unionId) {
-    q.updateUnion(unionId, input);
+    await q.updateUnion(unionId, input);
   } else {
     const personId = num(fd, "personId");
     if (!personId) return;
@@ -558,7 +558,7 @@ export async function saveUnionAction(fd: FormData) {
       num(fd, "spouseId"),
       str(fd, "spouseIdName"),
     );
-    q.createUnion(profileId, { ...input, partner1_id: personId, partner2_id: spouseId });
+    await q.createUnion(profileId, { ...input, partner1_id: personId, partner2_id: spouseId });
   }
   refreshProfile(slug);
 }
@@ -567,7 +567,7 @@ export async function deleteUnionAction(fd: FormData) {
   const slug = str(fd, "slug");
   const unionId = num(fd, "unionId");
   if (!slug || !unionId) return;
-  q.deleteUnion(unionId);
+  await q.deleteUnion(unionId);
   refreshProfile(slug);
 }
 
@@ -578,7 +578,7 @@ export async function createTaskAction(fd: FormData) {
   const profileId = num(fd, "profileId");
   const title = str(fd, "title");
   if (!slug || !profileId || !title) return;
-  q.createTask(profileId, {
+  await q.createTask(profileId, {
     title,
     person_id: num(fd, "person_id"),
     details: str(fd, "details"),
@@ -602,7 +602,7 @@ export async function updateTaskAction(fd: FormData) {
   if (priority) patch.priority = priority;
   if (fd.has("title")) patch.title = str(fd, "title") ?? "Sans titre";
   if (fd.has("details")) patch.details = str(fd, "details");
-  q.updateTask(taskId, patch);
+  await q.updateTask(taskId, patch);
   refreshProfile(slug);
 }
 
@@ -610,7 +610,7 @@ export async function deleteTaskAction(fd: FormData) {
   const slug = str(fd, "slug");
   const taskId = num(fd, "taskId");
   if (!slug || !taskId) return;
-  q.deleteTask(taskId);
+  await q.deleteTask(taskId);
   refreshProfile(slug);
 }
 
@@ -622,7 +622,7 @@ export async function createResourceAction(fd: FormData) {
   const label = str(fd, "label");
   const url = str(fd, "url");
   if (!slug || !profileId || !label || !url) return;
-  q.createResource(profileId, label, url, str(fd, "category"));
+  await q.createResource(profileId, label, url, str(fd, "category"));
   refreshProfile(slug);
 }
 
@@ -630,7 +630,7 @@ export async function deleteResourceAction(fd: FormData) {
   const slug = str(fd, "slug");
   const id = num(fd, "resourceId");
   if (!slug || !id) return;
-  q.deleteResource(id);
+  await q.deleteResource(id);
   refreshProfile(slug);
 }
 
@@ -641,7 +641,7 @@ export async function createSourceAction(fd: FormData) {
   const profileId = num(fd, "profileId");
   const personId = num(fd, "personId");
   if (!slug || !profileId || !personId) return;
-  q.createSource(profileId, {
+  await q.createSource(profileId, {
     person_id: personId,
     kind: str(fd, "kind") ?? "Autre",
     label: str(fd, "label"),
@@ -657,6 +657,6 @@ export async function deleteSourceAction(fd: FormData) {
   const slug = str(fd, "slug");
   const id = num(fd, "sourceId");
   if (!slug || !id) return;
-  q.deleteSource(id);
+  await q.deleteSource(id);
   refreshProfile(slug);
 }

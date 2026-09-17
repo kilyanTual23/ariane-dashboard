@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { queryAll, queryOne, execute, batch } from "./db";
 import { computeCompletion } from "./completion";
 import type {
   Person,
@@ -10,6 +10,7 @@ import type {
   TaskRow,
   UnionRow,
 } from "./types";
+import type { InStatement } from "@libsql/client";
 
 export function displayName(p: { given_names: string; surname: string }) {
   return `${p.given_names ?? ""} ${p.surname ?? ""}`.trim() || "Sans nom";
@@ -37,22 +38,20 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
 
 export type ProfileSummary = Profile & { personCount: number; openTasks: number };
 
-export function listProfiles(): ProfileSummary[] {
-  return db
-    .prepare(
-      `SELECT p.*,
-              (SELECT COUNT(*) FROM persons WHERE profile_id = p.id) AS personCount,
-              (SELECT COUNT(*) FROM tasks   WHERE profile_id = p.id AND status IN ('À faire','En cours')) AS openTasks
-       FROM profiles p ORDER BY p.name`,
-    )
-    .all() as ProfileSummary[];
+export async function listProfiles(): Promise<ProfileSummary[]> {
+  return queryAll<ProfileSummary>(
+    `SELECT p.*,
+            (SELECT COUNT(*) FROM persons WHERE profile_id = p.id) AS personCount,
+            (SELECT COUNT(*) FROM tasks   WHERE profile_id = p.id AND status IN ('À faire','En cours')) AS openTasks
+     FROM profiles p ORDER BY p.name`,
+  );
 }
 
-export function getProfileBySlug(slug: string): Profile | null {
-  return (db.prepare(`SELECT * FROM profiles WHERE slug = ?`).get(slug) as Profile) ?? null;
+export async function getProfileBySlug(slug: string): Promise<Profile | null> {
+  return queryOne<Profile>(`SELECT * FROM profiles WHERE slug = ?`, [slug]);
 }
 
-export function slugify(name: string) {
+export async function slugify(name: string): Promise<string> {
   const base =
     name
       .normalize("NFD")
@@ -63,62 +62,70 @@ export function slugify(name: string) {
       .slice(0, 48) || "profil";
   let slug = base;
   let i = 2;
-  while (db.prepare(`SELECT 1 FROM profiles WHERE slug = ?`).get(slug)) slug = `${base}-${i++}`;
+  while (await queryOne(`SELECT 1 FROM profiles WHERE slug = ?`, [slug])) {
+    slug = `${base}-${i++}`;
+  }
   return slug;
 }
 
-export function createProfile(name: string, description?: string | null): Profile {
-  const slug = slugify(name);
-  const info = db
-    .prepare(`INSERT INTO profiles (slug, name, description) VALUES (?, ?, ?)`)
-    .run(slug, name.trim(), description?.trim() || null);
-  return db.prepare(`SELECT * FROM profiles WHERE id = ?`).get(info.lastInsertRowid) as Profile;
+export async function createProfile(name: string, description?: string | null): Promise<Profile> {
+  const slug = await slugify(name);
+  const info = await execute(
+    `INSERT INTO profiles (slug, name, description) VALUES (?, ?, ?)`,
+    [slug, name.trim(), description?.trim() || null],
+  );
+  return (await queryOne<Profile>(`SELECT * FROM profiles WHERE id = ?`, [info.lastInsertRowid]))!;
 }
 
-export function updateProfile(
+export async function updateProfile(
   id: number,
   patch: { name?: string; description?: string | null; root_person_id?: number | null },
-) {
-  const current = db.prepare(`SELECT * FROM profiles WHERE id = ?`).get(id) as Profile | undefined;
+): Promise<void> {
+  const current = await queryOne<Profile>(`SELECT * FROM profiles WHERE id = ?`, [id]);
   if (!current) return;
-  db.prepare(
+  await execute(
     `UPDATE profiles SET name = ?, description = ?, root_person_id = ?, updated_at = datetime('now') WHERE id = ?`,
-  ).run(
-    patch.name?.trim() || current.name,
-    patch.description !== undefined ? patch.description?.trim() || null : current.description,
-    patch.root_person_id !== undefined ? patch.root_person_id : current.root_person_id,
-    id,
+    [
+      patch.name?.trim() || current.name,
+      patch.description !== undefined ? patch.description?.trim() || null : current.description,
+      patch.root_person_id !== undefined ? patch.root_person_id : current.root_person_id,
+      id,
+    ],
   );
-  if (patch.root_person_id !== undefined) recomputeSosa(id);
+  if (patch.root_person_id !== undefined) {
+    await recomputeSosa(id);
+  }
 }
 
-export function deleteProfile(id: number) {
-  db.prepare(`DELETE FROM profiles WHERE id = ?`).run(id);
+export async function deleteProfile(id: number): Promise<void> {
+  await execute(`DELETE FROM profiles WHERE id = ?`, [id]);
 }
 
 /* ---------------------------------------------------------------- personnes */
 
-export function listPersonRows(profileId: number): PersonRow[] {
-  return db
-    .prepare(`SELECT * FROM persons WHERE profile_id = ? ORDER BY surname, given_names`)
-    .all(profileId) as PersonRow[];
+export async function listPersonRows(profileId: number): Promise<PersonRow[]> {
+  return queryAll<PersonRow>(
+    `SELECT * FROM persons WHERE profile_id = ? ORDER BY surname, given_names`,
+    [profileId],
+  );
 }
 
 /** Charge tout le profil d'un coup : relations résolues + complétion calculée. */
-export function listPersons(profileId: number): Person[] {
-  const rows = listPersonRows(profileId);
-  const byId = new Map(rows.map((r) => [r.id, r]));
-
-  const links = db
-    .prepare(
+export async function listPersons(profileId: number): Promise<Person[]> {
+  const [rows, links, unions] = await Promise.all([
+    listPersonRows(profileId),
+    queryAll<{ parent_id: number; child_id: number }>(
       `SELECT pc.parent_id, pc.child_id FROM parent_child pc
        JOIN persons c ON c.id = pc.child_id WHERE c.profile_id = ?`,
-    )
-    .all(profileId) as { parent_id: number; child_id: number }[];
+      [profileId],
+    ),
+    queryAll<UnionRow>(
+      `SELECT * FROM unions WHERE profile_id = ? ORDER BY COALESCE(year, 9999), id`,
+      [profileId],
+    ),
+  ]);
 
-  const unions = db
-    .prepare(`SELECT * FROM unions WHERE profile_id = ? ORDER BY COALESCE(year, 9999), id`)
-    .all(profileId) as UnionRow[];
+  const byId = new Map(rows.map((r) => [r.id, r]));
 
   const parentsOf = new Map<number, number[]>();
   const childrenOf = new Map<number, number[]>();
@@ -165,8 +172,9 @@ export function listPersons(profileId: number): Person[] {
   });
 }
 
-export function getPerson(profileId: number, personId: number): Person | null {
-  return listPersons(profileId).find((p) => p.id === personId) ?? null;
+export async function getPerson(profileId: number, personId: number): Promise<Person | null> {
+  const all = await listPersons(profileId);
+  return all.find((p) => p.id === personId) ?? null;
 }
 
 export type PersonInput = Partial<
@@ -230,67 +238,65 @@ const PERSON_FIELDS: (keyof PersonInput)[] = [
   "notion_id",
 ];
 
-export function createPerson(profileId: number, input: PersonInput): number {
+export async function createPerson(profileId: number, input: PersonInput): Promise<number> {
   const cols = PERSON_FIELDS.filter((f) => input[f] !== undefined);
   const sql = `INSERT INTO persons (profile_id${cols.length ? ", " + cols.join(", ") : ""})
                VALUES (?${cols.map(() => ", ?").join("")})`;
-  const info = db.prepare(sql).run(profileId, ...cols.map((c) => input[c] as never));
-  return Number(info.lastInsertRowid);
+  const info = await execute(sql, [profileId, ...cols.map((c) => input[c])]);
+  return info.lastInsertRowid!;
 }
 
-export function updatePerson(personId: number, input: PersonInput) {
+export async function updatePerson(personId: number, input: PersonInput): Promise<void> {
   const cols = PERSON_FIELDS.filter((f) => input[f] !== undefined);
   if (!cols.length) return;
-  db.prepare(
+  await execute(
     `UPDATE persons SET ${cols.map((c) => `${c} = ?`).join(", ")}, updated_at = datetime('now') WHERE id = ?`,
-  ).run(...cols.map((c) => input[c] as never), personId);
+    [...cols.map((c) => input[c]), personId],
+  );
 }
 
 /** Les lieux déjà écrits dans le profil, les plus utilisés d'abord. */
-export function listPlaces(profileId: number): string[] {
-  const rows = db
-    .prepare(
-      `SELECT place, COUNT(*) AS n FROM (
-         SELECT birth_place AS place FROM persons WHERE profile_id = ? AND birth_place IS NOT NULL
-         UNION ALL
-         SELECT death_place FROM persons WHERE profile_id = ? AND death_place IS NOT NULL
-         UNION ALL
-         SELECT place FROM unions WHERE profile_id = ? AND place IS NOT NULL
-       )
-       WHERE TRIM(place) <> ''
-       GROUP BY place ORDER BY n DESC, place`,
-    )
-    .all(profileId, profileId, profileId) as { place: string; n: number }[];
+export async function listPlaces(profileId: number): Promise<string[]> {
+  const rows = await queryAll<{ place: string }>(
+    `SELECT place, COUNT(*) AS n FROM (
+       SELECT birth_place AS place FROM persons WHERE profile_id = ? AND birth_place IS NOT NULL
+       UNION ALL
+       SELECT death_place FROM persons WHERE profile_id = ? AND death_place IS NOT NULL
+       UNION ALL
+       SELECT place FROM unions WHERE profile_id = ? AND place IS NOT NULL
+     )
+     WHERE TRIM(place) <> ''
+     GROUP BY place ORDER BY n DESC, place`,
+    [profileId, profileId, profileId],
+  );
   return rows.map((r) => r.place);
 }
 
-export function getPersonRow(personId: number): PersonRow | null {
-  return (db.prepare(`SELECT * FROM persons WHERE id = ?`).get(personId) as PersonRow) ?? null;
+export async function getPersonRow(personId: number): Promise<PersonRow | null> {
+  return queryOne<PersonRow>(`SELECT * FROM persons WHERE id = ?`, [personId]);
 }
 
-export function profileIdOfPerson(personId: number): number | null {
-  const row = db.prepare(`SELECT profile_id FROM persons WHERE id = ?`).get(personId) as
-    | { profile_id: number }
-    | undefined;
+export async function profileIdOfPerson(personId: number): Promise<number | null> {
+  const row = await queryOne<{ profile_id: number }>(`SELECT profile_id FROM persons WHERE id = ?`, [personId]);
   return row?.profile_id ?? null;
 }
 
-export function deletePerson(personId: number) {
-  db.prepare(`DELETE FROM persons WHERE id = ?`).run(personId);
+export async function deletePerson(personId: number): Promise<void> {
+  await execute(`DELETE FROM persons WHERE id = ?`, [personId]);
 }
 
 /* ---------------------------------------------------------------- relations */
 
-export function addParent(parentId: number, childId: number) {
+export async function addParent(parentId: number, childId: number): Promise<void> {
   if (parentId === childId) return;
-  db.prepare(`INSERT OR IGNORE INTO parent_child (parent_id, child_id) VALUES (?, ?)`).run(
+  await execute(`INSERT OR IGNORE INTO parent_child (parent_id, child_id) VALUES (?, ?)`, [
     parentId,
     childId,
-  );
+  ]);
 }
 
-export function removeParent(parentId: number, childId: number) {
-  db.prepare(`DELETE FROM parent_child WHERE parent_id = ? AND child_id = ?`).run(parentId, childId);
+export async function removeParent(parentId: number, childId: number): Promise<void> {
+  await execute(`DELETE FROM parent_child WHERE parent_id = ? AND child_id = ?`, [parentId, childId]);
 }
 
 export type UnionInput = Partial<
@@ -308,13 +314,11 @@ export type UnionInput = Partial<
   >
 >;
 
-export function createUnion(profileId: number, input: UnionInput): number {
-  const info = db
-    .prepare(
-      `INSERT INTO unions (profile_id, partner1_id, partner2_id, date_raw, date_iso, year, place, source, source_ignored, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+export async function createUnion(profileId: number, input: UnionInput): Promise<number> {
+  const info = await execute(
+    `INSERT INTO unions (profile_id, partner1_id, partner2_id, date_raw, date_iso, year, place, source, source_ignored, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
       profileId,
       input.partner1_id ?? null,
       input.partner2_id ?? null,
@@ -325,21 +329,22 @@ export function createUnion(profileId: number, input: UnionInput): number {
       input.source ?? null,
       input.source_ignored ?? 0,
       input.notes ?? null,
-    );
-  return Number(info.lastInsertRowid);
+    ],
+  );
+  return info.lastInsertRowid!;
 }
 
-export function updateUnion(unionId: number, input: UnionInput) {
+export async function updateUnion(unionId: number, input: UnionInput): Promise<void> {
   const cols = Object.keys(input) as (keyof UnionInput)[];
   if (!cols.length) return;
-  db.prepare(`UPDATE unions SET ${cols.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`).run(
-    ...cols.map((c) => input[c] as never),
-    unionId,
+  await execute(
+    `UPDATE unions SET ${cols.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`,
+    [...cols.map((c) => input[c]), unionId],
   );
 }
 
-export function deleteUnion(unionId: number) {
-  db.prepare(`DELETE FROM unions WHERE id = ?`).run(unionId);
+export async function deleteUnion(unionId: number): Promise<void> {
+  await execute(`DELETE FROM unions WHERE id = ?`, [unionId]);
 }
 
 /* --------------------------------------------------------------------- sosa */
@@ -348,19 +353,16 @@ export function deleteUnion(unionId: number) {
  * Numérotation Sosa-Stradonitz depuis la racine du profil.
  * Le père prend 2n, la mère 2n+1 ; à sexe inconnu on garde l'ordre de saisie.
  */
-export function recomputeSosa(profileId: number) {
-  const profile = db.prepare(`SELECT * FROM profiles WHERE id = ?`).get(profileId) as
-    | Profile
-    | undefined;
-  db.prepare(`UPDATE persons SET sosa = NULL WHERE profile_id = ?`).run(profileId);
+export async function recomputeSosa(profileId: number): Promise<void> {
+  const profile = await queryOne<Profile>(`SELECT * FROM profiles WHERE id = ?`, [profileId]);
+  await execute(`UPDATE persons SET sosa = NULL WHERE profile_id = ?`, [profileId]);
   if (!profile?.root_person_id) return;
 
-  const rows = db
-    .prepare(
-      `SELECT pc.parent_id, pc.child_id, p.sex FROM parent_child pc
-       JOIN persons p ON p.id = pc.parent_id WHERE p.profile_id = ?`,
-    )
-    .all(profileId) as { parent_id: number; child_id: number; sex: string | null }[];
+  const rows = await queryAll<{ parent_id: number; child_id: number; sex: string | null }>(
+    `SELECT pc.parent_id, pc.child_id, p.sex FROM parent_child pc
+     JOIN persons p ON p.id = pc.parent_id WHERE p.profile_id = ?`,
+    [profileId],
+  );
 
   const parentsOf = new Map<number, number[]>();
   for (const r of rows) {
@@ -370,36 +372,43 @@ export function recomputeSosa(profileId: number) {
     else list.push(r.parent_id);
   }
 
-  const assign = db.prepare(`UPDATE persons SET sosa = ? WHERE id = ?`);
+  const updates: InStatement[] = [];
   const seen = new Set<number>();
   const queue: [number, number][] = [[profile.root_person_id, 1]];
-  const apply = db.transaction(() => {
-    while (queue.length) {
-      const [personId, sosa] = queue.shift()!;
-      if (seen.has(personId) || sosa > 2 ** 20) continue;
-      seen.add(personId);
-      assign.run(sosa, personId);
-      (parentsOf.get(personId) ?? []).slice(0, 2).forEach((pid, i) => queue.push([pid, sosa * 2 + i]));
+
+  while (queue.length) {
+    const [personId, sosa] = queue.shift()!;
+    if (seen.has(personId) || sosa > 2 ** 20) continue;
+    seen.add(personId);
+    updates.push({
+      sql: `UPDATE persons SET sosa = ? WHERE id = ?`,
+      args: [sosa, personId],
+    });
+    (parentsOf.get(personId) ?? []).slice(0, 2).forEach((pid, i) => queue.push([pid, sosa * 2 + i]));
+  }
+
+  if (updates.length > 0) {
+    // Par lots de 100 pour Turso
+    for (let i = 0; i < updates.length; i += 100) {
+      await batch(updates.slice(i, i + 100));
     }
-  });
-  apply();
+  }
 }
 
 /* ------------------------------------------------------------------- tâches */
 
 export type TaskWithPerson = TaskRow & { personName: string | null };
 
-export function listTasks(profileId: number): TaskWithPerson[] {
-  return db
-    .prepare(
-      `SELECT t.*, CASE WHEN p.id IS NULL THEN NULL ELSE TRIM(p.given_names || ' ' || p.surname) END AS personName
-       FROM tasks t LEFT JOIN persons p ON p.id = t.person_id
-       WHERE t.profile_id = ?
-       ORDER BY CASE t.status WHEN 'En cours' THEN 0 WHEN 'À faire' THEN 1 WHEN 'Fait' THEN 2 ELSE 3 END,
-                CASE t.priority WHEN 'Haute' THEN 0 WHEN 'Normale' THEN 1 ELSE 2 END,
-                t.created_at DESC`,
-    )
-    .all(profileId) as TaskWithPerson[];
+export async function listTasks(profileId: number): Promise<TaskWithPerson[]> {
+  return queryAll<TaskWithPerson>(
+    `SELECT t.*, CASE WHEN p.id IS NULL THEN NULL ELSE TRIM(p.given_names || ' ' || p.surname) END AS personName
+     FROM tasks t LEFT JOIN persons p ON p.id = t.person_id
+     WHERE t.profile_id = ?
+     ORDER BY CASE t.status WHEN 'En cours' THEN 0 WHEN 'À faire' THEN 1 WHEN 'Fait' THEN 2 ELSE 3 END,
+              CASE t.priority WHEN 'Haute' THEN 0 WHEN 'Normale' THEN 1 ELSE 2 END,
+              t.created_at DESC`,
+    [profileId],
+  );
 }
 
 export type TaskInput = Partial<
@@ -409,13 +418,11 @@ export type TaskInput = Partial<
   >
 >;
 
-export function createTask(profileId: number, input: TaskInput): number {
-  const info = db
-    .prepare(
-      `INSERT INTO tasks (profile_id, person_id, title, details, kind, priority, status, archive, url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+export async function createTask(profileId: number, input: TaskInput): Promise<number> {
+  const info = await execute(
+    `INSERT INTO tasks (profile_id, person_id, title, details, kind, priority, status, archive, url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
       profileId,
       input.person_id ?? null,
       (input.title ?? "Sans titre").trim(),
@@ -425,37 +432,37 @@ export function createTask(profileId: number, input: TaskInput): number {
       input.status ?? "À faire",
       input.archive ?? null,
       input.url ?? null,
-    );
-  return Number(info.lastInsertRowid);
+    ],
+  );
+  return info.lastInsertRowid!;
 }
 
-export function updateTask(taskId: number, input: TaskInput) {
+export async function updateTask(taskId: number, input: TaskInput): Promise<void> {
   const cols = Object.keys(input) as (keyof TaskInput)[];
   if (!cols.length) return;
-  db.prepare(
+  await execute(
     `UPDATE tasks SET ${cols.map((c) => `${c} = ?`).join(", ")},
        done_at = CASE WHEN ? = 'Fait' THEN datetime('now') ELSE done_at END
      WHERE id = ?`,
-  ).run(...cols.map((c) => input[c] as never), input.status ?? "", taskId);
+    [...cols.map((c) => input[c]), input.status ?? "", taskId],
+  );
 }
 
-export function deleteTask(taskId: number) {
-  db.prepare(`DELETE FROM tasks WHERE id = ?`).run(taskId);
+export async function deleteTask(taskId: number): Promise<void> {
+  await execute(`DELETE FROM tasks WHERE id = ?`, [taskId]);
 }
 
 /* ----------------------------------------------------- sources & ressources */
 
-export function listSources(personId: number): SourceRow[] {
-  return db.prepare(`SELECT * FROM sources WHERE person_id = ? ORDER BY id`).all(personId) as SourceRow[];
+export async function listSources(personId: number): Promise<SourceRow[]> {
+  return queryAll<SourceRow>(`SELECT * FROM sources WHERE person_id = ? ORDER BY id`, [personId]);
 }
 
-export function createSource(profileId: number, input: Partial<SourceRow>): number {
-  const info = db
-    .prepare(
-      `INSERT INTO sources (profile_id, person_id, kind, label, url, date_raw, place, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+export async function createSource(profileId: number, input: Partial<SourceRow>): Promise<number> {
+  const info = await execute(
+    `INSERT INTO sources (profile_id, person_id, kind, label, url, date_raw, place, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
       profileId,
       input.person_id ?? null,
       input.kind ?? "Autre",
@@ -464,34 +471,40 @@ export function createSource(profileId: number, input: Partial<SourceRow>): numb
       input.date_raw ?? null,
       input.place ?? null,
       input.notes ?? null,
-    );
-  return Number(info.lastInsertRowid);
+    ],
+  );
+  return info.lastInsertRowid!;
 }
 
-export function deleteSource(sourceId: number) {
-  db.prepare(`DELETE FROM sources WHERE id = ?`).run(sourceId);
+export async function deleteSource(sourceId: number): Promise<void> {
+  await execute(`DELETE FROM sources WHERE id = ?`, [sourceId]);
 }
 
-export function listResources(profileId: number): ResourceRow[] {
-  return db
-    .prepare(`SELECT * FROM resources WHERE profile_id = ? ORDER BY category, label`)
-    .all(profileId) as ResourceRow[];
+export async function listResources(profileId: number): Promise<ResourceRow[]> {
+  return queryAll<ResourceRow>(`SELECT * FROM resources WHERE profile_id = ? ORDER BY category, label`, [
+    profileId,
+  ]);
 }
 
-export function createResource(
+export async function createResource(
   profileId: number,
   label: string,
   url: string,
   category?: string | null,
-) {
-  db.prepare(`INSERT INTO resources (profile_id, label, url, category) VALUES (?, ?, ?, ?)`).run(
+): Promise<void> {
+  await execute(`INSERT INTO resources (profile_id, label, url, category) VALUES (?, ?, ?, ?)`, [
     profileId,
     label.trim(),
     url.trim(),
     category?.trim() || null,
-  );
+  ]);
 }
 
-export function deleteResource(id: number) {
-  db.prepare(`DELETE FROM resources WHERE id = ?`).run(id);
+export async function deleteResource(id: number): Promise<void> {
+  await execute(`DELETE FROM resources WHERE id = ?`, [id]);
 }
+
+export async function listAllSourcesForProfile(profileId: number): Promise<SourceRow[]> {
+  return queryAll<SourceRow>(`SELECT * FROM sources WHERE profile_id = ? ORDER BY id`, [profileId]);
+}
+

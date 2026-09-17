@@ -10,10 +10,10 @@ export const dynamic = "force-dynamic";
 
 export default async function NewPersonPage({ params }: PageProps<"/p/[slug]/personnes/nouvelle">) {
   const { slug } = await params;
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const places = listPlaces(profile.id);
+  const places = await listPlaces(profile.id);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 pt-4">

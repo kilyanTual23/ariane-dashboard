@@ -21,12 +21,14 @@ export default async function TasksPage({
   params,
 }: PageProps<"/p/[slug]/taches">) {
   const { slug } = await params;
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const persons = listPersons(profile.id);
-  const tasks = listTasks(profile.id);
-  const places = listPlaces(profile.id);
+  const [persons, tasks, places] = await Promise.all([
+    listPersons(profile.id),
+    listTasks(profile.id),
+    listPlaces(profile.id),
+  ]);
   const leads = computeLeads(persons, 12);
 
   const pickable: PickerPerson[] = persons.map((p) => ({

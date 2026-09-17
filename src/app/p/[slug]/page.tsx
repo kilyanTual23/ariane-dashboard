@@ -69,13 +69,16 @@ function Tile({
 
 export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">) {
   const { slug } = await params;
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const persons = listPersons(profile.id);
+  const [persons, allTasks] = await Promise.all([
+    listPersons(profile.id),
+    listTasks(profile.id),
+  ]);
   const stats = computeStats(persons);
   const leads = computeLeads(persons, 4);
-  const openTasks = listTasks(profile.id).filter(
+  const openTasks = allTasks.filter(
     (t) => t.status === "À faire" || t.status === "En cours",
   );
   const last = stats.recent[0];

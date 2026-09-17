@@ -14,10 +14,10 @@ const GENERATIONS = [3, 4, 5, 6];
 export default async function TreePage({ params, searchParams }: PageProps<"/p/[slug]/arbre">) {
   const { slug } = await params;
   const query = await searchParams;
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const persons = listPersons(profile.id);
+  const persons = await listPersons(profile.id);
   if (persons.length === 0) {
     return (
       <div className="flex flex-col gap-4">

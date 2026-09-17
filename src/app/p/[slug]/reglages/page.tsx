@@ -15,11 +15,13 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage({ params }: PageProps<"/p/[slug]/reglages">) {
   const { slug } = await params;
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const persons = listPersons(profile.id);
-  const resources = listResources(profile.id);
+  const [persons, resources] = await Promise.all([
+    listPersons(profile.id),
+    listResources(profile.id),
+  ]);
   const root = persons.find((p) => p.id === profile.root_person_id);
   const pickable: PickerPerson[] = persons.map((p) => ({
     id: p.id,

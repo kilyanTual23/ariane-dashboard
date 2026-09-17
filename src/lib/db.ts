@@ -1,57 +1,57 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
+import { createClient, type Client, type InStatement } from "@libsql/client";
 import path from "node:path";
 
-const dbPath =
-  process.env.ARIANE_DB ?? path.join(process.cwd(), "data", "ariane.db");
+function createDbClient(): Client {
+  const tursoUrl = process.env.TURSO_DATABASE_URL;
+  const tursoToken = process.env.TURSO_AUTH_TOKEN;
 
-function create(): Database.Database {
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  const schema = fs.readFileSync(
-    path.join(process.cwd(), "src", "lib", "schema.sql"),
-    "utf8",
-  );
-  db.exec(schema);
-  ensureColumns(db);
-  return db;
+  if (tursoUrl) {
+    return createClient({
+      url: tursoUrl,
+      authToken: tursoToken,
+    });
+  }
+
+  // Fallback local file
+  const localPath = process.env.ARIANE_DB ?? path.join(process.cwd(), "data", "ariane.db");
+  return createClient({
+    url: `file:${localPath}`,
+  });
+}
+
+// Conserver l'instance unique pendant le rechargement à chaud (Hot Module Replacement)
+const globalForDb = globalThis as unknown as { __arianeClient?: Client };
+export const db = globalForDb.__arianeClient ?? createDbClient();
+if (process.env.NODE_ENV !== "production") globalForDb.__arianeClient = db;
+
+export async function queryAll<T>(sql: string, args: unknown[] = []): Promise<T[]> {
+  const res = await db.execute({ sql, args: args as never[] });
+  return res.rows as unknown as T[];
+}
+
+export async function queryOne<T>(sql: string, args: unknown[] = []): Promise<T | null> {
+  const res = await db.execute({ sql, args: args as never[] });
+  return (res.rows[0] as unknown as T) ?? null;
+}
+
+export async function execute(
+  sql: string,
+  args: unknown[] = [],
+): Promise<{ lastInsertRowid: number | null; rowsAffected: number }> {
+  const res = await db.execute({ sql, args: args as never[] });
+  return {
+    lastInsertRowid: res.lastInsertRowid !== undefined ? Number(res.lastInsertRowid) : null,
+    rowsAffected: res.rowsAffected,
+  };
+}
+
+export async function batch(statements: InStatement[]): Promise<void> {
+  await db.batch(statements, "write");
 }
 
 /**
- * Les tables existantes ne sont pas recréées par `CREATE TABLE IF NOT EXISTS` :
- * on ajoute donc à la main les colonnes apparues après coup.
+ * Checkpoint WAL : sur Turso Cloud, chaque requête d'écriture est persistée
+ * directement et immédiatement dans le cloud, cette fonction est conservée pour
+ * rétrocompatibilité d'appel.
  */
-function ensureColumns(db: Database.Database) {
-  const additions: [table: string, column: string, type: string][] = [
-    ["persons", "geneanet_at", "TEXT"],
-    ["persons", "is_living", "INTEGER NOT NULL DEFAULT 0"],
-    ["persons", "is_unmarried", "INTEGER NOT NULL DEFAULT 0"],
-    ["persons", "birth_source_ignored", "INTEGER NOT NULL DEFAULT 0"],
-    ["persons", "death_source_ignored", "INTEGER NOT NULL DEFAULT 0"],
-    ["unions", "source_ignored", "INTEGER NOT NULL DEFAULT 0"],
-  ];
-  for (const [table, column, type] of additions) {
-    const columns = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
-      (c) => c.name,
-    );
-    if (!columns.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
-  }
-}
-
-// Une seule connexion, conservée entre les rechargements à chaud du dev server.
-const globalForDb = globalThis as unknown as { __arianeDb?: Database.Database };
-export const db = globalForDb.__arianeDb ?? create();
-if (process.env.NODE_ENV !== "production") globalForDb.__arianeDb = db;
-
-/** Vide immédiatement les écritures en attente du WAL dans le fichier ariane.db */
-export function checkpointDb() {
-  try {
-    db.pragma("wal_checkpoint(TRUNCATE)");
-  } catch {}
-}
-
-if (typeof process !== "undefined") {
-  process.on("beforeExit", () => checkpointDb());
-}
+export function checkpointDb() {}

@@ -7,26 +7,30 @@ import { STATUSES, type Status } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
-  const profiles = listProfiles()
-    .map((p) => {
-      const persons = listPersons(p.id);
-      const complete = persons.filter((x) => x.completion.score === x.completion.total).length;
-      const filled = persons.reduce((s, x) => s + x.completion.score, 0);
-      const slots = persons.reduce((s, x) => s + x.completion.total, 0);
-      const counts = STATUSES.map((status) => ({
-        status,
-        count: persons.filter((x) => x.status === status).length,
-      })).filter((c) => c.count > 0);
+export default async function HomePage() {
+  const rawProfiles = await listProfiles();
+  const profiles = (
+    await Promise.all(
+      rawProfiles.map(async (p) => {
+        const persons = await listPersons(p.id);
+        const complete = persons.filter((x) => x.completion.score === x.completion.total).length;
+        const filled = persons.reduce((s, x) => s + x.completion.score, 0);
+        const slots = persons.reduce((s, x) => s + x.completion.total, 0);
+        const counts = STATUSES.map((status) => ({
+          status,
+          count: persons.filter((x) => x.status === status).length,
+        })).filter((c) => c.count > 0);
 
-      return {
-        ...p,
-        complete,
-        // La complétion d'un profil, c'est la part des cases remplies de ses cartes.
-        percent: slots ? Math.round((filled / slots) * 100) : 0,
-        counts,
-      };
-    })
+        return {
+          ...p,
+          complete,
+          // La complétion d'un profil, c'est la part des cases remplies de ses cartes.
+          percent: slots ? Math.round((filled / slots) * 100) : 0,
+          counts,
+        };
+      }),
+    )
+  )
     // Les profils les plus avancés en premier : ce sont ceux qu'on peut boucler.
     .sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name, "fr"));
 

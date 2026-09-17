@@ -1,22 +1,28 @@
 import { NextResponse } from "next/server";
 
-import { db } from "@/lib/db";
-import { getProfileBySlug, listPersons, listResources, listTasks } from "@/lib/queries";
+import { getProfileBySlug, listAllSourcesForProfile, listPersons, listResources, listTasks } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/profils/[slug]/export">) {
   const { slug } = await ctx.params;
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) return NextResponse.json({ error: "Profil introuvable" }, { status: 404 });
+
+  const [persons, tasks, resources, sources] = await Promise.all([
+    listPersons(profile.id),
+    listTasks(profile.id),
+    listResources(profile.id),
+    listAllSourcesForProfile(profile.id),
+  ]);
 
   const payload = {
     exportedAt: new Date().toISOString(),
     profile,
-    persons: listPersons(profile.id),
-    tasks: listTasks(profile.id),
-    resources: listResources(profile.id),
-    sources: db.prepare(`SELECT * FROM sources WHERE profile_id = ?`).all(profile.id),
+    persons,
+    tasks,
+    resources,
+    sources,
   };
 
   return new NextResponse(JSON.stringify(payload, null, 2), {

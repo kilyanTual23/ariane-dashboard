@@ -7,11 +7,14 @@ export const dynamic = "force-dynamic";
 
 export default async function ProfileLayout({ children, params }: LayoutProps<"/p/[slug]">) {
   const { slug } = await params;
-  const profile = getProfileBySlug(slug);
+  const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const profiles = listProfiles();
-  const openTasks = listTasks(profile.id).filter(
+  const [profiles, allTasks] = await Promise.all([
+    listProfiles(),
+    listTasks(profile.id),
+  ]);
+  const openTasks = allTasks.filter(
     (t) => t.status === "À faire" || t.status === "En cours",
   );
 
