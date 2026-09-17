@@ -44,3 +44,14 @@ function ensureColumns(db: Database.Database) {
 const globalForDb = globalThis as unknown as { __arianeDb?: Database.Database };
 export const db = globalForDb.__arianeDb ?? create();
 if (process.env.NODE_ENV !== "production") globalForDb.__arianeDb = db;
+
+/** Vide immédiatement les écritures en attente du WAL dans le fichier ariane.db */
+export function checkpointDb() {
+  try {
+    db.pragma("wal_checkpoint(TRUNCATE)");
+  } catch {}
+}
+
+if (typeof process !== "undefined") {
+  process.on("beforeExit", () => checkpointDb());
+}

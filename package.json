@@ -11,7 +11,8 @@
     "verify": "tsx scripts/verify-import.ts",
     "migrate:status": "tsx scripts/migrate-status.ts",
     "audit": "tsx scripts/audit-import.ts",
-    "geneanet": "tsx scripts/match-geneanet.ts"
+    "geneanet": "tsx scripts/match-geneanet.ts",
+    "db:save": "tsx scripts/checkpoint.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

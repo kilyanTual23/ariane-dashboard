@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { checkpointDb } from "@/lib/db";
 import { normalizePlace, parseDateInput } from "@/lib/dates";
 import { inferSex } from "@/lib/names";
 import * as q from "@/lib/queries";
@@ -25,6 +26,7 @@ function num(fd: FormData, key: string): number | null {
 }
 
 function refreshProfile(slug: string) {
+  checkpointDb();
   revalidatePath(`/p/${slug}`, "layout");
 }
 
