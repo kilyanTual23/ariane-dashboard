@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 export type PickerPerson = {
   id: number;
@@ -27,6 +27,8 @@ export function PersonSelect({
   people,
   placeholder = "Chercher ou créer une personne…",
   required = false,
+  value: controlledId,
+  onChange,
 }: {
   /** Champ caché qui porte l'identifiant quand la personne existe déjà. */
   name: string;
@@ -35,11 +37,30 @@ export function PersonSelect({
   people: PickerPerson[];
   placeholder?: string;
   required?: boolean;
+  value?: number | null;
+  onChange?: (id: number | null) => void;
 }) {
   const listId = useId();
-  const [value, setValue] = useState("");
-  const match = people.find((p) => personLabel(p) === value);
-  const willCreate = !match && value.trim().length > 1;
+  const initialPerson = people.find((p) => p.id === controlledId);
+  const [text, setText] = useState(initialPerson ? personLabel(initialPerson) : "");
+
+  useEffect(() => {
+    if (controlledId !== undefined) {
+      const p = people.find((x) => x.id === controlledId);
+      setText(p ? personLabel(p) : "");
+    }
+  }, [controlledId, people]);
+
+  const match = people.find((p) => personLabel(p) === text);
+  const willCreate = !match && text.trim().length > 1;
+
+  const handleChange = (newText: string) => {
+    setText(newText);
+    if (onChange) {
+      const found = people.find((p) => personLabel(p) === newText);
+      onChange(found?.id ?? null);
+    }
+  };
 
   return (
     <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -47,10 +68,10 @@ export function PersonSelect({
         className="field"
         name={textName ?? `${name}Name`}
         list={listId}
-        value={value}
+        value={text}
         placeholder={placeholder}
         required={required}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
       />
       <datalist id={listId}>
         {people.map((p) => (
@@ -60,7 +81,7 @@ export function PersonSelect({
       <input type="hidden" name={name} value={match?.id ?? ""} />
       {willCreate && (
         <span className="text-[11px] text-fg-subtle">
-          nouvelle carte « {value.trim()} » — prénoms puis NOM en majuscules
+          nouvelle carte « {text.trim()} » — prénoms puis NOM en majuscules
         </span>
       )}
     </span>

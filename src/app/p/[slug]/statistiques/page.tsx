@@ -6,6 +6,7 @@ import { Card, CompletionBar, Stat, STATUS_DOT } from "@/components/ui";
 import { getProfileBySlug, listPersons } from "@/lib/queries";
 import { publicationOf } from "@/lib/publication";
 import { computeComponents, computeStats } from "@/lib/stats";
+import { detectAllAnomalies } from "@/lib/anomalies";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function StatsPage({ params }: PageProps<"/p/[slug]/statist
   const persons = await listPersons(profile.id);
   const stats = computeStats(persons);
   const components = computeComponents(persons);
+  const anomalies = detectAllAnomalies(persons);
   const toPublish = persons.filter((p) => publicationOf(p) === "à mettre sur Geneanet").length;
   const archived = persons.filter((p) => publicationOf(p) === "archivée").length;
 
@@ -53,6 +55,57 @@ export default async function StatsPage({ params }: PageProps<"/p/[slug]/statist
           hint={stats.blocked.length ? `${stats.blocked.length} fiches bloquées` : "aucun blocage"}
         />
       </div>
+
+      <Card
+        title={`Audit de cohérence — ${anomalies.length === 0 ? "0 anomalie" : `${anomalies.length} anomalie${anomalies.length > 1 ? "s" : ""}`}`}
+        action={
+          <span className="text-xs text-fg-subtle">
+            {anomalies.length === 0 ? "fiches cohérentes" : "incohérences à vérifier"}
+          </span>
+        }
+      >
+        {anomalies.length === 0 ? (
+          <div className="flex items-center gap-2.5 py-3 text-xs text-ok">
+            <span className="text-base">✓</span>
+            <span>
+              Toutes les dates, âges au mariage et écarts générationnels sont biologiquement et chronologiquement cohérents.
+            </span>
+          </div>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border">
+            {anomalies.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span
+                    className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-medium ${
+                      a.severity === "error"
+                        ? "bg-danger/10 text-danger border border-danger/20"
+                        : "bg-warn/10 text-warn border border-warn/20"
+                    }`}
+                  >
+                    {a.title}
+                  </span>
+                  <Link
+                    href={`/p/${slug}/personnes/${a.personId}`}
+                    className="text-sm font-medium text-fg underline-offset-4 hover:underline"
+                  >
+                    {a.personName}
+                  </Link>
+                  <span className="text-xs text-fg-muted">— {a.description}</span>
+                </div>
+                {a.relatedPersonId && (
+                  <Link
+                    href={`/p/${slug}/personnes/${a.relatedPersonId}`}
+                    className="text-xs text-fg-subtle underline hover:text-fg"
+                  >
+                    voir {a.relatedPersonName} →
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {components.length > 1 && (
         <Card

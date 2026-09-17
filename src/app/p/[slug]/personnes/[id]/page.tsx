@@ -26,6 +26,7 @@ import { StatusPicker } from "@/components/StatusPicker";
 import { buttonClass } from "@/components/ui";
 import { formatStamp, GENEANET_URL, publicationOf } from "@/lib/publication";
 import { getProfileBySlug, listPersons, listPlaces, listSources } from "@/lib/queries";
+import { detectPersonAnomalies } from "@/lib/anomalies";
 import { generationOf } from "@/lib/stats";
 import { summarize } from "@/lib/summary";
 import { ACT_KINDS, KINSHIPS, type Person, type PersonRef } from "@/lib/types";
@@ -94,6 +95,9 @@ export default async function PersonPage({
   ]);
   const person: Person | undefined = persons.find((p) => p.id === Number(id));
   if (!person) notFound();
+
+  const byId = new Map(persons.map((p) => [p.id, p]));
+  const anomalies = detectPersonAnomalies(person, byId);
 
   const sources = await listSources(person.id);
   const pickable: PickerPerson[] = persons
@@ -177,6 +181,40 @@ export default async function PersonPage({
       {/* ---------------------------------------------------------- la carte */}
       <article className="rounded-3xl border border-border bg-surface p-6 shadow-card sm:p-7">
         <SlotStrip score={score} total={total} missing={missing} />
+
+        {anomalies.length > 0 && (
+          <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-danger/30 bg-danger/5 p-4 text-xs text-danger">
+            <div className="flex items-center gap-2 font-medium text-[13px]">
+              <span>⚠️</span>
+              <span>
+                {anomalies.length} anomalie{anomalies.length > 1 ? "s" : ""} chronologique{anomalies.length > 1 ? "s" : ""} détectée{anomalies.length > 1 ? "s" : ""}
+              </span>
+            </div>
+            <ul className="flex flex-col gap-1.5 pl-5 list-disc text-fg-muted">
+              {anomalies.map((a) => (
+                <li key={a.id}>
+                  <strong className={a.severity === "error" ? "text-danger" : "text-warn"}>
+                    {a.title}
+                  </strong>{" "}
+                  : {a.description}
+                  {a.relatedPersonId && a.relatedPersonName && (
+                    <>
+                      {" "}
+                      (
+                      <Link
+                        href={`/p/${slug}/personnes/${a.relatedPersonId}`}
+                        className="underline hover:text-fg"
+                      >
+                        voir {a.relatedPersonName}
+                      </Link>
+                      )
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <header className="mt-5 flex flex-wrap items-start gap-4">
           <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-medium tracking-wide text-fg-muted">

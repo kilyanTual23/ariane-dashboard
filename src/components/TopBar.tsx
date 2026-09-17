@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { useEffect, useState } from "react";
+import { GlobalSearchModal, type GlobalSearchItem } from "@/components/GlobalSearchModal";
+
 type Tab = { href: string; label: string; badge?: number };
 
 /**
@@ -14,14 +17,39 @@ export function TopBar({
   current,
   tabs,
   secondary,
+  searchItems,
+  profileId,
 }: {
   profiles: { slug: string; name: string }[];
   current: string;
   tabs: Tab[];
   secondary: Tab[];
+  searchItems?: GlobalSearchItem[];
+  profileId?: number;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput =
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement)?.isContentEditable;
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      } else if (e.key === "/" && !isInput) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const isActive = (href: string) =>
     href === pathname || (pathname.startsWith(`${href}/`) && href.split("/").length > 3);
@@ -74,7 +102,22 @@ export function TopBar({
             </Link>
           ))}
 
-          <span className="ml-auto flex shrink-0 items-center gap-0.5">
+          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            {searchItems && profileId && (
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-fg-muted shadow-soft transition-colors hover:border-border-strong hover:text-fg"
+                title="Rechercher partout (⌘K ou /)"
+              >
+                <span>🔍</span>
+                <span className="hidden xl:inline">Rechercher…</span>
+                <kbd className="hidden sm:inline-block rounded border border-border bg-surface-2 px-1 py-px font-mono text-[10px] text-fg-subtle">
+                  ⌘K
+                </kbd>
+              </button>
+            )}
+
             {secondary.map((tab) => (
               <Link
                 key={tab.href}
@@ -91,6 +134,16 @@ export function TopBar({
           </span>
         </nav>
       </div>
+
+      {searchItems && profileId && (
+        <GlobalSearchModal
+          slug={current}
+          profileId={profileId}
+          items={searchItems}
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+        />
+      )}
     </header>
   );
 }
