@@ -177,6 +177,9 @@ export async function setPersonField(input: {
   }
 
   await q.updatePerson(personId, patch);
+  if (field !== "status") {
+    await q.checkAndUpdatePersonCompletion(personId);
+  }
   // Le sexe départage père (2n) et mère (2n+1) : la numérotation doit suivre.
   if (field === "sex") {
     const profileId = await q.profileIdOfPerson(personId);
@@ -206,6 +209,11 @@ export async function setUnionField(input: {
       patch.source_ignored = 0;
     }
     await q.updateUnion(input.unionId, patch);
+  }
+  const union = await q.getUnionRow(input.unionId);
+  if (union) {
+    if (union.partner1_id) await q.checkAndUpdatePersonCompletion(union.partner1_id);
+    if (union.partner2_id) await q.checkAndUpdatePersonCompletion(union.partner2_id);
   }
   refreshProfile(input.slug);
 }
@@ -334,6 +342,7 @@ export async function smartCreatePersonAction(fd: FormData) {
   }
 
   await q.recomputeSosa(profileId);
+  await q.checkAndUpdatePersonCompletion(primaryId);
   refreshProfile(slug);
   redirect(`/p/${slug}/personnes/${primaryId}`);
 }
@@ -344,6 +353,7 @@ export async function toggleLivingAction(fd: FormData) {
   const isLiving = num(fd, "isLiving") ?? 0;
   if (!slug || !personId) return;
   await q.updatePerson(personId, { is_living: isLiving });
+  await q.checkAndUpdatePersonCompletion(personId);
   refreshProfile(slug);
 }
 
@@ -353,6 +363,7 @@ export async function toggleUnmarriedAction(fd: FormData) {
   const isUnmarried = num(fd, "isUnmarried") ?? 0;
   if (!slug || !personId) return;
   await q.updatePerson(personId, { is_unmarried: isUnmarried });
+  await q.checkAndUpdatePersonCompletion(personId);
   refreshProfile(slug);
 }
 
@@ -379,6 +390,7 @@ export async function toggleActIgnoredAction(fd: FormData) {
       patch.birth_source = null;
     }
     await q.updatePerson(personId, patch);
+    await q.checkAndUpdatePersonCompletion(personId);
   } else if (actKind === "death" && personId) {
     const patch: q.PersonInput = { death_source_ignored: ignored };
     if (ignored && reason) {
@@ -387,6 +399,7 @@ export async function toggleActIgnoredAction(fd: FormData) {
       patch.death_source = null;
     }
     await q.updatePerson(personId, patch);
+    await q.checkAndUpdatePersonCompletion(personId);
   } else if (actKind === "marriage" && unionId) {
     const patch: q.UnionInput = { source_ignored: ignored };
     if (ignored && reason) {
@@ -395,6 +408,9 @@ export async function toggleActIgnoredAction(fd: FormData) {
       patch.source = null;
     }
     await q.updateUnion(unionId, patch);
+    const u = await q.getUnionRow(unionId);
+    if (u?.partner1_id) await q.checkAndUpdatePersonCompletion(u.partner1_id);
+    if (u?.partner2_id) await q.checkAndUpdatePersonCompletion(u.partner2_id);
   }
 
   refreshProfile(slug);
@@ -501,6 +517,7 @@ export async function addParentAction(fd: FormData) {
   );
   if (!parentId) return;
   await q.addParent(parentId, childId);
+  await q.checkAndUpdatePersonCompletion(childId);
   await q.recomputeSosa(profileId);
   refreshProfile(slug);
 }
@@ -517,6 +534,7 @@ export async function addChildAction(fd: FormData) {
   );
   if (!childId) return;
   await q.addParent(parentId, childId);
+  await q.checkAndUpdatePersonCompletion(childId);
   await q.recomputeSosa(profileId);
   refreshProfile(slug);
 }
@@ -550,6 +568,9 @@ export async function saveUnionAction(fd: FormData) {
   const unionId = num(fd, "unionId");
   if (unionId) {
     await q.updateUnion(unionId, input);
+    const u = await q.getUnionRow(unionId);
+    if (u?.partner1_id) await q.checkAndUpdatePersonCompletion(u.partner1_id);
+    if (u?.partner2_id) await q.checkAndUpdatePersonCompletion(u.partner2_id);
   } else {
     const personId = num(fd, "personId");
     if (!personId) return;
@@ -559,6 +580,8 @@ export async function saveUnionAction(fd: FormData) {
       str(fd, "spouseIdName"),
     );
     await q.createUnion(profileId, { ...input, partner1_id: personId, partner2_id: spouseId });
+    await q.checkAndUpdatePersonCompletion(personId);
+    if (spouseId) await q.checkAndUpdatePersonCompletion(spouseId);
   }
   refreshProfile(slug);
 }

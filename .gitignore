@@ -45,3 +45,6 @@ next-env.d.ts
 # ariane.db reste versionnable si tu veux en garder un historique.
 /data/*.db-wal
 /data/*.db-shm
+/data/*.db-info
+/data/*-replica.db*
+/data/.tmp.*

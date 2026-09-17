@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { queryAll, queryOne, execute, batch } from "./db";
 import { computeCompletion } from "./completion";
 import type {
@@ -47,9 +48,9 @@ export async function listProfiles(): Promise<ProfileSummary[]> {
   );
 }
 
-export async function getProfileBySlug(slug: string): Promise<Profile | null> {
+export const getProfileBySlug = cache(async (slug: string): Promise<Profile | null> => {
   return queryOne<Profile>(`SELECT * FROM profiles WHERE slug = ?`, [slug]);
-}
+});
 
 export async function slugify(name: string): Promise<string> {
   const base =
@@ -276,6 +277,37 @@ export async function getPersonRow(personId: number): Promise<PersonRow | null> 
   return queryOne<PersonRow>(`SELECT * FROM persons WHERE id = ?`, [personId]);
 }
 
+/**
+ * Vérifie si tous les critères de la fiche sont satisfaits (complétion à 100%).
+ * Si oui et que la personne n'est pas encore marquée "Complet", son statut est mis à jour automatiquement.
+ */
+export async function checkAndUpdatePersonCompletion(personId: number): Promise<boolean> {
+  const person = await getPersonRow(personId);
+  if (!person) return false;
+
+  const [unions, parentRes] = await Promise.all([
+    queryAll<UnionRow>(
+      `SELECT * FROM unions WHERE partner1_id = ? OR partner2_id = ? ORDER BY COALESCE(year, 9999), id`,
+      [personId, personId],
+    ),
+    queryOne<{ c: number }>(
+      `SELECT COUNT(*) AS c FROM parent_child WHERE child_id = ?`,
+      [personId],
+    ),
+  ]);
+
+  const parentCount = parentRes?.c ?? 0;
+  const completion = computeCompletion(person, unions[0] ?? null, parentCount);
+
+  if (completion.score === completion.total && completion.total > 0) {
+    if (person.status !== "Complet") {
+      await updatePerson(personId, { status: "Complet" });
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function profileIdOfPerson(personId: number): Promise<number | null> {
   const row = await queryOne<{ profile_id: number }>(`SELECT profile_id FROM persons WHERE id = ?`, [personId]);
   return row?.profile_id ?? null;
@@ -347,6 +379,10 @@ export async function deleteUnion(unionId: number): Promise<void> {
   await execute(`DELETE FROM unions WHERE id = ?`, [unionId]);
 }
 
+export async function getUnionRow(unionId: number): Promise<UnionRow | null> {
+  return queryOne<UnionRow>(`SELECT * FROM unions WHERE id = ?`, [unionId]);
+}
+
 /* --------------------------------------------------------------------- sosa */
 
 /**
@@ -399,7 +435,7 @@ export async function recomputeSosa(profileId: number): Promise<void> {
 
 export type TaskWithPerson = TaskRow & { personName: string | null };
 
-export async function listTasks(profileId: number): Promise<TaskWithPerson[]> {
+export const listTasks = cache(async (profileId: number): Promise<TaskWithPerson[]> => {
   return queryAll<TaskWithPerson>(
     `SELECT t.*, CASE WHEN p.id IS NULL THEN NULL ELSE TRIM(p.given_names || ' ' || p.surname) END AS personName
      FROM tasks t LEFT JOIN persons p ON p.id = t.person_id
@@ -409,7 +445,7 @@ export async function listTasks(profileId: number): Promise<TaskWithPerson[]> {
               t.created_at DESC`,
     [profileId],
   );
-}
+});
 
 export type TaskInput = Partial<
   Pick<
