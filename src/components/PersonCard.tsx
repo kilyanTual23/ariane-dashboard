@@ -26,10 +26,9 @@ export type CardPerson = {
   isUnmarried?: boolean;
 };
 
-/** Le monogramme tient lieu de portrait : deux lettres, rien de plus. */
-export function monogram(given: string, surname: string) {
-  const a = given.trim()[0] ?? "";
-  const b = surname.trim()[0] ?? "";
+export function monogram(given?: string | null, surname?: string | null) {
+  const a = (given ?? "").trim()[0] ?? "";
+  const b = (surname ?? "").trim()[0] ?? "";
   return (a + b).toUpperCase() || "?";
 }
 

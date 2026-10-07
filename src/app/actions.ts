@@ -25,9 +25,10 @@ function num(fd: FormData, key: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function refreshProfile(slug: string) {
-  checkpointDb();
+async function refreshProfile(slug: string) {
+  await checkpointDb();
   revalidatePath(`/p/${slug}`, "layout");
+  revalidatePath(`/p/${slug}/personnes`, "page");
 }
 
 /* ----------------------------------------------------------------- profils */

@@ -233,6 +233,39 @@ export function PersonGrid({
     setIsHydrated(true);
   }, [slug, storageKey, presetsStorageKey]);
 
+  // Synchronisation avec les props externes (recherche globale, liens d'onglets, navigation)
+  useEffect(() => {
+    if (initialQuery !== undefined) setQuery(initialQuery);
+  }, [initialQuery]);
+
+  useEffect(() => {
+    if (initialStatus !== undefined) setStatus(initialStatus);
+  }, [initialStatus]);
+
+  useEffect(() => {
+    if (initialSosaOnly !== undefined) setSosaOnly(initialSosaOnly);
+  }, [initialSosaOnly]);
+
+  useEffect(() => {
+    if (initialKinship !== undefined) setKinship(initialKinship);
+  }, [initialKinship]);
+
+  useEffect(() => {
+    if (initialMissing !== undefined) setMissing(initialMissing);
+  }, [initialMissing]);
+
+  useEffect(() => {
+    if (initialPublication !== undefined) setPublication(initialPublication);
+  }, [initialPublication]);
+
+  useEffect(() => {
+    if (initialSort !== undefined) setSort(initialSort);
+  }, [initialSort]);
+
+  useEffect(() => {
+    if (initialDesc !== undefined) setDesc(initialDesc);
+  }, [initialDesc]);
+
   // 2. Mémorisation automatique : dès qu'un filtre change, sauvegarder dans localStorage et synchroniser l'URL
   useEffect(() => {
     if (!isHydrated) return;
