@@ -5,6 +5,25 @@ const nextConfig: NextConfig = {
   turbopack: { root: __dirname },
   // better-sqlite3 et libsql sont des modules natifs : ils ne doivent jamais être bundlés.
   serverExternalPackages: ["better-sqlite3", "@libsql/client", "libsql"],
+  // Autoriser l'accès en développement et Server Actions depuis Tailscale
+  allowedDevOrigins: [
+    "100.114.238.81",
+    "100.114.238.81:3000",
+    "*.ts.net",
+    "localhost:3000",
+    "127.0.0.1:3000",
+  ],
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        "100.114.238.81:3000",
+        "100.114.238.81",
+        "*.ts.net",
+        "localhost:3000",
+        "127.0.0.1:3000",
+      ],
+    },
+  },
 };
 
 export default nextConfig;
