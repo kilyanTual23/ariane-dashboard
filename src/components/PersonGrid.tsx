@@ -33,11 +33,15 @@ const MISSING_FILTERS = [
   "Lieu de naissance",
 ] as const;
 
-function norm(v: string) {
+function norm(v: string | null | undefined): string {
+  if (!v) return "";
   return v
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[()[\]{},;:'"«»_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export type FilterState = {
@@ -355,17 +359,42 @@ export function PersonGrid({
   );
 
   const filtered = useMemo(() => {
-    const q = norm(query.trim());
+    const qClean = norm(query);
+    const tokens = qClean ? qClean.split(" ").filter(Boolean) : [];
+
     const result = people.filter((p) => {
       if (sosaOnly && !p.sosa) return false;
       if (status && p.status !== status) return false;
       if (kinship && (p.kinship ?? "") !== kinship) return false;
       if (missing && !p.missing.includes(missing)) return false;
       if (publication && p.publication !== publication) return false;
-      if (!q) return true;
-      return norm(
-        [p.name, p.place, p.deathPlace, p.occupation, p.spouse, p.sosa ? `sosa ${p.sosa}` : ""].filter(Boolean).join(" "),
-      ).includes(q);
+      if (tokens.length === 0) return true;
+
+      const nameNorm = norm(p.name);
+      const givenNorm = norm(p.given);
+      const surnameNorm = norm(p.surname);
+      const bPlaceNorm = norm(p.place);
+      const dPlaceNorm = norm(p.deathPlace);
+      const occNorm = norm(p.occupation);
+      const spouseNorm = norm(p.spouse);
+      const sosaStr = p.sosa ? String(p.sosa) : "";
+      const sosaFull = p.sosa ? `sosa ${p.sosa} #${p.sosa}` : "";
+      const bYearStr = p.birthYear ? String(p.birthYear) : "";
+      const dYearStr = p.deathYear ? String(p.deathYear) : "";
+      const mYearStr = p.marriageYear ? String(p.marriageYear) : "";
+
+      const pool = `${nameNorm} ${givenNorm} ${surnameNorm} ${bPlaceNorm} ${dPlaceNorm} ${occNorm} ${spouseNorm} ${sosaFull} ${bYearStr} ${dYearStr} ${mYearStr}`;
+
+      for (const token of tokens) {
+        const cleanToken = token.replace(/^(#|sosa:?)/, "");
+        const matched =
+          pool.includes(token) ||
+          (cleanToken && sosaStr === cleanToken) ||
+          (cleanToken && (bYearStr === cleanToken || dYearStr === cleanToken || mYearStr === cleanToken));
+
+        if (!matched) return false;
+      }
+      return true;
     });
 
     const dir = desc ? -1 : 1;

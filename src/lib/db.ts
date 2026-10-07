@@ -6,8 +6,12 @@ function createDbClient(): Client {
   const tursoToken = process.env.TURSO_AUTH_TOKEN;
 
   if (tursoUrl) {
-    // Pendant le build Next.js (multi-workers concurrents) ou si désactivé explicitement : connexion directe
-    if (process.env.TURSO_DISABLE_REPLICA || process.env.NEXT_PHASE === "phase-production-build") {
+    // Sur Windows (où l'Embedded Replica file sync n'est pas supporté par libsql) ou si désactivé : connexion directe
+    if (
+      process.platform === "win32" ||
+      process.env.TURSO_DISABLE_REPLICA ||
+      process.env.NEXT_PHASE === "phase-production-build"
+    ) {
       return createClient({
         url: tursoUrl,
         authToken: tursoToken,
@@ -52,13 +56,19 @@ let syncPromise: Promise<void> | null = null;
 
 export async function syncDb(): Promise<void> {
   const client = db as Client & { sync?: () => Promise<void> };
-  if (typeof client.sync === "function") {
+  if (
+    typeof client.sync === "function" &&
+    process.env.TURSO_DATABASE_URL &&
+    process.platform !== "win32"
+  ) {
     try {
       await client.sync();
       isSynced = true;
     } catch (err) {
       console.warn("[Turso] Avertissement de synchronisation de la réplique:", err);
     }
+  } else {
+    isSynced = true;
   }
 }
 

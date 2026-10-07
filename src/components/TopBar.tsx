@@ -38,12 +38,15 @@ export function TopBar({
         e.target instanceof HTMLTextAreaElement ||
         (e.target as HTMLElement)?.isContentEditable;
 
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      const key = e.key.toLowerCase();
+      const isAltK = e.altKey && !e.ctrlKey && !e.metaKey && key === "k";
+      const isShiftK = (e.ctrlKey || e.metaKey) && e.shiftKey && key === "k";
+      const isSlash = e.key === "/" && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey;
+      const isCtrlK = (e.ctrlKey || e.metaKey) && !e.shiftKey && key === "k";
+
+      if (isAltK || isShiftK || isSlash || isCtrlK) {
         e.preventDefault();
-        setSearchOpen(true);
-      } else if (e.key === "/" && !isInput) {
-        e.preventDefault();
-        setSearchOpen(true);
+        setSearchOpen((prev) => !prev);
       }
     };
 
@@ -108,12 +111,12 @@ export function TopBar({
                 type="button"
                 onClick={() => setSearchOpen(true)}
                 className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-fg-muted shadow-soft transition-colors hover:border-border-strong hover:text-fg"
-                title="Rechercher partout (⌘K ou /)"
+                title="Rechercher partout (Alt+K ou /)"
               >
                 <span>🔍</span>
                 <span className="hidden xl:inline">Rechercher…</span>
-                <kbd className="hidden sm:inline-block rounded border border-border bg-surface-2 px-1 py-px font-mono text-[10px] text-fg-subtle">
-                  ⌘K
+                <kbd className="hidden sm:inline-block rounded border border-border bg-surface-2 px-1.5 py-px font-mono text-[10px] text-fg-subtle">
+                  Alt+K
                 </kbd>
               </button>
             )}

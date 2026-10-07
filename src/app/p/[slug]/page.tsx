@@ -99,9 +99,15 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
   const searchable: SearchPerson[] = persons.map((p) => ({
     id: p.id,
     name: p.displayName,
+    givenNames: p.given_names,
+    surname: p.surname,
+    sosa: p.sosa,
     birthYear: p.birth_year,
     deathYear: p.death_year,
     place: p.birth_place ?? p.death_place,
+    birthPlace: p.birth_place,
+    deathPlace: p.death_place,
+    occupation: p.occupation,
     percent: p.completion.percent,
   }));
 

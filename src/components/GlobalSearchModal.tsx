@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -11,8 +10,8 @@ import type { Kinship, Status } from "@/lib/types";
 export type GlobalSearchItem = {
   id: number;
   name: string;
-  givenNames: string;
-  surname: string;
+  givenNames?: string | null;
+  surname?: string | null;
   sosa: number | null;
   kinship: Kinship | null;
   status: Status;
@@ -24,11 +23,15 @@ export type GlobalSearchItem = {
   percent: number;
 };
 
-function norm(v: string) {
+function norm(v: string | null | undefined): string {
+  if (!v) return "";
   return v
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[()[\]{},;:'"«»_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function GlobalSearchModal({
@@ -59,8 +62,9 @@ export function GlobalSearchModal({
   }, [open]);
 
   const filteredResults = useMemo((): { item: GlobalSearchItem; score: number; reason: string }[] => {
-    const q = norm(query.trim());
-    if (!q) {
+    const qClean = norm(query);
+
+    if (!qClean) {
       // Si requête vide mais filtre actif, ou 6 personnes récentes / SOSA
       let base = items;
       if (filterType === "sosa") {
@@ -73,62 +77,83 @@ export function GlobalSearchModal({
       return base.slice(0, filterType === "all" ? 6 : 10).map((p) => ({ item: p, score: 0, reason: "" }));
     }
 
-    // Détection si recherche de sosa pure (ex: "sosa 14" ou "#14")
-    const sosaMatch = q.match(/^(?:sosa|#)\s*(\d+)$/);
-    const targetSosa = sosaMatch ? Number(sosaMatch[1]) : null;
+    const tokens = qClean.split(" ").filter((t) => t.length > 0);
+    if (tokens.length === 0) return [];
 
-    return items
-      .map((p) => {
-        let matchScore = 0;
-        let matchReason = "";
+    const scored: { item: GlobalSearchItem; score: number; reason: string }[] = [];
 
-        // Match Sosa
-        if (targetSosa !== null && p.sosa === targetSosa) {
-          matchScore += 100;
-          matchReason = `Sosa ${p.sosa}`;
-        } else if (p.sosa && String(p.sosa) === q) {
-          matchScore += 80;
-          matchReason = `Sosa ${p.sosa}`;
+    for (const p of items) {
+      // Filtres de catégorie
+      if (filterType === "sosa" && !p.sosa) continue;
+      if (filterType === "job" && (!p.occupation || !norm(p.occupation).includes(qClean))) continue;
+      if (filterType === "place" && (!p.birthPlace || !norm(p.birthPlace).includes(qClean)) && (!p.deathPlace || !norm(p.deathPlace).includes(qClean))) continue;
+
+      const nameNorm = norm(p.name);
+      const givenNorm = norm(p.givenNames);
+      const surnameNorm = norm(p.surname);
+      const bPlaceNorm = norm(p.birthPlace);
+      const dPlaceNorm = norm(p.deathPlace);
+      const occNorm = norm(p.occupation);
+      const sosaStr = p.sosa ? String(p.sosa) : "";
+      const sosaFull = p.sosa ? `sosa ${p.sosa} #${p.sosa}` : "";
+      const bYearStr = p.birthYear ? String(p.birthYear) : "";
+      const dYearStr = p.deathYear ? String(p.deathYear) : "";
+      const yearsStr = `${bYearStr} ${dYearStr}`.trim();
+      const statusNorm = norm(p.status);
+
+      const pool = `${nameNorm} ${givenNorm} ${surnameNorm} ${bPlaceNorm} ${dPlaceNorm} ${occNorm} ${sosaFull} ${yearsStr} ${statusNorm}`;
+
+      let matchesAll = true;
+      for (const token of tokens) {
+        const cleanToken = token.replace(/^(#|sosa:?)/, "");
+        const matched =
+          pool.includes(token) ||
+          (cleanToken && sosaStr === cleanToken) ||
+          (cleanToken && (bYearStr === cleanToken || dYearStr === cleanToken));
+
+        if (!matched) {
+          matchesAll = false;
+          break;
         }
+      }
 
-        // Match Nom / Prénoms
-        const fullNameNorm = norm(`${p.givenNames} ${p.surname}`);
-        if (fullNameNorm.startsWith(q)) {
-          matchScore += 50;
-        } else if (fullNameNorm.includes(q)) {
-          matchScore += 30;
-        }
+      if (!matchesAll) continue;
 
-        // Match Métier
-        if (p.occupation && norm(p.occupation).includes(q)) {
-          matchScore += 25;
-          matchReason = matchReason || `Métier : ${p.occupation}`;
-        }
+      let score = 0;
+      let reason = "";
 
-        // Match Lieux (naissance ou décès)
-        const bPlace = p.birthPlace ? norm(p.birthPlace) : "";
-        const dPlace = p.deathPlace ? norm(p.deathPlace) : "";
-        if (bPlace.includes(q) || dPlace.includes(q)) {
-          matchScore += 20;
-          const matchedPlace = bPlace.includes(q) ? p.birthPlace : p.deathPlace;
-          matchReason = matchReason || `Lieu : ${matchedPlace?.split(",")[0]?.trim()}`;
-        }
+      if (sosaStr === qClean || sosaFull.includes(qClean)) {
+        score += 100;
+        reason = `Sosa ${p.sosa}`;
+      } else if (surnameNorm === qClean || nameNorm === qClean) {
+        score += 90;
+      } else if (surnameNorm.startsWith(qClean) || nameNorm.startsWith(qClean)) {
+        score += 70;
+      } else if (surnameNorm.includes(qClean) || nameNorm.includes(qClean)) {
+        score += 45;
+      } else if (bPlaceNorm.includes(qClean) || dPlaceNorm.includes(qClean)) {
+        score += 35;
+        const matchedPlace = bPlaceNorm.includes(qClean) ? p.birthPlace : p.deathPlace;
+        reason = `Lieu : ${matchedPlace?.split(",")[0]?.trim()}`;
+      } else if (occNorm.includes(qClean)) {
+        score += 30;
+        reason = `Métier : ${p.occupation}`;
+      } else if (yearsStr.includes(qClean)) {
+        score += 25;
+        reason = `Année : ${bYearStr || dYearStr}`;
+      }
 
-        // Match Statut
-        if (norm(p.status).includes(q)) {
-          matchScore += 15;
-          matchReason = matchReason || `Statut : ${p.status}`;
-        }
+      for (const token of tokens) {
+        if (surnameNorm.startsWith(token) || givenNorm.startsWith(token)) score += 15;
+        if (nameNorm.includes(token)) score += 10;
+        if (bYearStr === token || dYearStr === token) score += 15;
+        if (sosaStr === token) score += 20;
+      }
 
-        // Filtre de catégorie
-        if (filterType === "sosa" && !p.sosa) return null;
-        if (filterType === "job" && (!p.occupation || !norm(p.occupation).includes(q))) return null;
-        if (filterType === "place" && (!bPlace.includes(q) && !dPlace.includes(q))) return null;
+      scored.push({ item: p, score, reason });
+    }
 
-        if (matchScore === 0) return null;
-        return { item: p, score: matchScore, reason: matchReason };
-      })
-      .filter((r): r is { item: GlobalSearchItem; score: number; reason: string } => r !== null)
+    return scored
       .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name, "fr"))
       .slice(0, 10);
   }, [items, query, filterType]);
@@ -137,6 +162,13 @@ export function GlobalSearchModal({
     setSelectedIndex(0);
   }, [query, filterType]);
 
+  const submitSearchToCards = () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    onClose();
+    router.push(`/p/${slug}/personnes?q=${encodeURIComponent(trimmed)}`);
+  };
+
   // Raccourcis clavier
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -144,19 +176,25 @@ export function GlobalSearchModal({
       return;
     }
 
-    if (filteredResults.length === 0) return;
-
-    if (e.key === "ArrowDown") {
+    if (e.key === "ArrowDown" && filteredResults.length > 0) {
       e.preventDefault();
       setSelectedIndex((prev) => (prev + 1) % filteredResults.length);
-    } else if (e.key === "ArrowUp") {
+      return;
+    }
+
+    if (e.key === "ArrowUp" && filteredResults.length > 0) {
       e.preventDefault();
       setSelectedIndex((prev) => (prev - 1 + filteredResults.length) % filteredResults.length);
-    } else if (e.key === "Enter") {
-      if (filteredResults[selectedIndex]) {
-        e.preventDefault();
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (filteredResults.length > 0 && filteredResults[selectedIndex]) {
         onClose();
         router.push(`/p/${slug}/personnes/${filteredResults[selectedIndex].item.id}`);
+      } else if (query.trim()) {
+        submitSearchToCards();
       }
     }
   };
@@ -175,7 +213,7 @@ export function GlobalSearchModal({
           <input
             ref={inputRef}
             className="flex-1 bg-transparent text-[16px] text-fg placeholder:text-fg-subtle focus:outline-none"
-            placeholder="Rechercher par nom, lieu, métier, sosa… (ex: Fougères, meunier, sosa 12)"
+            placeholder="Rechercher par nom, lieu, métier, sosa, année… (Alt+K ou /)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -296,30 +334,49 @@ export function GlobalSearchModal({
           })}
 
           {filteredResults.length === 0 && (
-            <div className="p-8 text-center text-sm text-fg-muted">
-              Aucun résultat pour « {query.trim()} »
+            <div className="p-8 text-center">
+              <p className="text-sm text-fg-muted">
+                Aucun résultat immédiat pour « {query.trim()} »
+              </p>
+              <button
+                type="button"
+                onClick={submitSearchToCards}
+                className="mt-2 text-xs font-medium text-fg underline underline-offset-4 hover:opacity-80"
+              >
+                Chercher dans toutes les Cartes →
+              </button>
             </div>
           )}
         </div>
 
-        {/* Footer avec action de création rapide */}
+        {/* Footer avec action de création rapide et voir dans les cartes */}
         <div className="flex flex-wrap items-center justify-between border-t border-border bg-surface-2/30 px-4 py-2.5 text-xs text-fg-subtle">
-          {query.trim().length >= 2 ? (
-            <form action={quickCreatePersonAction} className="flex items-center gap-2">
-              <input type="hidden" name="slug" value={slug} />
-              <input type="hidden" name="profileId" value={profileId} />
-              <input type="hidden" name="fullName" value={query.trim()} />
+          {query.trim() ? (
+            <div className="flex items-center gap-3">
               <button
-                type="submit"
+                type="button"
+                onClick={submitSearchToCards}
                 className="font-medium text-fg underline underline-offset-4 hover:opacity-80"
               >
-                + Créer la fiche « {query.trim()} »
+                Voir dans les Cartes →
               </button>
-            </form>
+
+              <form action={quickCreatePersonAction} className="flex items-center gap-2">
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="profileId" value={profileId} />
+                <input type="hidden" name="fullName" value={query.trim()} />
+                <button
+                  type="submit"
+                  className="text-fg-muted hover:text-fg underline underline-offset-4"
+                >
+                  + Créer fiche
+                </button>
+              </form>
+            </div>
           ) : (
-            <span>Tapez au moins 2 caractères pour filtrer</span>
+            <span>Tapez un mot-clé ou filtrez par catégorie</span>
           )}
-          <span className="hidden sm:inline">↑ ↓ pour naviguer · Entrée pour ouvrir</span>
+          <span className="hidden sm:inline">↑ ↓ naviguer · Entrée ouvrir · ESC fermer</span>
         </div>
       </div>
     </div>
