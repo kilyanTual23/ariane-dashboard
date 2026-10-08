@@ -13,7 +13,8 @@
     "audit": "tsx scripts/audit-import.ts",
     "geneanet": "tsx scripts/match-geneanet.ts",
     "db:save": "tsx scripts/checkpoint.ts",
-    "migrate:turso": "tsx scripts/migrate-to-turso.ts"
+    "migrate:turso": "tsx scripts/migrate-to-turso.ts",
+    "actes:download": "tsx scripts/download-all-actes.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { toggleActIgnoredAction } from "@/app/actions";
+import { downloadActAction, toggleActIgnoredAction } from "@/app/actions";
 import { Inline, type InlineTarget } from "@/components/Inline";
 
 const COMMON_REASONS = [
@@ -19,6 +19,7 @@ export function ActSlot({
   label = "Acte",
   value,
   isIgnored,
+  hasLocalCopy = false,
 }: {
   slug: string;
   personId?: number;
@@ -27,12 +28,23 @@ export function ActSlot({
   label?: string;
   value: string | null | undefined;
   isIgnored: boolean;
+  hasLocalCopy?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [modalOpen, setModalOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [downloading, setDownloading] = useState(false);
   const [optimisticIgnored, setOptimisticIgnored] = useState(isIgnored);
   const [selectedReason, setSelectedReason] = useState<string>(COMMON_REASONS[0]);
   const [customReason, setCustomReason] = useState("");
+
+  const localImageUrl =
+    personId
+      ? `/api/actes/person_${personId}_${actKind}.jpg`
+      : unionId
+        ? `/api/actes/union_${unionId}_marriage.jpg`
+        : null;
 
   useEffect(() => {
     setOptimisticIgnored(isIgnored);
@@ -46,6 +58,24 @@ export function ActSlot({
           personId: personId!,
           field: actKind === "birth" ? "birth_source" : "death_source",
         };
+
+  const handleDownload = () => {
+    if (!value?.startsWith("http")) return;
+    setDownloading(true);
+    startTransition(async () => {
+      try {
+        const fd = new FormData();
+        fd.append("slug", slug);
+        fd.append("url", value);
+        if (personId) fd.append("personId", String(personId));
+        if (unionId) fd.append("unionId", String(unionId));
+        fd.append("actKind", actKind);
+        await downloadActAction(fd);
+      } finally {
+        setDownloading(false);
+      }
+    });
+  };
 
   const handleIgnore = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,30 +142,59 @@ export function ActSlot({
       <div className="flex items-center justify-between gap-1 pb-0.5">
         <span className="slot-label">{label}</span>
 
-        {!optimisticIgnored ? (
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className="rounded px-1.5 py-0.5 text-[10.5px] font-medium text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
-            title="Marquer cet acte comme introuvable ou inaccessible pour ne pas pénaliser la complétion de la carte"
-          >
-            Ø Ignorer
-          </button>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded bg-fg/10 px-1.5 py-0.2 text-[10px] font-semibold text-fg">
-              🚫 Ignoré
-            </span>
+        <div className="flex items-center gap-1.5">
+          {hasLocalCopy && localImageUrl && (
             <button
               type="button"
-              onClick={handleRestore}
-              className="text-[10.5px] text-fg-subtle underline hover:text-fg"
-              title="Rétablir l'exigence de cet acte pour cette personne"
+              onClick={() => {
+                setZoom(1);
+                setViewerOpen(true);
+              }}
+              className="inline-flex items-center gap-1 rounded bg-fg/10 px-1.5 py-0.5 text-[10.5px] font-medium text-fg transition-colors hover:bg-fg/20"
+              title="Consulter la copie locale enregistrée de cet acte"
             >
-              Rétablir
+              <span>🖼️</span>
+              <span className="hidden sm:inline">Copie locale</span>
             </button>
-          </div>
-        )}
+          )}
+
+          {!hasLocalCopy && value?.startsWith("http") && !optimisticIgnored && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="rounded px-1.5 py-0.5 text-[10.5px] font-medium text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+              title="Télécharger une copie haute définition sur le serveur en cas d'indisponibilité du lien"
+            >
+              {downloading ? "⏳" : "⬇️ Sauvegarder"}
+            </button>
+          )}
+
+          {!optimisticIgnored ? (
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="rounded px-1.5 py-0.5 text-[10.5px] font-medium text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+              title="Marquer cet acte comme introuvable ou inaccessible pour ne pas pénaliser la complétion de la carte"
+            >
+              Ø Ignorer
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded bg-fg/10 px-1.5 py-0.2 text-[10px] font-semibold text-fg">
+                🚫 Ignoré
+              </span>
+              <button
+                type="button"
+                onClick={handleRestore}
+                className="text-[10.5px] text-fg-subtle underline hover:text-fg"
+                title="Rétablir l'exigence de cet acte pour cette personne"
+              >
+                Rétablir
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Contenu du Slot */}
@@ -242,6 +301,107 @@ export function ActSlot({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de visualisation de l'acte haute résolution */}
+      {viewerOpen && localImageUrl && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-black/85 p-3 sm:p-6 backdrop-blur-md"
+          onClick={() => setViewerOpen(false)}
+        >
+          {/* Barre d'outils supérieure */}
+          <div
+            className="flex items-center justify-between gap-3 rounded-2xl bg-surface/95 px-4 py-2.5 shadow-xl backdrop-blur-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base font-semibold text-fg truncate">
+                {label} (copie locale haute définition)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
+                className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg hover:bg-surface-2"
+                title="Dézoomer"
+              >
+                −
+              </button>
+              <span className="text-xs font-medium text-fg-muted min-w-12 text-center">
+                {Math.round(zoom * 100)} %
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+                className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg hover:bg-surface-2"
+                title="Zoomer"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom(1)}
+                className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-fg-subtle hover:bg-surface-2 hover:text-fg"
+                title="Réinitialiser le zoom"
+              >
+                100%
+              </button>
+
+              <span className="h-4 w-px bg-border" />
+
+              <a
+                href={localImageUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-fg hover:bg-surface-2"
+                title="Ouvrir l'image originale dans un nouvel onglet"
+              >
+                Ouvrir ↗
+              </a>
+              <a
+                href={localImageUrl}
+                download
+                className="rounded-lg bg-fg px-3 py-1 text-xs font-medium text-accent-fg hover:opacity-90"
+                title="Télécharger l'image sur votre ordinateur"
+              >
+                Télécharger 💾
+              </a>
+
+              <button
+                type="button"
+                onClick={() => setViewerOpen(false)}
+                className="ml-1 rounded-lg p-1.5 text-fg-subtle hover:bg-surface-2 hover:text-fg"
+                title="Fermer (Échap)"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Zone d'affichage de l'image */}
+          <div
+            className="flex-1 overflow-auto flex items-center justify-center p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setViewerOpen(false);
+            }}
+          >
+            <img
+              src={localImageUrl}
+              alt={label}
+              style={{
+                transform: `scale(${zoom})`,
+                transformOrigin: "center center",
+                transition: "transform 0.15s ease-out",
+                maxWidth: zoom <= 1 ? "100%" : "none",
+                maxHeight: zoom <= 1 ? "100%" : "none",
+              }}
+              className="rounded-xl shadow-2xl object-contain select-none"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}

@@ -48,3 +48,5 @@ next-env.d.ts
 /data/*.db-info
 /data/*-replica.db*
 /data/.tmp.*
+/data/actes/*
+!/data/actes/.gitkeep

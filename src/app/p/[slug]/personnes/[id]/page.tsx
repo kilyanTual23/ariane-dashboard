@@ -26,6 +26,7 @@ import { StatusPicker } from "@/components/StatusPicker";
 import { buttonClass } from "@/components/ui";
 import { formatStamp, GENEANET_URL, publicationOf } from "@/lib/publication";
 import { getProfileBySlug, listPersons, listPlaces, listSources } from "@/lib/queries";
+import { hasLocalAct } from "@/lib/act-downloader";
 import { detectPersonAnomalies } from "@/lib/anomalies";
 import { generationOf } from "@/lib/stats";
 import { summarize } from "@/lib/summary";
@@ -510,6 +511,7 @@ export default async function PersonPage({
               label="Acte"
               value={person.birth_source}
               isIgnored={Boolean(person.birth_source_ignored)}
+              hasLocalCopy={hasLocalAct({ kind: "person", personId: person.id, actKind: "birth" })}
             />
           </div>
 
@@ -597,6 +599,7 @@ export default async function PersonPage({
                   label="Acte"
                   value={union.source}
                   isIgnored={Boolean(union.source_ignored)}
+                  hasLocalCopy={hasLocalAct({ kind: "union", unionId: union.id })}
                 />
               </div>
             </div>
@@ -784,6 +787,7 @@ export default async function PersonPage({
                   label="Acte"
                   value={person.death_source}
                   isIgnored={Boolean(person.death_source_ignored)}
+                  hasLocalCopy={hasLocalAct({ kind: "person", personId: person.id, actKind: "death" })}
                 />
               </div>
             </div>

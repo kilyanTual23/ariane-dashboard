@@ -7,6 +7,7 @@ import { checkpointDb } from "@/lib/db";
 import { normalizePlace, parseDateInput } from "@/lib/dates";
 import { inferSex } from "@/lib/names";
 import * as q from "@/lib/queries";
+import { downloadAct } from "@/lib/act-downloader";
 import { STATUSES, type Priority, type Status, type TaskStatus } from "@/lib/types";
 
 /* ------------------------------------------------------------------ helpers */
@@ -142,6 +143,9 @@ export async function setPersonField(input: {
       patch.birth_source = value || null;
       if (value && (value.startsWith("http") || value.startsWith("www"))) {
         patch.birth_source_ignored = 0;
+        void downloadAct(value, { kind: "person", personId, actKind: "birth" }).then((r) => {
+          if (r.ok) refreshProfile(slug);
+        });
       }
       break;
     }
@@ -149,6 +153,9 @@ export async function setPersonField(input: {
       patch.death_source = value || null;
       if (value && (value.startsWith("http") || value.startsWith("www"))) {
         patch.death_source_ignored = 0;
+        void downloadAct(value, { kind: "person", personId, actKind: "death" }).then((r) => {
+          if (r.ok) refreshProfile(slug);
+        });
       }
       break;
     }
@@ -208,6 +215,9 @@ export async function setUnionField(input: {
     const patch: q.UnionInput = { source: value || null };
     if (value && (value.startsWith("http") || value.startsWith("www"))) {
       patch.source_ignored = 0;
+      void downloadAct(value, { kind: "union", unionId: input.unionId }).then((r) => {
+        if (r.ok) refreshProfile(input.slug);
+      });
     }
     await q.updateUnion(input.unionId, patch);
   }
@@ -217,6 +227,26 @@ export async function setUnionField(input: {
     if (union.partner2_id) await q.checkAndUpdatePersonCompletion(union.partner2_id);
   }
   refreshProfile(input.slug);
+}
+
+export async function downloadActAction(fd: FormData) {
+  const url = str(fd, "url");
+  const slug = str(fd, "slug");
+  const personId = num(fd, "personId");
+  const unionId = num(fd, "unionId");
+  const actKind = str(fd, "actKind") as "birth" | "death" | "marriage";
+
+  if (!url) return;
+
+  if (personId && (actKind === "birth" || actKind === "death")) {
+    await downloadAct(url, { kind: "person", personId, actKind });
+  } else if (unionId) {
+    await downloadAct(url, { kind: "union", unionId });
+  }
+
+  if (slug) {
+    refreshProfile(slug);
+  }
 }
 
 /** Création express : un nom suffit, le reste se remplit dans la fiche. */
