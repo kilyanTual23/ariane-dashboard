@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toggleActIgnoredAction } from "@/app/actions";
 import { Inline, type InlineTarget } from "@/components/Inline";
 
@@ -30,8 +30,13 @@ export function ActSlot({
 }) {
   const [pending, startTransition] = useTransition();
   const [modalOpen, setModalOpen] = useState(false);
+  const [optimisticIgnored, setOptimisticIgnored] = useState(isIgnored);
   const [selectedReason, setSelectedReason] = useState<string>(COMMON_REASONS[0]);
   const [customReason, setCustomReason] = useState("");
+
+  useEffect(() => {
+    setOptimisticIgnored(isIgnored);
+  }, [isIgnored]);
 
   const target: InlineTarget =
     actKind === "marriage" && unionId
@@ -45,59 +50,69 @@ export function ActSlot({
   const handleIgnore = (e: React.FormEvent) => {
     e.preventDefault();
     const reasonToSave = (customReason.trim() || selectedReason).trim();
+    setModalOpen(false);
+    setOptimisticIgnored(true);
 
     startTransition(async () => {
-      const fd = new FormData();
-      fd.append("slug", slug);
-      if (personId) fd.append("personId", String(personId));
-      if (unionId) fd.append("unionId", String(unionId));
-      fd.append("actKind", actKind);
-      fd.append("ignored", "1");
-      if (reasonToSave && reasonToSave !== "Non mentionné / Sans motif particulier") {
-        fd.append("reason", reasonToSave);
+      try {
+        const fd = new FormData();
+        fd.append("slug", slug);
+        if (personId) fd.append("personId", String(personId));
+        if (unionId) fd.append("unionId", String(unionId));
+        fd.append("actKind", actKind);
+        fd.append("ignored", "1");
+        if (reasonToSave && reasonToSave !== "Non mentionné / Sans motif particulier") {
+          fd.append("reason", reasonToSave);
+        }
+        await toggleActIgnoredAction(fd);
+      } catch {
+        setOptimisticIgnored(isIgnored);
       }
-      await toggleActIgnoredAction(fd);
-      setModalOpen(false);
     });
   };
 
   const handleRestore = () => {
+    setOptimisticIgnored(false);
     startTransition(async () => {
-      const fd = new FormData();
-      fd.append("slug", slug);
-      if (personId) fd.append("personId", String(personId));
-      if (unionId) fd.append("unionId", String(unionId));
-      fd.append("actKind", actKind);
-      fd.append("ignored", "0");
-      // Si la valeur actuelle était simplement un motif d'ignorance, la nettoyer
-      if (
-        value &&
-        (COMMON_REASONS.some((r) => value.includes(r)) ||
-          value.startsWith("Introuvable") ||
-          value.startsWith("Inaccessible") ||
-          value.startsWith("Archives détruites"))
-      ) {
-        fd.append("reason", "clear");
+      try {
+        const fd = new FormData();
+        fd.append("slug", slug);
+        if (personId) fd.append("personId", String(personId));
+        if (unionId) fd.append("unionId", String(unionId));
+        fd.append("actKind", actKind);
+        fd.append("ignored", "0");
+        // Si la valeur actuelle était simplement un motif d'ignorance, la nettoyer
+        if (
+          value &&
+          (COMMON_REASONS.some((r) => value.includes(r)) ||
+            value.startsWith("Introuvable") ||
+            value.startsWith("Inaccessible") ||
+            value.startsWith("Archives détruites"))
+        ) {
+          fd.append("reason", "clear");
+        }
+        await toggleActIgnoredAction(fd);
+      } catch {
+        setOptimisticIgnored(isIgnored);
       }
-      await toggleActIgnoredAction(fd);
     });
   };
 
   return (
     <div
       className={`slot group/slot relative transition-colors ${
-        isIgnored
+        optimisticIgnored
           ? "border-border/60 bg-surface-2/40"
           : value?.trim()
             ? ""
             : "slot-empty"
-      } ${pending ? "opacity-60" : ""}`}
+      }`}
     >
       {/* En-tête du Slot */}
       <div className="flex items-center justify-between gap-1 pb-0.5">
         <span className="slot-label">{label}</span>
 
-        {!isIgnored ? (
+        {!optimisticIgnored ? (
           <button
             type="button"
             onClick={() => setModalOpen(true)}
@@ -125,7 +140,7 @@ export function ActSlot({
 
       {/* Contenu du Slot */}
       <div className="flex min-w-0 flex-1 flex-col text-sm">
-        {isIgnored ? (
+        {optimisticIgnored ? (
           <div className="flex flex-col justify-center py-0.5">
             <p className="truncate text-xs font-medium text-fg-muted">
               {value?.trim() ? value : "Acte introuvable ou inaccessible"}

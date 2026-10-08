@@ -40,14 +40,14 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
 
 export type ProfileSummary = Profile & { personCount: number; openTasks: number };
 
-export async function listProfiles(): Promise<ProfileSummary[]> {
+export const listProfiles = cache(async (): Promise<ProfileSummary[]> => {
   return queryAll<ProfileSummary>(
     `SELECT p.*,
             (SELECT COUNT(*) FROM persons WHERE profile_id = p.id) AS personCount,
             (SELECT COUNT(*) FROM tasks   WHERE profile_id = p.id AND status IN ('À faire','En cours')) AS openTasks
      FROM profiles p ORDER BY p.name`,
   );
-}
+});
 
 export const getProfileBySlug = cache(async (slug: string): Promise<Profile | null> => {
   return queryOne<Profile>(`SELECT * FROM profiles WHERE slug = ?`, [slug]);
@@ -105,15 +105,15 @@ export async function deleteProfile(id: number): Promise<void> {
 
 /* ---------------------------------------------------------------- personnes */
 
-export async function listPersonRows(profileId: number): Promise<PersonRow[]> {
+export const listPersonRows = cache(async (profileId: number): Promise<PersonRow[]> => {
   return queryAll<PersonRow>(
     `SELECT * FROM persons WHERE profile_id = ? ORDER BY surname, given_names`,
     [profileId],
   );
-}
+});
 
 /** Charge tout le profil d'un coup : relations résolues + complétion calculée. */
-export async function listPersons(profileId: number): Promise<Person[]> {
+export const listPersons = cache(async (profileId: number): Promise<Person[]> => {
   const [rows, links, unions] = await Promise.all([
     listPersonRows(profileId),
     queryAll<{ parent_id: number; child_id: number }>(
@@ -172,7 +172,7 @@ export async function listPersons(profileId: number): Promise<Person[]> {
       completion: computeCompletion(row, personUnions[0] ?? null, parentIds.length),
     } satisfies Person;
   });
-}
+});
 
 export async function getPerson(profileId: number, personId: number): Promise<Person | null> {
   const all = await listPersons(profileId);
@@ -258,7 +258,7 @@ export async function updatePerson(personId: number, input: PersonInput): Promis
 }
 
 /** Les lieux déjà écrits dans le profil, les plus utilisés d'abord. */
-export async function listPlaces(profileId: number): Promise<string[]> {
+export const listPlaces = cache(async (profileId: number): Promise<string[]> => {
   const rows = await queryAll<{ place: string }>(
     `SELECT place, COUNT(*) AS n FROM (
        SELECT birth_place AS place FROM persons WHERE profile_id = ? AND birth_place IS NOT NULL
@@ -272,11 +272,11 @@ export async function listPlaces(profileId: number): Promise<string[]> {
     [profileId, profileId, profileId],
   );
   return rows.map((r) => r.place);
-}
+});
 
-export async function getPersonRow(personId: number): Promise<PersonRow | null> {
+export const getPersonRow = cache(async (personId: number): Promise<PersonRow | null> => {
   return queryOne<PersonRow>(`SELECT * FROM persons WHERE id = ?`, [personId]);
-}
+});
 
 /**
  * Vérifie si tous les critères de la fiche sont satisfaits (complétion à 100%).
@@ -505,9 +505,9 @@ export async function deleteTask(taskId: number): Promise<void> {
 
 /* ----------------------------------------------------- sources & ressources */
 
-export async function listSources(personId: number): Promise<SourceRow[]> {
+export const listSources = cache(async (personId: number): Promise<SourceRow[]> => {
   return queryAll<SourceRow>(`SELECT * FROM sources WHERE person_id = ? ORDER BY id`, [personId]);
-}
+});
 
 export async function createSource(profileId: number, input: Partial<SourceRow>): Promise<number> {
   const info = await execute(
@@ -531,11 +531,11 @@ export async function deleteSource(sourceId: number): Promise<void> {
   await execute(`DELETE FROM sources WHERE id = ?`, [sourceId]);
 }
 
-export async function listResources(profileId: number): Promise<ResourceRow[]> {
+export const listResources = cache(async (profileId: number): Promise<ResourceRow[]> => {
   return queryAll<ResourceRow>(`SELECT * FROM resources WHERE profile_id = ? ORDER BY category, label`, [
     profileId,
   ]);
-}
+});
 
 export async function createResource(
   profileId: number,
@@ -555,7 +555,7 @@ export async function deleteResource(id: number): Promise<void> {
   await execute(`DELETE FROM resources WHERE id = ?`, [id]);
 }
 
-export async function listAllSourcesForProfile(profileId: number): Promise<SourceRow[]> {
+export const listAllSourcesForProfile = cache(async (profileId: number): Promise<SourceRow[]> => {
   return queryAll<SourceRow>(`SELECT * FROM sources WHERE profile_id = ? ORDER BY id`, [profileId]);
-}
+});
 

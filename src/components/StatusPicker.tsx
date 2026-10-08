@@ -26,9 +26,14 @@ export function StatusPicker({
   status: Status;
 }) {
   const [open, setOpen] = useState(false);
+  const [optimisticStatus, setOptimisticStatus] = useState<Status>(status);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setOptimisticStatus(status);
+  }, [status]);
 
   useEffect(() => {
     if (!open) return;
@@ -46,10 +51,15 @@ export function StatusPicker({
 
   const choose = (next: Status) => {
     setOpen(false);
-    if (next === status) return;
+    if (next === optimisticStatus) return;
+    setOptimisticStatus(next);
     startTransition(async () => {
-      await setPersonField({ slug, personId, field: "status", value: next });
-      router.refresh();
+      try {
+        await setPersonField({ slug, personId, field: "status", value: next });
+        router.refresh();
+      } catch {
+        setOptimisticStatus(status);
+      }
     });
   };
 
@@ -58,13 +68,10 @@ export function StatusPicker({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        disabled={pending}
-        className={`inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3.5 py-1.5 text-[13px] shadow-soft transition-all hover:border-border-strong ${
-          pending ? "opacity-50" : ""
-        }`}
+        className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3.5 py-1.5 text-[13px] shadow-soft transition-all hover:border-border-strong"
       >
-        <span className={`size-2 rounded-full ${STATUS_DOT[status] ?? "bg-neutral"}`} />
-        {status}
+        <span className={`size-2 rounded-full ${STATUS_DOT[optimisticStatus] ?? "bg-neutral"}`} />
+        {optimisticStatus}
         <span className="text-[10px] text-fg-subtle">▾</span>
       </button>
 
@@ -76,7 +83,7 @@ export function StatusPicker({
               type="button"
               onClick={() => choose(s)}
               className={`flex w-full items-start gap-2.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-surface-2 ${
-                s === status ? "bg-surface-2" : ""
+                s === optimisticStatus ? "bg-surface-2" : ""
               }`}
             >
               <span className={`mt-1.5 size-2 shrink-0 rounded-full ${STATUS_DOT[s]}`} />
@@ -84,7 +91,7 @@ export function StatusPicker({
                 <span className="block text-sm">{s}</span>
                 <span className="block text-[11px] text-fg-subtle">{MEANING[s]}</span>
               </span>
-              {s === status && <span className="ml-auto text-xs text-fg">✓</span>}
+              {s === optimisticStatus && <span className="ml-auto text-xs text-fg">✓</span>}
             </button>
           ))}
         </div>

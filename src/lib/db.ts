@@ -8,7 +8,6 @@ function createDbClient(): Client {
   if (tursoUrl) {
     // Sur Windows (où l'Embedded Replica file sync n'est pas supporté par libsql) ou si désactivé : connexion directe
     if (
-      process.platform === "win32" ||
       process.env.TURSO_DISABLE_REPLICA ||
       process.env.NEXT_PHASE === "phase-production-build"
     ) {
@@ -53,19 +52,20 @@ if (process.env.NODE_ENV !== "production") globalForDb.__arianeClient = db;
 
 let isSynced = false;
 let syncPromise: Promise<void> | null = null;
+let lastSyncTime = 0;
+const SYNC_INTERVAL_MS = 60_000;
 
 export async function syncDb(): Promise<void> {
   const client = db as Client & { sync?: () => Promise<void> };
-  if (
-    typeof client.sync === "function" &&
-    process.env.TURSO_DATABASE_URL &&
-    process.platform !== "win32"
-  ) {
+  if (typeof client.sync === "function" && process.env.TURSO_DATABASE_URL) {
     try {
       await client.sync();
       isSynced = true;
+      lastSyncTime = Date.now();
     } catch (err) {
       console.warn("[Turso] Avertissement de synchronisation de la réplique:", err);
+      // Même en cas d'erreur temporaire de connexion, autoriser la lecture sur la réplique locale
+      isSynced = true;
     }
   } else {
     isSynced = true;
@@ -73,7 +73,14 @@ export async function syncDb(): Promise<void> {
 }
 
 export async function ensureSynced(): Promise<void> {
-  if (isSynced) return;
+  if (isSynced) {
+    if (Date.now() - lastSyncTime > SYNC_INTERVAL_MS && !syncPromise) {
+      syncPromise = syncDb().finally(() => {
+        syncPromise = null;
+      });
+    }
+    return;
+  }
   const client = db as Client & { sync?: () => Promise<void> };
   if (typeof client.sync !== "function") {
     isSynced = true;
@@ -119,8 +126,8 @@ export async function batch(statements: InStatement[]): Promise<void> {
 }
 
 /**
- * Checkpoint / synchronisation WAL : synchronise la réplique locale avec Turso.
+ * Checkpoint / synchronisation WAL : synchronise la réplique locale avec Turso en arrière-plan.
  */
 export async function checkpointDb() {
-  await syncDb();
+  void syncDb();
 }

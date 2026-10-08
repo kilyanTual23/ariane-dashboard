@@ -60,11 +60,16 @@ export function Inline({
   className?: string;
 }) {
   const [editing, setEditing] = useState(false);
+  const [optimisticValue, setOptimisticValue] = useState<string | null | undefined>(value);
   const [draft, setDraft] = useState(value ?? "");
   const [remote, setRemote] = useState<Suggestion[]>([]);
   const [highlight, setHighlight] = useState(-1);
   const { save, pending } = useSave(slug, target);
   const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setOptimisticValue(value);
+  }, [value]);
 
   useEffect(() => {
     if (editing) ref.current?.focus();
@@ -112,7 +117,7 @@ export function Inline({
 
   // On repart toujours de la valeur affichée au moment où l'on ouvre le champ.
   const open = () => {
-    setDraft(value ?? "");
+    setDraft(optimisticValue ?? "");
     setRemote([]);
     setHighlight(-1);
     setEditing(true);
@@ -133,11 +138,13 @@ export function Inline({
           ? (normalizePlace(typed) ?? "")
           : typed;
 
-    if (normalized.trim() === (value ?? "").trim()) {
-      close();
+    close();
+
+    if (normalized.trim() === (optimisticValue ?? "").trim()) {
       return;
     }
-    save(normalized, close);
+    setOptimisticValue(normalized);
+    save(normalized);
   };
 
   if (editing) {
@@ -220,8 +227,8 @@ export function Inline({
     );
   }
 
-  const empty = !value?.trim();
-  const shown = empty ? placeholder : variant === "source" ? sourceLabel(value) : value;
+  const empty = !optimisticValue?.trim();
+  const shown = empty ? placeholder : variant === "source" ? sourceLabel(optimisticValue) : optimisticValue;
 
   const trigger = (
     <button
@@ -231,23 +238,23 @@ export function Inline({
         fill
           ? "slot-target"
           : "-mx-1.5 rounded-md px-1.5 text-left break-words transition-colors hover:bg-surface-2"
-      } ${empty ? "italic text-fg-subtle" : ""} ${pending ? "opacity-50" : ""}`}
+      } ${empty ? "italic text-fg-subtle" : ""}`}
     >
       {shown}
     </button>
   );
 
   // Un acte déjà trouvé garde son lien cliquable ; le crayon ouvre l'édition.
-  if (variant === "source" && !empty && isUrl(value)) {
+  if (variant === "source" && !empty && isUrl(optimisticValue)) {
     return (
       <span className={`flex min-w-0 max-w-full items-baseline gap-1.5 ${fill ? "w-full" : ""} ${className}`}>
         <a
-          href={value!}
+          href={optimisticValue!}
           target="_blank"
           rel="noreferrer"
           className="min-w-0 flex-1 truncate text-fg underline underline-offset-4 hover:opacity-80"
         >
-          {sourceLabel(value)} ↗
+          {sourceLabel(optimisticValue)} ↗
         </a>
         <button
           type="button"
@@ -285,15 +292,21 @@ export function InlineSelect({
   emptyLabel?: string;
   className?: string;
 }) {
+  const [optimistic, setOptimistic] = useState(value ?? "");
+  useEffect(() => {
+    setOptimistic(value ?? "");
+  }, [value]);
+
   const { save, pending } = useSave(slug, target);
   return (
     <select
-      className={`w-auto cursor-pointer rounded-lg border border-transparent bg-transparent px-2 py-1 text-[13px] text-fg-muted transition-colors hover:border-border hover:bg-surface-2 ${
-        pending ? "opacity-50" : ""
-      } ${className}`}
-      value={value ?? ""}
-      disabled={pending}
-      onChange={(e) => save(e.target.value)}
+      className={`w-auto cursor-pointer rounded-lg border border-transparent bg-transparent px-2 py-1 text-[13px] text-fg-muted transition-colors hover:border-border hover:bg-surface-2 ${className}`}
+      value={optimistic}
+      onChange={(e) => {
+        const next = e.target.value;
+        setOptimistic(next);
+        save(next);
+      }}
     >
       <option value="">{emptyLabel}</option>
       {options.map((o) => (
