@@ -69,6 +69,10 @@ export async function downloadAct(
       imageBuffer = await downloadCorreze(url);
     } else if (url.includes("drive.google.com")) {
       imageBuffer = await downloadGoogleDrive(url);
+    } else if (url.includes("archivesdepartementales76.net")) {
+      imageBuffer = await downloadSeineMaritime(url);
+    } else if (url.includes("archives-manche.fr")) {
+      imageBuffer = await downloadManche(url);
     } else {
       return { ok: false, error: "Archive non supportée pour le téléchargement automatique" };
     }
@@ -264,4 +268,129 @@ async function downloadGoogleDrive(url: string): Promise<Buffer> {
   if (!res.ok) throw new Error(`Échec Google Drive: ${res.status}`);
 
   return Buffer.from(await res.arrayBuffer());
+}
+
+/* ----------------------------------------------------------- Navigateur Chrome */
+
+function getChromeExecutablePath(): string | null {
+  const paths = [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+  ];
+  for (const p of paths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+/* ----------------------------------------------------------- Seine-Maritime (76) */
+
+async function downloadSeineMaritime(url: string): Promise<Buffer> {
+  const chromePath = getChromeExecutablePath();
+  if (!chromePath) throw new Error("Chrome/Edge introuvable pour contourner la protection Anubis");
+
+  const puppeteer = await import("puppeteer-core");
+  const browser = await puppeteer.launch({
+    executablePath: chromePath,
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 35000 });
+
+    const pageNumMatch = url.match(/\/dao\/\d+\/(\d+)/);
+    const pageNum = pageNumMatch ? parseInt(pageNumMatch[1], 10) : 1;
+
+    const manifest = await page.evaluate(async () => {
+      const arkMatch = window.location.pathname.match(/\/ark:\/50278\/[a-f0-9]+/);
+      if (!arkMatch) return null;
+      const res = await fetch(`${arkMatch[0]}/manifest`);
+      return await res.json();
+    });
+
+    if (!manifest) throw new Error("Manifeste 76 introuvable");
+
+    const canvases = manifest.sequences?.[0]?.canvases || [];
+    const canvas =
+      canvases.find((c: Record<string, unknown>) => typeof c["@id"] === "string" && c["@id"].includes(`/canvas/0/${pageNum}`)) ||
+      canvases[pageNum - 1] ||
+      canvases[0];
+
+    const imgRes = canvas?.images?.[0]?.resource;
+    const service = imgRes?.service?.["@id"];
+    const directFile = imgRes?.["@id"];
+    const imgUrl = service ? `${service}/full/full/0/default.jpg` : directFile;
+
+    if (!imgUrl) throw new Error("URL d'image 76 introuvable");
+
+    const base64Data = await page.evaluate(async (targetUrl: string) => {
+      const res = await fetch(targetUrl);
+      const blob = await res.blob();
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    }, imgUrl);
+
+    return Buffer.from(base64Data.split(",")[1], "base64");
+  } finally {
+    await browser.close();
+  }
+}
+
+/* ------------------------------------------------------------------- Manche (50) */
+
+async function downloadManche(url: string): Promise<Buffer> {
+  const chromePath = getChromeExecutablePath();
+  if (!chromePath) throw new Error("Chrome/Edge introuvable pour contourner la protection de la Manche");
+
+  const puppeteer = await import("puppeteer-core");
+  const browser = await puppeteer.launch({
+    executablePath: chromePath,
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 35000 });
+
+    const hash = await page.evaluate(() => window.location.hash);
+    const m = hash.match(/image\/(\d+)\/(\d+)/);
+    const detailM = page.url().match(/detail=(\d+)/);
+
+    let fullImgUrl: string | null = null;
+    if (m && detailM) {
+      fullImgUrl = `https://www.archives-manche.fr/_recherche-images/show/${detailM[1]}/image/${m[1]}/${m[2]}`;
+    } else {
+      const imgInDom = await page.evaluate(() => {
+        const found = Array.from(document.querySelectorAll("img"))
+          .map((i) => i.src)
+          .find((s) => s.includes("_recherche-images"));
+        return found ? found.split("?")[0] : null;
+      });
+      fullImgUrl = imgInDom;
+    }
+
+    if (!fullImgUrl) throw new Error("URL d'image de la Manche introuvable");
+
+    const base64Data = await page.evaluate(async (targetUrl: string) => {
+      const res = await fetch(targetUrl);
+      const blob = await res.blob();
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    }, fullImgUrl);
+
+    return Buffer.from(base64Data.split(",")[1], "base64");
+  } finally {
+    await browser.close();
+  }
 }
