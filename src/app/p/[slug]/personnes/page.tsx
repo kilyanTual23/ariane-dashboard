@@ -46,6 +46,7 @@ export default async function PersonsPage({
     total: p.completion.total,
     percent: p.completion.percent,
     missing: p.completion.missing,
+    ignored: p.completion.ignored,
     publication: publicationOf(p),
     spouse: p.unions[0]?.spouse?.displayName ?? null,
     marriageYear: p.unions[0]?.year ?? null,

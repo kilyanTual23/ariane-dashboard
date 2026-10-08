@@ -21,6 +21,7 @@ export type CardPerson = {
   total: number;
   percent: number;
   missing: string[];
+  ignored?: string[];
   publication: Publication;
   isLiving?: boolean;
   isUnmarried?: boolean;
@@ -51,18 +52,27 @@ export function SlotStrip({
   score,
   total,
   missing,
+  ignored = [],
   className = "",
 }: {
   score: number;
   total: number;
   missing: string[];
+  ignored?: string[];
   className?: string;
 }) {
   const tone = completionTone(score, total);
+  const title =
+    missing.length === 0
+      ? ignored.length > 0
+        ? `Carte complète avec lacunes (${ignored.join(", ")})`
+        : "Carte complète"
+      : `Il manque : ${missing.join(", ")}${ignored.length > 0 ? ` (dispensé : ${ignored.join(", ")})` : ""}`;
+
   return (
     <span
       className={`flex gap-[3px] ${className}`}
-      title={missing.length === 0 ? "Carte complète" : `Il manque : ${missing.join(", ")}`}
+      title={title}
       aria-label={`${score} cases remplies sur ${total}`}
     >
       {Array.from({ length: total }, (_, i) => (
@@ -100,7 +110,7 @@ export function PersonCard({
       href={`/p/${slug}/personnes/${person.id}`}
       className={`group flex h-full flex-col rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card ${skin} ${className}`}
     >
-      <SlotStrip score={person.score} total={person.total} missing={person.missing} />
+      <SlotStrip score={person.score} total={person.total} missing={person.missing} ignored={person.ignored} />
 
       <div className="mt-3.5 mb-3.5 flex items-start gap-3">
         <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[11px] font-medium tracking-wide text-fg-muted">
@@ -131,9 +141,15 @@ export function PersonCard({
             classée
           </span>
         ) : toPublish ? (
-          <span className="rounded-full bg-warn-soft px-2 py-0.5 font-medium text-warn">
-            à reporter sur Geneanet
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="flex items-center gap-1 truncate text-xs font-medium text-ok">
+              <span className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[person.status] ?? "bg-ok"}`} />
+              {person.status}
+            </span>
+            <span className="shrink-0 rounded-full bg-warn-soft px-1.5 py-0.5 text-[10px] font-medium text-warn">
+              Geneanet ↗
+            </span>
+          </div>
         ) : (
           <span className="flex items-center gap-1.5 text-fg-muted">
             <span className={`size-1.5 rounded-full ${STATUS_DOT[person.status] ?? "bg-neutral"}`} />

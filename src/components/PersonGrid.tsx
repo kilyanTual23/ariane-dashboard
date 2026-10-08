@@ -397,7 +397,13 @@ export function PersonGrid({
 
     const result = people.filter((p) => {
       if (sosaOnly && !p.sosa) return false;
-      if (status && p.status !== status) return false;
+      if (status) {
+        if (status === "Complet") {
+          if (p.status !== "Complet" && p.status !== "Complet (lacunes)") return false;
+        } else if (p.status !== status) {
+          return false;
+        }
+      }
       if (kinship && (p.kinship ?? "") !== kinship) return false;
       if (missing && !p.missing.includes(missing)) return false;
       if (publication && p.publication !== publication) return false;
@@ -482,7 +488,10 @@ export function PersonGrid({
 
   // Pre-calculated counts for quick tabs
   const enRechercheCount = useMemo(() => people.filter((p) => p.status === "En recherche").length, [people]);
-  const completsCount = useMemo(() => people.filter((p) => p.status === "Complet").length, [people]);
+  const completsCount = useMemo(
+    () => people.filter((p) => p.status === "Complet" || p.status === "Complet (lacunes)").length,
+    [people],
+  );
   const bloquésCount = useMemo(() => people.filter((p) => p.status === "Bloqué").length, [people]);
   const sosaCount = useMemo(() => people.filter((p) => !!p.sosa).length, [people]);
 
@@ -648,7 +657,7 @@ export function PersonGrid({
             setSosaOnly(false);
           }}
           className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition-colors ${
-            status === "Complet" && !sosaOnly
+            (status === "Complet" || status === "Complet (lacunes)") && !sosaOnly
               ? "bg-surface-3 font-medium text-fg"
               : "text-fg-muted hover:bg-surface-2 hover:text-fg"
           }`}

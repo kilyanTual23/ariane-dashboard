@@ -13,6 +13,7 @@ export const STATUS_DOT: Record<Status, string> = {
   "En recherche": "bg-info",
   Bloqué: "bg-danger",
   Complet: "bg-ok",
+  "Complet (lacunes)": "bg-ok ring-2 ring-ok/30",
 };
 
 /** Teinte de texte assortie, pour les endroits où le statut doit sauter aux yeux. */
@@ -21,6 +22,7 @@ export const STATUS_TEXT: Record<Status, string> = {
   "En recherche": "text-info",
   Bloqué: "text-danger",
   Complet: "text-ok",
+  "Complet (lacunes)": "text-ok",
 };
 
 /** Pastille pleine : fond teinté, texte assorti. */
@@ -29,6 +31,7 @@ export const STATUS_SOFT: Record<Status, string> = {
   "En recherche": "bg-info-soft text-info",
   Bloqué: "bg-danger-soft text-danger",
   Complet: "bg-ok-soft text-ok",
+  "Complet (lacunes)": "bg-ok-soft text-ok",
 };
 
 export function StatusBadge({ status }: { status: Status }) {

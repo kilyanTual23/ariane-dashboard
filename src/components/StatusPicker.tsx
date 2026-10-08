@@ -12,7 +12,8 @@ const MEANING: Record<Status, string> = {
   "Pas commencé": "personne ne s’en est encore occupé",
   "En recherche": "en cours, ou des pistes sont ouvertes",
   Bloqué: "plus rien à tirer pour l’instant",
-  Complet: "rien de plus à trouver",
+  Complet: "rien de plus à trouver (sans lacune)",
+  "Complet (lacunes)": "recherche close malgré des actes ou dates introuvables",
 };
 
 export function StatusPicker({

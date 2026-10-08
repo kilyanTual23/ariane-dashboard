@@ -459,7 +459,7 @@ export async function movePersonAction(input: {
     await q.updatePerson(personId, {
       geneanet_at: new Date().toISOString().slice(0, 19).replace("T", " "),
       status:
-        current && (current.status === "Complet" || current.status === "Bloqué")
+        current && (current.status === "Complet" || current.status === "Complet (lacunes)" || current.status === "Bloqué")
           ? current.status
           : "Complet",
     });

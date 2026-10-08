@@ -14,7 +14,7 @@ import { STATUSES, type Status } from "@/lib/types";
  * Le cycle de vie d'une carte, de gauche à droite. « Classées » est la fin du
  * parcours : reportée sur Geneanet, on n'y revient plus.
  */
-const COLUMNS = [...STATUSES, "Classées"] as const;
+const COLUMNS = ["Pas commencé", "En recherche", "Bloqué", "Complet", "Classées"] as const;
 type Column = (typeof COLUMNS)[number];
 
 const HINT: Record<Column, string> = {
@@ -27,6 +27,7 @@ const HINT: Record<Column, string> = {
 
 function columnOf(person: GridPerson): Column {
   if (person.publication === "archivée") return "Classées";
+  if (person.status === "Complet (lacunes)") return "Complet";
   if ((STATUSES as readonly string[]).includes(person.status)) return person.status as Column;
   if (person.status.startsWith("Bloqué")) return "Bloqué";
   return "Pas commencé";
@@ -101,8 +102,13 @@ function KanbanCard({ slug, person }: { slug: string; person: GridPerson }) {
             <span>✓</span> classée
           </span>
         ) : toPublish ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-warn-soft px-2 py-0.5 text-[10.5px] font-medium text-warn">
-            à reporter ↗
+          <span className="inline-flex items-center gap-1">
+            <span className="text-[11px] font-medium text-ok">
+              {person.status === "Complet (lacunes)" ? "Complète (lacunes)" : "Fiche complète"}
+            </span>
+            <span className="rounded-full bg-warn-soft px-1.5 py-0.5 text-[10px] font-medium text-warn">
+              Geneanet ↗
+            </span>
           </span>
         ) : person.missing.length > 0 ? (
           <span
@@ -113,7 +119,9 @@ function KanbanCard({ slug, person }: { slug: string; person: GridPerson }) {
             {person.missing.length > 1 ? ` (+${person.missing.length - 1})` : ""}
           </span>
         ) : (
-          <span className="text-[11px] font-medium text-ok">Fiche complète</span>
+          <span className="text-[11px] font-medium text-ok">
+            {person.status === "Complet (lacunes)" ? "Complète (lacunes)" : "Fiche complète"}
+          </span>
         )}
 
         <span className="num shrink-0 text-[11px] text-fg-subtle">

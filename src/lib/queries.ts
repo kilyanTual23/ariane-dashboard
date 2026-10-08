@@ -8,6 +8,7 @@ import type {
   Profile,
   ResourceRow,
   SourceRow,
+  Status,
   TaskRow,
   UnionRow,
 } from "./types";
@@ -300,12 +301,26 @@ export async function checkAndUpdatePersonCompletion(personId: number): Promise<
   const completion = computeCompletion(person, unions[0] ?? null, parentCount);
 
   if (completion.score === completion.total && completion.total > 0) {
-    if (person.status !== "Complet") {
-      await updatePerson(personId, { status: "Complet" });
+    const targetStatus: Status = completion.ignored.length > 0 ? "Complet (lacunes)" : "Complet";
+    if (person.status !== targetStatus) {
+      await updatePerson(personId, { status: targetStatus });
       return true;
     }
+  } else if (person.status === "Complet" || person.status === "Complet (lacunes)") {
+    await updatePerson(personId, { status: "En recherche" });
+    return true;
   }
   return false;
+}
+
+export async function recomputeAllCompletions(profileId: number): Promise<number> {
+  const persons = await listPersonRows(profileId);
+  let updated = 0;
+  for (const p of persons) {
+    const changed = await checkAndUpdatePersonCompletion(p.id);
+    if (changed) updated++;
+  }
+  return updated;
 }
 
 export async function profileIdOfPerson(personId: number): Promise<number | null> {

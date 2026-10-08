@@ -180,7 +180,21 @@ export default async function PersonPage({
 
       {/* ---------------------------------------------------------- la carte */}
       <article className="rounded-3xl border border-border bg-surface p-6 shadow-card sm:p-7">
-        <SlotStrip score={score} total={total} missing={missing} />
+        <SlotStrip score={score} total={total} missing={missing} ignored={person.completion.ignored} />
+
+        {score === total && total > 0 && (
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-ok/20 bg-ok-soft/40 px-3.5 py-2 text-xs text-ok">
+            <span className="flex items-center gap-2 font-medium">
+              <span>✓</span>
+              {person.completion.ignored.length > 0
+                ? `Carte complète avec lacunes (dispensé : ${person.completion.ignored.join(", ")})`
+                : "Carte 100% complète"}
+            </span>
+            <span className="num font-semibold">
+              {score}/{total}
+            </span>
+          </div>
+        )}
 
         {anomalies.length > 0 && (
           <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-danger/30 bg-danger/5 p-4 text-xs text-danger">
@@ -444,18 +458,31 @@ export default async function PersonPage({
         <div className="mt-7 border-t border-border pt-5">
           <GroupTitle>Naissance</GroupTitle>
           <div className="grid gap-2 sm:grid-cols-3">
-            <Slot label="Date" filled={!!person.birth_date_raw}>
-              <Inline
-                slug={slug}
-                target={target("birth_date_raw")}
-                value={person.birth_date_raw}
-                placeholder={
-                  person.birth_year ? `vers ${person.birth_year}` : "à remplir"
-                }
-                variant="date"
-                fill
-              />
-            </Slot>
+            {(() => {
+              const isDispensed = Boolean(person.birth_source_ignored) && !person.birth_date_raw;
+              return (
+                <Slot
+                  label="Date"
+                  filled={!!person.birth_date_raw || isDispensed}
+                  className={isDispensed ? "border-border/60 bg-surface-2/30" : ""}
+                >
+                  <Inline
+                    slug={slug}
+                    target={target("birth_date_raw")}
+                    value={person.birth_date_raw}
+                    placeholder={
+                      person.birth_year
+                        ? `vers ${person.birth_year}`
+                        : isDispensed
+                          ? "non requise (acte ignoré)"
+                          : "à remplir"
+                    }
+                    variant="date"
+                    fill
+                  />
+                </Slot>
+              );
+            })()}
             <Slot label="Lieu" filled={!!person.birth_place}>
               <Inline
                 slug={slug}
@@ -501,20 +528,35 @@ export default async function PersonPage({
                 )}
               </GroupTitle>
               <div className="grid gap-2 sm:grid-cols-3">
-                <Slot label="Date" filled={!!union.date_raw}>
-                  <Inline
-                    slug={slug}
-                    target={{
-                      kind: "union",
-                      unionId: union.id,
-                      field: "date_raw",
-                    }}
-                    value={union.date_raw}
-                    placeholder="à remplir"
-                    variant="date"
-                    fill
-                  />
-                </Slot>
+                {(() => {
+                  const isDispensed = Boolean(union.source_ignored) && !union.date_raw;
+                  return (
+                    <Slot
+                      label="Date"
+                      filled={!!union.date_raw || isDispensed}
+                      className={isDispensed ? "border-border/60 bg-surface-2/30" : ""}
+                    >
+                      <Inline
+                        slug={slug}
+                        target={{
+                          kind: "union",
+                          unionId: union.id,
+                          field: "date_raw",
+                        }}
+                        value={union.date_raw}
+                        placeholder={
+                          union.year
+                            ? `vers ${union.year}`
+                            : isDispensed
+                              ? "non requise (acte ignoré)"
+                              : "à remplir"
+                        }
+                        variant="date"
+                        fill
+                      />
+                    </Slot>
+                  );
+                })()}
                 <Slot label="Lieu" filled={!!union.place}>
                   <Inline
                     slug={slug}
@@ -672,16 +714,31 @@ export default async function PersonPage({
                 Décès
               </GroupTitle>
               <div className="grid gap-2 sm:grid-cols-3">
-                <Slot label="Date" filled={!!person.death_date_raw}>
-                  <Inline
-                    slug={slug}
-                    target={target("death_date_raw")}
-                    value={person.death_date_raw}
-                    placeholder="à remplir"
-                    variant="date"
-                    fill
-                  />
-                </Slot>
+                {(() => {
+                  const isDispensed = Boolean(person.death_source_ignored) && !person.death_date_raw;
+                  return (
+                    <Slot
+                      label="Date"
+                      filled={!!person.death_date_raw || isDispensed}
+                      className={isDispensed ? "border-border/60 bg-surface-2/30" : ""}
+                    >
+                      <Inline
+                        slug={slug}
+                        target={target("death_date_raw")}
+                        value={person.death_date_raw}
+                        placeholder={
+                          person.death_year
+                            ? `vers ${person.death_year}`
+                            : isDispensed
+                              ? "non requise (acte ignoré)"
+                              : "à remplir"
+                        }
+                        variant="date"
+                        fill
+                      />
+                    </Slot>
+                  );
+                })()}
                 <Slot label="Lieu" filled={!!person.death_place}>
                   <Inline
                     slug={slug}

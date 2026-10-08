@@ -1,4 +1,10 @@
-export const STATUSES = ["Pas commencé", "En recherche", "Bloqué", "Complet"] as const;
+export const STATUSES = [
+  "Pas commencé",
+  "En recherche",
+  "Bloqué",
+  "Complet",
+  "Complet (lacunes)",
+] as const;
 export type Status = (typeof STATUSES)[number];
 
 export const KINSHIPS = [
@@ -153,4 +159,5 @@ export type Completion = {
   percent: number; // 0..100
   missing: string[];
   filled: string[];
+  ignored: string[];
 };

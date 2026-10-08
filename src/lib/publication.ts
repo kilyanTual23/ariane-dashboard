@@ -14,7 +14,9 @@ export function publicationOf(person: {
   geneanet_at: string | null;
 }): Publication {
   if (person.geneanet_at) return "archivée";
-  if (person.status === "Complet") return "à mettre sur Geneanet";
+  if (person.status === "Complet" || person.status === "Complet (lacunes)") {
+    return "à mettre sur Geneanet";
+  }
   return "en cours";
 }
 
