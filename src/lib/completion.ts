@@ -52,8 +52,9 @@ export function computeCompletion(
     ["Identité", filled(person.surname) || filled(person.given_names)],
   ];
 
-  // 1. Naissance : si l'acte est ignoré et que la date n'est pas renseignée, elle n'est pas requise
+  // 1. Naissance : si l'acte est ignoré, la date et le lieu non renseignés ne sont pas requis
   const hasBirthDate = filled(person.birth_date_raw) || filled(person.birth_date_iso);
+  const hasBirthPlace = filled(person.birth_place);
   if (birthSourceIgnored) {
     ignored.push("Acte de naissance");
     if (hasBirthDate) {
@@ -61,15 +62,21 @@ export function computeCompletion(
     } else {
       ignored.push("Date de naissance");
     }
+    if (hasBirthPlace) {
+      checks.push(["Lieu de naissance", true]);
+    } else {
+      ignored.push("Lieu de naissance");
+    }
   } else {
     checks.push(["Date de naissance", hasBirthDate]);
     checks.push(["Acte de naissance", filled(person.birth_source)]);
+    checks.push(["Lieu de naissance", hasBirthPlace]);
   }
-  checks.push(["Lieu de naissance", filled(person.birth_place)]);
 
-  // 2. Mariage (si non célibataire / sans union) : dispense acte et date si ignoré
+  // 2. Mariage (si non célibataire / sans union) : dispense acte, date et lieu si ignoré
   if (!isUnmarried) {
     const hasMarriageDate = filled(union?.date_raw) || filled(union?.date_iso);
+    const hasMarriagePlace = filled(union?.place);
     if (marriageSourceIgnored) {
       ignored.push("Acte de mariage");
       if (hasMarriageDate) {
@@ -77,16 +84,22 @@ export function computeCompletion(
       } else {
         ignored.push("Date de mariage");
       }
+      if (hasMarriagePlace) {
+        checks.push(["Lieu de mariage", true]);
+      } else {
+        ignored.push("Lieu de mariage");
+      }
     } else {
       checks.push(["Date de mariage", hasMarriageDate]);
       checks.push(["Acte de mariage", filled(union?.source)]);
+      checks.push(["Lieu de mariage", hasMarriagePlace]);
     }
-    checks.push(["Lieu de mariage", filled(union?.place)]);
   }
 
-  // 3. Décès (si non vivant) : dispense acte et date si ignoré
+  // 3. Décès (si non vivant) : dispense acte, date et lieu si ignoré
   if (!isLiving) {
     const hasDeathDate = filled(person.death_date_raw) || filled(person.death_date_iso);
+    const hasDeathPlace = filled(person.death_place);
     if (deathSourceIgnored) {
       ignored.push("Acte de décès");
       if (hasDeathDate) {
@@ -94,11 +107,16 @@ export function computeCompletion(
       } else {
         ignored.push("Date de décès");
       }
+      if (hasDeathPlace) {
+        checks.push(["Lieu de décès", true]);
+      } else {
+        ignored.push("Lieu de décès");
+      }
     } else {
       checks.push(["Date de décès", hasDeathDate]);
       checks.push(["Acte de décès", filled(person.death_source)]);
+      checks.push(["Lieu de décès", hasDeathPlace]);
     }
-    checks.push(["Lieu de décès", filled(person.death_place)]);
   }
 
   // 4. Parents

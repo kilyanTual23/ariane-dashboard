@@ -483,17 +483,26 @@ export default async function PersonPage({
                 </Slot>
               );
             })()}
-            <Slot label="Lieu" filled={!!person.birth_place}>
-              <Inline
-                slug={slug}
-                target={target("birth_place")}
-                value={person.birth_place}
-                placeholder="à remplir"
-                variant="place"
-                places={places}
-                fill
-              />
-            </Slot>
+            {(() => {
+              const isDispensed = Boolean(person.birth_source_ignored) && !person.birth_place;
+              return (
+                <Slot
+                  label="Lieu"
+                  filled={!!person.birth_place || isDispensed}
+                  className={isDispensed ? "border-border/60 bg-surface-2/30" : ""}
+                >
+                  <Inline
+                    slug={slug}
+                    target={target("birth_place")}
+                    value={person.birth_place}
+                    placeholder={isDispensed ? "non requis (acte ignoré)" : "à remplir"}
+                    variant="place"
+                    places={places}
+                    fill
+                  />
+                </Slot>
+              );
+            })()}
             <ActSlot
               slug={slug}
               personId={person.id}
@@ -557,21 +566,30 @@ export default async function PersonPage({
                     </Slot>
                   );
                 })()}
-                <Slot label="Lieu" filled={!!union.place}>
-                  <Inline
-                    slug={slug}
-                    target={{
-                      kind: "union",
-                      unionId: union.id,
-                      field: "place",
-                    }}
-                    value={union.place}
-                    placeholder="à remplir"
-                    variant="place"
-                    places={places}
-                    fill
-                  />
-                </Slot>
+                {(() => {
+                  const isDispensed = Boolean(union.source_ignored) && !union.place;
+                  return (
+                    <Slot
+                      label="Lieu"
+                      filled={!!union.place || isDispensed}
+                      className={isDispensed ? "border-border/60 bg-surface-2/30" : ""}
+                    >
+                      <Inline
+                        slug={slug}
+                        target={{
+                          kind: "union",
+                          unionId: union.id,
+                          field: "place",
+                        }}
+                        value={union.place}
+                        placeholder={isDispensed ? "non requis (acte ignoré)" : "à remplir"}
+                        variant="place"
+                        places={places}
+                        fill
+                      />
+                    </Slot>
+                  );
+                })()}
                 <ActSlot
                   slug={slug}
                   unionId={union.id}
@@ -739,17 +757,26 @@ export default async function PersonPage({
                     </Slot>
                   );
                 })()}
-                <Slot label="Lieu" filled={!!person.death_place}>
-                  <Inline
-                    slug={slug}
-                    target={target("death_place")}
-                    value={person.death_place}
-                    placeholder="à remplir"
-                    variant="place"
-                    places={places}
-                    fill
-                  />
-                </Slot>
+                {(() => {
+                  const isDispensed = Boolean(person.death_source_ignored) && !person.death_place;
+                  return (
+                    <Slot
+                      label="Lieu"
+                      filled={!!person.death_place || isDispensed}
+                      className={isDispensed ? "border-border/60 bg-surface-2/30" : ""}
+                    >
+                      <Inline
+                        slug={slug}
+                        target={target("death_place")}
+                        value={person.death_place}
+                        placeholder={isDispensed ? "non requis (acte ignoré)" : "à remplir"}
+                        variant="place"
+                        places={places}
+                        fill
+                      />
+                    </Slot>
+                  );
+                })()}
                 <ActSlot
                   slug={slug}
                   personId={person.id}
