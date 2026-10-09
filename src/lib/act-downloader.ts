@@ -313,20 +313,68 @@ async function downloadMayenne(url: string): Promise<Buffer> {
   const arkId = mMatch[1];
   const pageId = mMatch[2];
 
-  // Obtenir les dimensions réelles via info.json
+  // 1. Obtenir les dimensions réelles via info.json
   const infoUrl = `https://archives.lamayenne.fr/archives-en-ligne/iiif/ark:/37963/${arkId}/${pageId}/info.json`;
   const infoRes = await fetch(infoUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
   if (!infoRes.ok) throw new Error(`Échec info.json Mayenne: ${infoRes.status}`);
 
   const info = await infoRes.json();
   const width = info.width || 3000;
+  const height = info.height || 2000;
 
-  // Téléchargement de l'image haute définition
-  const imgUrl = `https://archives.lamayenne.fr/archives-en-ligne/iiif/ark:/37963/${arkId}/${pageId}/full/${width},/0/default.jpg`;
-  const imgRes = await fetch(imgUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
-  if (!imgRes.ok) throw new Error(`Échec image IIIF Mayenne: ${imgRes.status}`);
+  // Tentative directe si le serveur autorise le plein format
+  const directUrl = `https://archives.lamayenne.fr/archives-en-ligne/iiif/ark:/37963/${arkId}/${pageId}/full/${width},/0/default.jpg`;
+  try {
+    const directRes = await fetch(directUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (directRes.ok && directRes.headers.get("content-type")?.includes("image")) {
+      return Buffer.from(await directRes.arrayBuffer());
+    }
+  } catch {
+    // Si direct non autorisé, bascule sur l'assemblage par tuiles IIIF
+  }
 
-  return Buffer.from(await imgRes.arrayBuffer());
+  // 2. Assemblage haute définition par tuiles IIIF (contourne le 403 d'IIPImage sur /full/)
+  const tileSize = info.tiles?.[0]?.width || 512;
+  const cols = Math.ceil(width / tileSize);
+  const rows = Math.ceil(height / tileSize);
+
+  const tiles: { left: number; top: number; url: string }[] = [];
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const tileX = x * tileSize;
+      const tileY = y * tileSize;
+      const tileW = Math.min(tileSize, width - tileX);
+      const tileH = Math.min(tileSize, height - tileY);
+      const tileUrl = `https://archives.lamayenne.fr/archives-en-ligne/iiif/ark:/37963/${arkId}/${pageId}/${tileX},${tileY},${tileW},${tileH}/${tileW},${tileH}/0/default.jpg`;
+      tiles.push({ left: tileX, top: tileY, url: tileUrl });
+    }
+  }
+
+  const composites: { input: Buffer; left: number; top: number }[] = [];
+  for (let i = 0; i < tiles.length; i += 10) {
+    const chunk = tiles.slice(i, i + 10);
+    const results = await Promise.all(
+      chunk.map(async (t) => {
+        const res = await fetch(t.url, { headers: { "User-Agent": "Mozilla/5.0" } });
+        if (!res.ok) throw new Error(`Échec tuile Mayenne: ${res.status}`);
+        const buf = Buffer.from(await res.arrayBuffer());
+        return { input: buf, left: t.left, top: t.top };
+      }),
+    );
+    composites.push(...results);
+  }
+
+  return await sharp({
+    create: {
+      width,
+      height,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 },
+    },
+  })
+    .composite(composites)
+    .jpeg({ quality: 85 })
+    .toBuffer();
 }
 
 /* ------------------------------------------------------------------- Corrèze (19) */
@@ -412,10 +460,10 @@ async function downloadGoogleDrive(url: string): Promise<Buffer> {
 /* ----------------------------------------------------------- Navigateur Chrome */
 
 function getChromeExecutablePath(): string | null {
-  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(/*turbopackIgnore: true*/ process.env.PUPPETEER_EXECUTABLE_PATH)) {
     return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
-  if (process.env.CHROME_BIN && fs.existsSync(process.env.CHROME_BIN)) {
+  if (process.env.CHROME_BIN && fs.existsSync(/*turbopackIgnore: true*/ process.env.CHROME_BIN)) {
     return process.env.CHROME_BIN;
   }
   const paths = [
@@ -434,7 +482,7 @@ function getChromeExecutablePath(): string | null {
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   ];
   for (const p of paths) {
-    if (fs.existsSync(p)) return p;
+    if (fs.existsSync(/*turbopackIgnore: true*/ p)) return p;
   }
   return null;
 }
