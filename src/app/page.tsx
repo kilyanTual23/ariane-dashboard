@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { createProfileAction } from "./actions";
+import { logoutAction } from "./login/actions";
 import { listPersons, listProfiles } from "@/lib/queries";
 import { buttonClass, completionTone, STATUS_DOT } from "@/components/ui";
 import { STATUSES, type Status } from "@/lib/types";
@@ -41,17 +42,28 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-16 sm:py-20">
-      <header className="mb-10">
-        <span className="inline-flex items-center gap-2 text-[13px] font-medium tracking-tight">
-          <span className="size-1.5 rounded-full bg-fg" />
-          Ariane
-        </span>
-        <h1 className="mt-6 text-[40px] leading-[1.08] tracking-[-0.035em] sm:text-[52px]">
-          Profils de recherche
-        </h1>
-        <p className="mt-4 max-w-md text-[15px] leading-relaxed text-fg-muted">
-          Chaque profil est un arbre indépendant, classé ici du plus avancé au plus jeune.
-        </p>
+      <header className="mb-10 flex items-start justify-between gap-4">
+        <div>
+          <span className="inline-flex items-center gap-2 text-[13px] font-medium tracking-tight">
+            <span className="size-1.5 rounded-full bg-fg" />
+            Ariane
+          </span>
+          <h1 className="mt-6 text-[40px] leading-[1.08] tracking-[-0.035em] sm:text-[52px]">
+            Profils de recherche
+          </h1>
+          <p className="mt-4 max-w-md text-[15px] leading-relaxed text-fg-muted">
+            Chaque profil est un arbre indépendant, classé ici du plus avancé au plus jeune.
+          </p>
+        </div>
+        <form action={logoutAction} className="pt-1">
+          <button
+            type="submit"
+            className="rounded-lg border border-border px-3 py-1.5 text-xs text-fg-muted transition-colors hover:border-fg/20 hover:text-fg"
+            title="Verrouiller la session"
+          >
+            Déconnexion
+          </button>
+        </form>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2">

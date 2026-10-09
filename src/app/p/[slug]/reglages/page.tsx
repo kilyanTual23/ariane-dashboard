@@ -11,6 +11,7 @@ import {
 import { PersonSelect, type PickerPerson } from "@/components/PersonSelect";
 import { buttonClass, Card } from "@/components/ui";
 import { getProfileBySlug, listPersons, listResources } from "@/lib/queries";
+import { logoutAction } from "@/app/login/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -133,6 +134,19 @@ export default async function SettingsPage({ params }: PageProps<"/p/[slug]/regl
         <a href={`/api/profils/${slug}/export`} className={buttonClass()} download>
           Télécharger le JSON
         </a>
+      </Card>
+
+      <Card title="Sécurité">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-fg-muted">
+            L&apos;accès à Ariane est protégé par mot de passe.
+          </p>
+          <form action={logoutAction}>
+            <button type="submit" className={buttonClass("ghost")}>
+              Se déconnecter
+            </button>
+          </form>
+        </div>
       </Card>
 
       <Card title="Zone sensible">
