@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
@@ -155,6 +156,8 @@ export async function downloadAct(
       imageBuffer = await downloadManche(url);
     } else if (url.includes("archinoe.net") || url.includes("archinoe.fr") || url.includes("archinoe")) {
       imageBuffer = await downloadArchinoe(url);
+    } else if (url.includes("archives.gironde.fr") || url.includes("gironde.fr")) {
+      imageBuffer = await downloadGironde(url);
     } else if (url.match(/\.(pdf|jpe?g|png|webp)($|\?)/i)) {
       const directRes = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
       if (directRes.ok) {
@@ -720,4 +723,138 @@ async function downloadArchinoe(url: string): Promise<Buffer> {
 
   throw new Error("Échec du téléchargement de l'image Archinoë");
 }
+
+/* ---------------------------------------------------------------- Gironde (33) / Anubis PoW + Ligeo IIIF */
+
+async function solveAnubis(url: string, userAgent: string): Promise<string> {
+  const res1 = await fetch(url, { headers: { "User-Agent": userAgent } });
+  const html1 = await res1.text();
+
+  if (!html1.includes("anubis_challenge")) {
+    const rawCookie = res1.headers.get("set-cookie");
+    return rawCookie ? rawCookie.split(";")[0].trim() : "";
+  }
+
+  const challengeMatch = html1.match(/<script id="anubis_challenge"[^>]*>([\s\S]*?)<\/script>/);
+  if (!challengeMatch) throw new Error("Challenge Anubis introuvable");
+
+  const { challenge, rules } = JSON.parse(challengeMatch[1]);
+  const s = challenge.randomData as string;
+  const a = rules.difficulty as number;
+  const c = Math.floor(a / 2);
+  const l = a % 2 !== 0;
+
+  const t0 = Date.now();
+  let nonce = 0;
+  let hashHex = "";
+  for (;; nonce++) {
+    const buf = crypto.createHash("sha256").update(s + nonce).digest();
+    let match = true;
+    for (let i = 0; i < c; i++) {
+      if (buf[i] !== 0) {
+        match = false;
+        break;
+      }
+    }
+    if (match && l && (buf[c] >> 4) !== 0) match = false;
+    if (match) {
+      hashHex = buf.toString("hex");
+      break;
+    }
+  }
+  const elapsed = Date.now() - t0;
+
+  const baseUrl = new URL(url).origin;
+  const passUrl = new URL("/.within.website/x/cmd/anubis/api/pass-challenge", baseUrl);
+  passUrl.searchParams.set("id", challenge.id);
+  passUrl.searchParams.set("response", hashHex);
+  passUrl.searchParams.set("nonce", String(nonce));
+  passUrl.searchParams.set("redir", url);
+  passUrl.searchParams.set("elapsedTime", String(elapsed));
+
+  const passRes = await fetch(passUrl.toString(), {
+    headers: {
+      "User-Agent": userAgent,
+      Referer: url,
+    },
+    redirect: "manual",
+  });
+
+  const passCookies = passRes.headers.getSetCookie?.() || [passRes.headers.get("set-cookie")];
+  const authCookie = passCookies
+    .filter(Boolean)
+    .map((raw) => (raw ? raw.split(";")[0].trim() : ""))
+    .find((cookie) => cookie.includes("anubis-auth"));
+
+  if (!authCookie) {
+    throw new Error("Échec de validation de la protection Anubis");
+  }
+
+  return authCookie;
+}
+
+async function downloadGironde(url: string): Promise<Buffer> {
+  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+  const cookie = await solveAnubis(url, userAgent);
+
+  const arkMatch = url.match(/ark:\/\d+\/([a-zA-Z0-9]+)/);
+  if (!arkMatch) throw new Error("Identifiant ARK introuvable dans l'URL de la Gironde");
+  const arkId = arkMatch[1];
+
+  // Numéro de vue (ex: daogrp/0/6 ou canvas/0/6)
+  const pageMatch = url.match(/(?:daogrp|canvas)\/\d+\/(\d+)/i) || url.match(/\/(\d+)$/);
+  const targetPage = pageMatch ? parseInt(pageMatch[1], 10) : 1;
+
+  // Récupération du manifeste IIIF Ligeo
+  const manifestUrl = `https://archives.gironde.fr/ark:/25651/${arkId}/manifest`;
+  const manifestRes = await fetch(manifestUrl, {
+    headers: { "User-Agent": userAgent, Cookie: cookie },
+  });
+  if (!manifestRes.ok) throw new Error(`Échec récupération manifeste IIIF: ${manifestRes.status}`);
+
+  const manifest = await manifestRes.json();
+  const canvases = manifest.sequences?.[0]?.canvases || [];
+  if (!canvases.length) throw new Error("Aucun canvas dans le manifeste Gironde");
+
+  // Recherche du canvas correspondant
+  const canvasTargetStr = `/canvas/0/${targetPage}`;
+  const targetCanvas =
+    canvases.find((item: { "@id"?: string }) => item["@id"]?.includes(canvasTargetStr)) ||
+    canvases[Math.min(targetPage - 1, canvases.length - 1)];
+
+  const resource = targetCanvas?.images?.[0]?.resource;
+  if (!resource) throw new Error("Ressource image introuvable dans le canvas Gironde");
+
+  const iiifServiceUrl = resource.service?.["@id"];
+  const directDownloadUrl = resource["@id"];
+
+  // 1. Priorité au serveur IIIF haute fidélité (image complète pleine résolution)
+  if (iiifServiceUrl) {
+    const iiifUrl = `${iiifServiceUrl}/full/full/0/default.jpg`;
+    const iiifRes = await fetch(iiifUrl, {
+      headers: { "User-Agent": userAgent, Cookie: cookie },
+    });
+    if (iiifRes.ok) {
+      const buf = Buffer.from(await iiifRes.arrayBuffer());
+      if (buf.length > 5000) return buf;
+    }
+  }
+
+  // 2. Téléchargement direct en repli
+  if (directDownloadUrl) {
+    const directRes = await fetch(directDownloadUrl, {
+      headers: { "User-Agent": userAgent, Cookie: cookie },
+    });
+    if (directRes.ok) {
+      const contentType = directRes.headers.get("content-type") ?? "";
+      if (contentType.includes("image") || contentType.includes("octet-stream")) {
+        const buf = Buffer.from(await directRes.arrayBuffer());
+        if (buf.length > 5000) return buf;
+      }
+    }
+  }
+
+  throw new Error("Impossible de télécharger l'acte des Archives de la Gironde");
+}
+
 
