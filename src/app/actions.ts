@@ -26,10 +26,13 @@ function num(fd: FormData, key: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-async function refreshProfile(slug: string) {
+async function refreshProfile(slug: string, personId?: number) {
   await checkpointDb();
   revalidatePath(`/p/${slug}`, "layout");
   revalidatePath(`/p/${slug}/personnes`, "page");
+  if (personId) {
+    revalidatePath(`/p/${slug}/personnes/${personId}`, "page");
+  }
 }
 
 /* ----------------------------------------------------------------- profils */
@@ -51,7 +54,7 @@ export async function updateProfileAction(fd: FormData) {
     description: str(fd, "description"),
   });
   revalidatePath("/");
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 export async function setRootPersonAction(fd: FormData) {
@@ -59,7 +62,7 @@ export async function setRootPersonAction(fd: FormData) {
   const slug = str(fd, "slug");
   if (!id || !slug) return;
   await q.updateProfile(id, { root_person_id: num(fd, "rootPersonId") });
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 export async function deleteProfileAction(fd: FormData) {
@@ -193,7 +196,7 @@ export async function setPersonField(input: {
     const profileId = await q.profileIdOfPerson(personId);
     if (profileId) await q.recomputeSosa(profileId);
   }
-  refreshProfile(slug);
+  await refreshProfile(slug, personId);
 }
 
 /** Même principe pour les trois champs d'une union. */
@@ -226,7 +229,7 @@ export async function setUnionField(input: {
     if (union.partner1_id) await q.checkAndUpdatePersonCompletion(union.partner1_id);
     if (union.partner2_id) await q.checkAndUpdatePersonCompletion(union.partner2_id);
   }
-  refreshProfile(input.slug);
+  await refreshProfile(input.slug);
 }
 
 export async function downloadActAction(fd: FormData) {
@@ -245,7 +248,7 @@ export async function downloadActAction(fd: FormData) {
   }
 
   if (slug) {
-    refreshProfile(slug);
+    await refreshProfile(slug, personId ?? undefined);
   }
 }
 
@@ -264,7 +267,7 @@ export async function quickCreatePersonAction(fd: FormData) {
     sex: inferSex(given_names),
     status: "En recherche",
   });
-  refreshProfile(slug);
+  await refreshProfile(slug, id);
   redirect(`/p/${slug}/personnes/${id}`);
 }
 
@@ -374,7 +377,7 @@ export async function smartCreatePersonAction(fd: FormData) {
 
   await q.recomputeSosa(profileId);
   await q.checkAndUpdatePersonCompletion(primaryId);
-  refreshProfile(slug);
+  await refreshProfile(slug, primaryId);
   redirect(`/p/${slug}/personnes/${primaryId}`);
 }
 
@@ -385,7 +388,7 @@ export async function toggleLivingAction(fd: FormData) {
   if (!slug || !personId) return;
   await q.updatePerson(personId, { is_living: isLiving });
   await q.checkAndUpdatePersonCompletion(personId);
-  refreshProfile(slug);
+  await refreshProfile(slug, personId);
 }
 
 export async function toggleUnmarriedAction(fd: FormData) {
@@ -395,7 +398,7 @@ export async function toggleUnmarriedAction(fd: FormData) {
   if (!slug || !personId) return;
   await q.updatePerson(personId, { is_unmarried: isUnmarried });
   await q.checkAndUpdatePersonCompletion(personId);
-  refreshProfile(slug);
+  await refreshProfile(slug, personId);
 }
 
 /**
@@ -444,7 +447,7 @@ export async function toggleActIgnoredAction(fd: FormData) {
     if (u?.partner2_id) await q.checkAndUpdatePersonCompletion(u.partner2_id);
   }
 
-  refreshProfile(slug);
+  await refreshProfile(slug, personId ?? undefined);
 }
 
 export async function deletePersonAction(fd: FormData) {
@@ -454,7 +457,7 @@ export async function deletePersonAction(fd: FormData) {
   if (!slug || !personId || !profileId) return;
   await q.deletePerson(personId);
   await q.recomputeSosa(profileId);
-  refreshProfile(slug);
+  await refreshProfile(slug);
   redirect(`/p/${slug}/personnes`);
 }
 
@@ -470,7 +473,7 @@ export async function markGeneanetAction(fd: FormData) {
   await q.updatePerson(personId, {
     geneanet_at: done ? new Date().toISOString().slice(0, 19).replace("T", " ") : null,
   });
-  refreshProfile(slug);
+  await refreshProfile(slug, personId);
 }
 
 /**
@@ -499,7 +502,7 @@ export async function movePersonAction(input: {
     return;
   }
 
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 export async function quickStatusAction(fd: FormData) {
@@ -508,7 +511,7 @@ export async function quickStatusAction(fd: FormData) {
   const status = str(fd, "status") as Status | null;
   if (!slug || !personId || !status) return;
   await q.updatePerson(personId, { status });
-  refreshProfile(slug);
+  await refreshProfile(slug, personId);
 }
 
 /* --------------------------------------------------------------- relations */
@@ -522,16 +525,17 @@ async function resolveOrCreatePerson(
   profileId: number,
   id: number | null,
   name: string | null,
+  fallbackSex?: "M" | "F" | null,
 ): Promise<number | null> {
   if (id) return id;
   if (!name) return null;
-  const { splitName } = await import("@/lib/names");
+  const { splitName, inferSex } = await import("@/lib/names");
   const { given_names, surname } = splitName(name);
   if (!given_names && !surname) return null;
   return await q.createPerson(profileId, {
     given_names,
     surname,
-    sex: inferSex(given_names),
+    sex: inferSex(given_names) ?? fallbackSex ?? null,
     status: "Pas commencé",
   });
 }
@@ -541,16 +545,24 @@ export async function addParentAction(fd: FormData) {
   const profileId = num(fd, "profileId");
   const childId = num(fd, "childId");
   if (!slug || !profileId || !childId) return;
+
+  const child = await q.getPerson(profileId, childId);
+  const existingFather = child?.parents.find((p) => p.sex === "M");
+  const existingMother = child?.parents.find((p) => p.sex === "F");
+  const fallbackSex =
+    existingFather && !existingMother ? "F" : existingMother && !existingFather ? "M" : null;
+
   const parentId = await resolveOrCreatePerson(
     profileId,
     num(fd, "parentId"),
     str(fd, "parentIdName"),
+    fallbackSex,
   );
   if (!parentId) return;
   await q.addParent(parentId, childId);
   await q.checkAndUpdatePersonCompletion(childId);
   await q.recomputeSosa(profileId);
-  refreshProfile(slug);
+  await refreshProfile(slug, childId);
 }
 
 export async function addChildAction(fd: FormData) {
@@ -567,7 +579,7 @@ export async function addChildAction(fd: FormData) {
   await q.addParent(parentId, childId);
   await q.checkAndUpdatePersonCompletion(childId);
   await q.recomputeSosa(profileId);
-  refreshProfile(slug);
+  await refreshProfile(slug, parentId);
 }
 
 export async function removeParentAction(fd: FormData) {
@@ -578,7 +590,7 @@ export async function removeParentAction(fd: FormData) {
   if (!slug || !profileId || !childId || !parentId) return;
   await q.removeParent(parentId, childId);
   await q.recomputeSosa(profileId);
-  refreshProfile(slug);
+  await refreshProfile(slug, childId);
 }
 
 export async function saveUnionAction(fd: FormData) {
@@ -614,7 +626,7 @@ export async function saveUnionAction(fd: FormData) {
     await q.checkAndUpdatePersonCompletion(personId);
     if (spouseId) await q.checkAndUpdatePersonCompletion(spouseId);
   }
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 export async function deleteUnionAction(fd: FormData) {
@@ -622,7 +634,7 @@ export async function deleteUnionAction(fd: FormData) {
   const unionId = num(fd, "unionId");
   if (!slug || !unionId) return;
   await q.deleteUnion(unionId);
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 /* ------------------------------------------------------------------ tâches */
@@ -642,7 +654,7 @@ export async function createTaskAction(fd: FormData) {
     priority: (str(fd, "priority") as Priority) ?? "Normale",
     status: (str(fd, "status") as TaskStatus) ?? "À faire",
   });
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 export async function updateTaskAction(fd: FormData) {
@@ -657,7 +669,7 @@ export async function updateTaskAction(fd: FormData) {
   if (fd.has("title")) patch.title = str(fd, "title") ?? "Sans titre";
   if (fd.has("details")) patch.details = str(fd, "details");
   await q.updateTask(taskId, patch);
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 export async function deleteTaskAction(fd: FormData) {
@@ -665,7 +677,7 @@ export async function deleteTaskAction(fd: FormData) {
   const taskId = num(fd, "taskId");
   if (!slug || !taskId) return;
   await q.deleteTask(taskId);
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 /* -------------------------------------------------------------- ressources */
@@ -677,7 +689,7 @@ export async function createResourceAction(fd: FormData) {
   const url = str(fd, "url");
   if (!slug || !profileId || !label || !url) return;
   await q.createResource(profileId, label, url, str(fd, "category"));
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 export async function deleteResourceAction(fd: FormData) {
@@ -685,7 +697,7 @@ export async function deleteResourceAction(fd: FormData) {
   const id = num(fd, "resourceId");
   if (!slug || !id) return;
   await q.deleteResource(id);
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 /* ---------------------------------------------------------------- sources */
@@ -704,7 +716,7 @@ export async function createSourceAction(fd: FormData) {
     place: str(fd, "place"),
     notes: str(fd, "notes"),
   });
-  refreshProfile(slug);
+  await refreshProfile(slug, personId);
 }
 
 export async function deleteSourceAction(fd: FormData) {
@@ -712,7 +724,7 @@ export async function deleteSourceAction(fd: FormData) {
   const id = num(fd, "sourceId");
   if (!slug || !id) return;
   await q.deleteSource(id);
-  refreshProfile(slug);
+  await refreshProfile(slug);
 }
 
 /* ---------------------------------------------------------------- OCR / Transcriptions */
@@ -737,7 +749,7 @@ export async function appendTranscriptionToNotesAction(fd: FormData): Promise<{ 
         : `--- Transcription d'acte ---\n${text}`;
 
       await q.updatePerson(personId, { notes: updatedNotes });
-      refreshProfile(slug);
+      await refreshProfile(slug, personId);
       return { ok: true };
     } else if (unionId) {
       const union = await q.getUnionRow(unionId);
@@ -749,7 +761,7 @@ export async function appendTranscriptionToNotesAction(fd: FormData): Promise<{ 
         : `--- Transcription d'acte ---\n${text}`;
 
       await q.updateUnion(unionId, { notes: updatedNotes });
-      refreshProfile(slug);
+      await refreshProfile(slug);
       return { ok: true };
     }
     return { ok: false, error: "Cible introuvable" };
@@ -1023,7 +1035,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
 
       await q.recomputeSosa(profileId);
       await q.checkAndUpdatePersonCompletion(personId);
-      refreshProfile(slug);
+      await refreshProfile(slug, personId);
       return { ok: true, updatedFields };
     } else if (unionId) {
       const union = await q.getUnionRow(unionId);
@@ -1058,7 +1070,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
 
       if (union.partner1_id) await q.checkAndUpdatePersonCompletion(union.partner1_id);
       if (union.partner2_id) await q.checkAndUpdatePersonCompletion(union.partner2_id);
-      refreshProfile(slug);
+      await refreshProfile(slug);
       return { ok: true, updatedFields };
     }
 

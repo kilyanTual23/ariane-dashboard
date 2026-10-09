@@ -51,13 +51,23 @@ export function PersonSelect({
     }
   }, [controlledId, people]);
 
-  const match = people.find((p) => personLabel(p) === text);
-  const willCreate = !match && text.trim().length > 1;
+  const trimmed = text.trim();
+  const match =
+    people.find((p) => personLabel(p) === text) ??
+    (people.filter((p) => p.name.trim().toLowerCase() === trimmed.toLowerCase()).length === 1
+      ? people.find((p) => p.name.trim().toLowerCase() === trimmed.toLowerCase())
+      : undefined);
+  const willCreate = !match && trimmed.length > 1;
 
   const handleChange = (newText: string) => {
     setText(newText);
     if (onChange) {
-      const found = people.find((p) => personLabel(p) === newText);
+      const trimmedNew = newText.trim();
+      const found =
+        people.find((p) => personLabel(p) === newText) ??
+        (people.filter((p) => p.name.trim().toLowerCase() === trimmedNew.toLowerCase()).length === 1
+          ? people.find((p) => p.name.trim().toLowerCase() === trimmedNew.toLowerCase())
+          : undefined);
       onChange(found?.id ?? null);
     }
   };

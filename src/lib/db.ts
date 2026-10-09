@@ -126,8 +126,8 @@ export async function batch(statements: InStatement[]): Promise<void> {
 }
 
 /**
- * Checkpoint / synchronisation WAL : synchronise la réplique locale avec Turso en arrière-plan.
+ * Checkpoint / synchronisation WAL : synchronise la réplique locale avec Turso.
  */
-export async function checkpointDb() {
-  void syncDb();
+export async function checkpointDb(): Promise<void> {
+  await syncDb();
 }
