@@ -45,6 +45,9 @@ export function getLocalActUrl(target: ActTarget): string | null {
  * - Ille-et-Vilaine (35) : Visionneuse Thot / Zoomify
  * - Mayenne (53) : Serveur IIIF
  * - Corrèze (19) : REST API / Originaux
+ * - Archinoë (17, 22, 49, 56, etc.) : Visionneuse Archinoë / Téléchargement direct
+ * - Seine-Maritime (76) : IIIF / Mnesys
+ * - Manche (50) : Puppeteer
  * - Google Drive : Téléchargement direct
  */
 /**
@@ -150,6 +153,8 @@ export async function downloadAct(
       imageBuffer = await downloadSeineMaritime(url);
     } else if (url.includes("archives-manche.fr")) {
       imageBuffer = await downloadManche(url);
+    } else if (url.includes("archinoe.net") || url.includes("archinoe.fr") || url.includes("archinoe")) {
+      imageBuffer = await downloadArchinoe(url);
     } else if (url.match(/\.(pdf|jpe?g|png|webp)($|\?)/i)) {
       const directRes = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
       if (directRes.ok) {
@@ -596,3 +601,123 @@ async function downloadManche(url: string): Promise<Buffer> {
     await browser.close();
   }
 }
+
+/* ---------------------------------------------------------------- Archinoë (17, 22, 49, 56, etc.) */
+
+async function downloadArchinoe(url: string): Promise<Buffer> {
+  const pageRes = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+    redirect: "follow",
+  });
+  const html = await pageRes.text();
+  const cookies = pageRes.headers.get("set-cookie") ?? "";
+  const baseUrl = new URL(pageRes.url).origin;
+
+  // Extraire le chemin data-original du visualiseur
+  const dataOriginalMatch = html.match(/data-original=["']([^"']+\.jpe?g)/i);
+  if (!dataOriginalMatch) {
+    throw new Error("Impossible de trouver le chemin de l'image dans la visionneuse Archinoë");
+  }
+  const imgPath = dataOriginalMatch[1];
+
+  // Extraire l'identifiant (ark id ou infocote)
+  const infocoteMatch =
+    html.match(/name=['"]infocote['"][^>]*value=['"]([^'"]+)['"]/i) ||
+    url.match(/ark:\/\d+\/([a-zA-Z0-9]+)/);
+  const arkId = infocoteMatch ? infocoteMatch[1] : "";
+
+  // Extraire le numéro de vue
+  const vueMatch = html.match(/id=["']visu_image_(\d+)["']/i);
+  const vue = vueMatch ? vueMatch[1] : "1";
+
+  // Extraire la cote
+  const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+  const cote = titleMatch ? titleMatch[1].split("-")[0].trim() : "";
+
+  // Méthode 1 : telechargement.html direct (originale pleine résolution)
+  try {
+    const telechargementUrl = new URL("/v2/visualiseur/telechargement.html", baseUrl).toString();
+    const hashRes = await fetch(telechargementUrl, {
+      method: "POST",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        Cookie: cookies,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Referer: pageRes.url,
+      },
+      body: new URLSearchParams({
+        id: arkId,
+        img: imgPath,
+        cote,
+        vue,
+        type: "hash",
+      }).toString(),
+    });
+    const hash = (await hashRes.text()).trim();
+    if (hash && hash.startsWith("h")) {
+      const downloadParams = new URLSearchParams({
+        type: "direct",
+        img: imgPath,
+        w: "6000",
+        h: "6000",
+        ha: hash,
+        vue,
+        id: arkId,
+        ir: "",
+      });
+      const imgRes = await fetch(`${telechargementUrl}?${downloadParams.toString()}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+          Cookie: cookies,
+          Referer: pageRes.url,
+        },
+      });
+      if (imgRes.ok) {
+        const buf = Buffer.from(await imgRes.arrayBuffer());
+        if (buf.length > 5000) return buf;
+      }
+    }
+  } catch (err) {
+    console.warn("[Archinoe] Échec du téléchargement direct, tentative via genereImage:", err);
+  }
+
+  // Méthode 2 : Fallback genereImage
+  const genereUrl = new URL("/v2/images/genereImage.html", baseUrl);
+  genereUrl.search = new URLSearchParams({
+    l: "3500",
+    h: "3500",
+    r: "0",
+    n: "0",
+    b: "0",
+    c: "0",
+    o: "IMG",
+    id: `visu_image_${vue}`,
+    image: imgPath,
+  }).toString();
+
+  const genereRes = await fetch(genereUrl.toString(), {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      Cookie: cookies,
+      Referer: pageRes.url,
+    },
+  });
+  const data = await genereRes.text();
+  const parts = data.split("\t");
+  if (parts.length >= 2 && parts[1].startsWith("/cache/")) {
+    const cachedImgUrl = new URL(parts[1], baseUrl).toString();
+    const cacheRes = await fetch(cachedImgUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        Cookie: cookies,
+        Referer: pageRes.url,
+      },
+    });
+    if (cacheRes.ok) {
+      return Buffer.from(await cacheRes.arrayBuffer());
+    }
+  }
+
+  throw new Error("Échec du téléchargement de l'image Archinoë");
+}
+

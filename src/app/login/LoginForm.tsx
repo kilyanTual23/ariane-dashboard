@@ -65,3 +65,4 @@ export function LoginForm({ initialError, from }: LoginFormProps) {
     </form>
   );
 }
+

@@ -41,3 +41,4 @@ export async function logoutAction() {
   cookieStore.delete(AUTH_COOKIE_NAME);
   redirect("/login");
 }
+

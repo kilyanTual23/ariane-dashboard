@@ -14,3 +14,4 @@ export async function verifyToken(token: string, password: string): Promise<bool
   const expected = await hashToken(password);
   return token === expected;
 }
+
