@@ -38,6 +38,7 @@ export function TopBar({
         e.target instanceof HTMLTextAreaElement ||
         (e.target as HTMLElement)?.isContentEditable;
 
+      if (!e.key) return;
       const key = e.key.toLowerCase();
       const isAltK = e.altKey && !e.ctrlKey && !e.metaKey && key === "k";
       const isShiftK = (e.ctrlKey || e.metaKey) && e.shiftKey && key === "k";
