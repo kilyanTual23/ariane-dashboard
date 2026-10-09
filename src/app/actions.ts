@@ -714,3 +714,358 @@ export async function deleteSourceAction(fd: FormData) {
   await q.deleteSource(id);
   refreshProfile(slug);
 }
+
+/* ---------------------------------------------------------------- OCR / Transcriptions */
+
+export async function appendTranscriptionToNotesAction(fd: FormData): Promise<{ ok: boolean; error?: string }> {
+  const slug = str(fd, "slug");
+  const personId = num(fd, "personId");
+  const unionId = num(fd, "unionId");
+  const text = str(fd, "text");
+  if (!slug || !text) return { ok: false, error: "Données manquantes" };
+
+  try {
+    if (personId) {
+      const profileId = await q.profileIdOfPerson(personId);
+      if (!profileId) return { ok: false, error: "Profil introuvable" };
+      const person = await q.getPerson(profileId, personId);
+      if (!person) return { ok: false, error: "Personne introuvable" };
+
+      const currentNotes = person.notes?.trim() || "";
+      const updatedNotes = currentNotes
+        ? `${currentNotes}\n\n--- Transcription d'acte ---\n${text}`
+        : `--- Transcription d'acte ---\n${text}`;
+
+      await q.updatePerson(personId, { notes: updatedNotes });
+      refreshProfile(slug);
+      return { ok: true };
+    } else if (unionId) {
+      const union = await q.getUnionRow(unionId);
+      if (!union) return { ok: false, error: "Union introuvable" };
+
+      const currentNotes = union.notes?.trim() || "";
+      const updatedNotes = currentNotes
+        ? `${currentNotes}\n\n--- Transcription d'acte ---\n${text}`
+        : `--- Transcription d'acte ---\n${text}`;
+
+      await q.updateUnion(unionId, { notes: updatedNotes });
+      refreshProfile(slug);
+      return { ok: true };
+    }
+    return { ok: false, error: "Cible introuvable" };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * Enregistre les données extraites d'un acte directement dans les bons champs
+ * de la fiche (date, lieu, prénoms, nom, parents, conjoint, notes).
+ */
+export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
+  ok: boolean;
+  error?: string;
+  updatedFields?: string[];
+}> {
+  const slug = str(fd, "slug");
+  const personId = num(fd, "personId");
+  const unionId = num(fd, "unionId");
+  const actKind = str(fd, "actKind") as "birth" | "death" | "marriage" | null;
+
+  const dateRaw = str(fd, "date_raw");
+  const place = str(fd, "place");
+
+  // Dates et lieux spécifiques
+  const birthDateRaw = str(fd, "birth_date_raw") || (actKind === "birth" ? dateRaw : null);
+  const birthPlace = str(fd, "birth_place") || (actKind === "birth" ? place : null);
+  const deathDateRaw = str(fd, "death_date_raw") || (actKind === "death" ? dateRaw : null);
+  const deathPlace = str(fd, "death_place") || (actKind === "death" ? place : null);
+
+  const givenNames = str(fd, "given_names");
+  const surname = str(fd, "surname")?.toLocaleUpperCase("fr") || null;
+  const occupation = str(fd, "occupation");
+
+  // Père
+  const fatherGivenNames = str(fd, "father_given_names");
+  const fatherSurname = str(fd, "father_surname")?.toLocaleUpperCase("fr") || null;
+  const fatherOccupation = str(fd, "father_occupation");
+  const fatherIsDeceased = str(fd, "father_is_deceased") === "1" || str(fd, "father_is_deceased") === "true";
+  const fatherDeathDateRaw = str(fd, "father_death_date_raw");
+  const fatherDeathPlace = str(fd, "father_death_place");
+  const fatherBirthDateRaw = str(fd, "father_birth_date_raw");
+  const fatherBirthPlace = str(fd, "father_birth_place");
+  const createFather = str(fd, "create_father") === "1" || str(fd, "create_father") === "true";
+
+  // Mère
+  const motherGivenNames = str(fd, "mother_given_names");
+  const motherSurname = str(fd, "mother_surname")?.toLocaleUpperCase("fr") || null;
+  const motherOccupation = str(fd, "mother_occupation");
+  const motherIsDeceased = str(fd, "mother_is_deceased") === "1" || str(fd, "mother_is_deceased") === "true";
+  const motherDeathDateRaw = str(fd, "mother_death_date_raw");
+  const motherDeathPlace = str(fd, "mother_death_place");
+  const motherBirthDateRaw = str(fd, "mother_birth_date_raw");
+  const motherBirthPlace = str(fd, "mother_birth_place");
+  const createMother = str(fd, "create_mother") === "1" || str(fd, "create_mother") === "true";
+
+  // Conjoint & Mariage
+  const marriageDateRaw = str(fd, "marriage_date_raw") || (actKind === "marriage" ? dateRaw : null);
+  const marriagePlace = str(fd, "marriage_place") || (actKind === "marriage" ? place : null);
+  const spouseGivenNames = str(fd, "spouse_given_names");
+  const spouseSurname = str(fd, "spouse_surname")?.toLocaleUpperCase("fr") || null;
+  const createUnion = str(fd, "create_union") === "1" || str(fd, "create_union") === "true";
+
+  const appendToNotes = str(fd, "append_to_notes") === "1" || str(fd, "append_to_notes") === "true";
+  const transcriptionText = str(fd, "transcription_text");
+
+  if (!slug) return { ok: false, error: "Profil non spécifié" };
+
+  try {
+    const updatedFields: string[] = [];
+
+    if (personId) {
+      const profileId = await q.profileIdOfPerson(personId);
+      if (!profileId) return { ok: false, error: "Profil introuvable" };
+      const person = await q.getPerson(profileId, personId);
+      if (!person) return { ok: false, error: "Personne introuvable" };
+
+      const patch: q.PersonInput = {};
+
+      // 1. Naissance du sujet
+      if (birthDateRaw) {
+        const d = parseDateInput(birthDateRaw);
+        patch.birth_date_raw = d.canonical;
+        patch.birth_date_iso = d.iso;
+        if (d.year) {
+          patch.birth_year = d.year;
+          patch.birth_year_estimated = d.qualifier === "exact" ? 0 : 1;
+        }
+        updatedFields.push("Date de naissance");
+      }
+      if (birthPlace) {
+        patch.birth_place = normalizePlace(birthPlace);
+        updatedFields.push("Lieu de naissance");
+      }
+
+      // 2. Décès du sujet
+      if (deathDateRaw) {
+        const d = parseDateInput(deathDateRaw);
+        patch.death_date_raw = d.canonical;
+        patch.death_date_iso = d.iso;
+        if (d.year) patch.death_year = d.year;
+        patch.is_living = 0;
+        updatedFields.push("Date de décès");
+      }
+      if (deathPlace) {
+        patch.death_place = normalizePlace(deathPlace);
+        patch.is_living = 0;
+        updatedFields.push("Lieu de décès");
+      }
+
+      // 3. Identité & Métier si non renseignés
+      if (givenNames && (!person.given_names || person.given_names === "Sans nom")) {
+        patch.given_names = givenNames;
+        updatedFields.push("Prénoms");
+      }
+      if (surname && (!person.surname || person.surname === "Sans nom")) {
+        patch.surname = surname;
+        updatedFields.push("Nom");
+      }
+      if (occupation && !person.occupation) {
+        patch.occupation = occupation;
+        updatedFields.push("Métier");
+      }
+
+      // 4. Notes
+      if (appendToNotes && transcriptionText) {
+        const currentNotes = person.notes?.trim() || "";
+        patch.notes = currentNotes
+          ? `${currentNotes}\n\n--- Transcription d'acte ---\n${transcriptionText}`
+          : `--- Transcription d'acte ---\n${transcriptionText}`;
+        updatedFields.push("Notes");
+      }
+
+      if (Object.keys(patch).length > 0) {
+        await q.updatePerson(personId, patch);
+      }
+
+      // 5. Père (création ou mise à jour de ses dates/lieux/statut)
+      if (createFather && (fatherGivenNames || fatherSurname)) {
+        const existingFather = person.parents.find((p) => p.sex === "M");
+        if (!existingFather) {
+          const fPatch: q.PersonInput = {
+            given_names: fatherGivenNames || "",
+            surname: fatherSurname || person.surname || "",
+            sex: "M",
+            status: "En recherche",
+          };
+          if (fatherOccupation) fPatch.occupation = fatherOccupation;
+          if (fatherIsDeceased) fPatch.is_living = 0;
+          if (fatherDeathDateRaw) {
+            const d = parseDateInput(fatherDeathDateRaw);
+            fPatch.death_date_raw = d.canonical;
+            fPatch.death_date_iso = d.iso;
+            if (d.year) fPatch.death_year = d.year;
+          }
+          if (fatherDeathPlace) fPatch.death_place = normalizePlace(fatherDeathPlace);
+          if (fatherBirthDateRaw) {
+            const d = parseDateInput(fatherBirthDateRaw);
+            fPatch.birth_date_raw = d.canonical;
+            fPatch.birth_date_iso = d.iso;
+            if (d.year) fPatch.birth_year = d.year;
+          }
+          if (fatherBirthPlace) fPatch.birth_place = normalizePlace(fatherBirthPlace);
+          const fatherId = await q.createPerson(profileId, fPatch);
+          await q.addParent(fatherId, personId);
+          updatedFields.push("Père créé et lié");
+        } else {
+          // Enrichir la fiche existante du père avec les nouvelles données
+          const fUpdate: q.PersonInput = {};
+          if (fatherOccupation && !existingFather.displayName) fUpdate.occupation = fatherOccupation;
+          if (fatherIsDeceased) fUpdate.is_living = 0;
+          if (fatherDeathDateRaw && !existingFather.death_year) {
+            const d = parseDateInput(fatherDeathDateRaw);
+            fUpdate.death_date_raw = d.canonical;
+            fUpdate.death_date_iso = d.iso;
+            if (d.year) fUpdate.death_year = d.year;
+          }
+          if (fatherDeathPlace) fUpdate.death_place = normalizePlace(fatherDeathPlace);
+          if (fatherBirthPlace) fUpdate.birth_place = normalizePlace(fatherBirthPlace);
+          if (Object.keys(fUpdate).length > 0) {
+            await q.updatePerson(existingFather.id, fUpdate);
+            updatedFields.push("Fiche du père mise à jour");
+          }
+        }
+      }
+
+      // 6. Mère (création ou mise à jour de ses dates/lieux/statut)
+      if (createMother && (motherGivenNames || motherSurname)) {
+        const existingMother = person.parents.find((p) => p.sex === "F");
+        if (!existingMother) {
+          const mPatch: q.PersonInput = {
+            given_names: motherGivenNames || "",
+            surname: motherSurname || "",
+            sex: "F",
+            status: "En recherche",
+          };
+          if (motherOccupation) mPatch.occupation = motherOccupation;
+          if (motherIsDeceased) mPatch.is_living = 0;
+          if (motherDeathDateRaw) {
+            const d = parseDateInput(motherDeathDateRaw);
+            mPatch.death_date_raw = d.canonical;
+            mPatch.death_date_iso = d.iso;
+            if (d.year) mPatch.death_year = d.year;
+          }
+          if (motherDeathPlace) mPatch.death_place = normalizePlace(motherDeathPlace);
+          if (motherBirthDateRaw) {
+            const d = parseDateInput(motherBirthDateRaw);
+            mPatch.birth_date_raw = d.canonical;
+            mPatch.birth_date_iso = d.iso;
+            if (d.year) mPatch.birth_year = d.year;
+          }
+          if (motherBirthPlace) mPatch.birth_place = normalizePlace(motherBirthPlace);
+          const motherId = await q.createPerson(profileId, mPatch);
+          await q.addParent(motherId, personId);
+          updatedFields.push("Mère créée et liée");
+        } else {
+          // Enrichir la fiche existante de la mère
+          const mUpdate: q.PersonInput = {};
+          if (motherOccupation) mUpdate.occupation = motherOccupation;
+          if (motherIsDeceased) mUpdate.is_living = 0;
+          if (motherDeathDateRaw && !existingMother.death_year) {
+            const d = parseDateInput(motherDeathDateRaw);
+            mUpdate.death_date_raw = d.canonical;
+            mUpdate.death_date_iso = d.iso;
+            if (d.year) mUpdate.death_year = d.year;
+          }
+          if (motherDeathPlace) mUpdate.death_place = normalizePlace(motherDeathPlace);
+          if (motherBirthPlace) mUpdate.birth_place = normalizePlace(motherBirthPlace);
+          if (Object.keys(mUpdate).length > 0) {
+            await q.updatePerson(existingMother.id, mUpdate);
+            updatedFields.push("Fiche de la mère mise à jour");
+          }
+        }
+      }
+
+      // 7. Mariage / Conjoint (si mention marginale ou acte de mariage)
+      if (createUnion && (marriageDateRaw || marriagePlace || spouseSurname || spouseGivenNames)) {
+        const uPatch: q.UnionInput = {};
+        if (marriageDateRaw) {
+          const d = parseDateInput(marriageDateRaw);
+          uPatch.date_raw = d.canonical;
+          uPatch.date_iso = d.iso;
+          if (d.year) uPatch.year = d.year;
+        }
+        if (marriagePlace) uPatch.place = normalizePlace(marriagePlace);
+
+        if (person.unions.length > 0) {
+          await q.updateUnion(person.unions[0].id, uPatch);
+          updatedFields.push("Mariage mis à jour");
+        } else if (spouseGivenNames || spouseSurname) {
+          const spouseSex = person.sex === "M" ? "F" : person.sex === "F" ? "M" : null;
+          const spouseId = await q.createPerson(profileId, {
+            given_names: spouseGivenNames || "",
+            surname: spouseSurname || "",
+            sex: spouseSex,
+            status: "En recherche",
+          });
+          await q.createUnion(profileId, {
+            partner1_id: personId,
+            partner2_id: spouseId,
+            date_raw: uPatch.date_raw,
+            date_iso: uPatch.date_iso,
+            year: uPatch.year,
+            place: uPatch.place,
+          });
+          updatedFields.push("Union et conjoint créés");
+        }
+      }
+
+      await q.recomputeSosa(profileId);
+      await q.checkAndUpdatePersonCompletion(personId);
+      refreshProfile(slug);
+      return { ok: true, updatedFields };
+    } else if (unionId) {
+      const union = await q.getUnionRow(unionId);
+      if (!union) return { ok: false, error: "Union introuvable" };
+
+      const patch: q.UnionInput = {};
+      const mDate = marriageDateRaw || dateRaw;
+      const mPlace = marriagePlace || place;
+
+      if (mDate) {
+        const d = parseDateInput(mDate);
+        patch.date_raw = d.canonical;
+        patch.date_iso = d.iso;
+        if (d.year) patch.year = d.year;
+        updatedFields.push("Date de mariage");
+      }
+      if (mPlace) {
+        patch.place = normalizePlace(mPlace);
+        updatedFields.push("Lieu de mariage");
+      }
+      if (appendToNotes && transcriptionText) {
+        const currentNotes = union.notes?.trim() || "";
+        patch.notes = currentNotes
+          ? `${currentNotes}\n\n--- Transcription d'acte ---\n${transcriptionText}`
+          : `--- Transcription d'acte ---\n${transcriptionText}`;
+        updatedFields.push("Notes");
+      }
+
+      if (Object.keys(patch).length > 0) {
+        await q.updateUnion(unionId, patch);
+      }
+
+      if (union.partner1_id) await q.checkAndUpdatePersonCompletion(union.partner1_id);
+      if (union.partner2_id) await q.checkAndUpdatePersonCompletion(union.partner2_id);
+      refreshProfile(slug);
+      return { ok: true, updatedFields };
+    }
+
+    return { ok: false, error: "Aucune cible (personne ou union) spécifiée" };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
