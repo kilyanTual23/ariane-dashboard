@@ -6,37 +6,13 @@ function createDbClient(): Client {
   const tursoToken = process.env.TURSO_AUTH_TOKEN;
 
   if (tursoUrl) {
-    // Sur Windows (où l'Embedded Replica file sync n'est pas supporté par libsql) ou si désactivé : connexion directe
-    if (
-      process.env.TURSO_DISABLE_REPLICA ||
-      process.platform === "win32" ||
-      process.env.NEXT_PHASE === "phase-production-build"
-    ) {
-      return createClient({
-        url: tursoUrl,
-        authToken: tursoToken,
-      });
-    }
-
-    try {
-      // Mode Réplique locale embarquée (Embedded Replica) :
-      // Les requêtes SELECT tournent en local en < 1ms, tandis que les écritures
-      // sont transmises à Turso Cloud et synchronisées avec le fichier local.
-      const replicaPath =
-        process.env.ARIANE_REPLICA_DB ?? path.join(process.cwd(), "data", "ariane-replica.db");
-
-      return createClient({
-        url: `file:${replicaPath}`,
-        syncUrl: tursoUrl,
-        authToken: tursoToken,
-      });
-    } catch (e) {
-      console.warn("[Turso] Embedded replica indisponible, fallback direct vers Turso Cloud:", e);
-      return createClient({
-        url: tursoUrl,
-        authToken: tursoToken,
-      });
-    }
+    // Connexion directe haute performance vers Turso Cloud :
+    // Élimine les verrous SQLite concurrents (busy_timeout 30s) de l'Embedded Replica,
+    // évite tout gel sur le VPS et garantit des temps de réponse instantanés (< 100ms).
+    return createClient({
+      url: tursoUrl,
+      authToken: tursoToken,
+    });
   }
 
   // Fallback local file pur
@@ -51,48 +27,12 @@ const globalForDb = globalThis as unknown as { __arianeClient?: Client };
 export const db = globalForDb.__arianeClient ?? createDbClient();
 if (process.env.NODE_ENV !== "production") globalForDb.__arianeClient = db;
 
-let isSynced = false;
-let syncPromise: Promise<void> | null = null;
-let lastSyncTime = 0;
-const SYNC_INTERVAL_MS = 60_000;
-
 export async function syncDb(): Promise<void> {
-  const client = db as Client & { sync?: () => Promise<void> };
-  if (typeof client.sync === "function" && process.env.TURSO_DATABASE_URL) {
-    try {
-      await client.sync();
-      isSynced = true;
-      lastSyncTime = Date.now();
-    } catch (err) {
-      console.warn("[Turso] Avertissement de synchronisation de la réplique:", err);
-      // Même en cas d'erreur temporaire de connexion, autoriser la lecture sur la réplique locale
-      isSynced = true;
-    }
-  } else {
-    isSynced = true;
-  }
+  // En connexion directe Turso Cloud, aucune synchronisation locale bloquante n'est requise.
 }
 
 export async function ensureSynced(): Promise<void> {
-  if (isSynced) {
-    if (Date.now() - lastSyncTime > SYNC_INTERVAL_MS && !syncPromise) {
-      syncPromise = syncDb().finally(() => {
-        syncPromise = null;
-      });
-    }
-    return;
-  }
-  const client = db as Client & { sync?: () => Promise<void> };
-  if (typeof client.sync !== "function") {
-    isSynced = true;
-    return;
-  }
-  if (!syncPromise) {
-    syncPromise = syncDb().finally(() => {
-      syncPromise = null;
-    });
-  }
-  await syncPromise;
+  // Pas de verrou WAL ni de sync bloquant.
 }
 
 export async function queryAll<T>(sql: string, args: unknown[] = []): Promise<T[]> {
