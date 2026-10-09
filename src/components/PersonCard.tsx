@@ -41,7 +41,7 @@ export function lifeSpan(
   const birth = p.birthYear ? `${p.birthYearEstimated ? "~" : ""}${p.birthYear}` : "?";
   if (p.isLiving) return `${birth} (vivant)`;
   const death = p.deathYear ? String(p.deathYear) : p.birthYear ? "?" : "?";
-  return `${birth} – ${death}`;
+  return `${birth} - ${death}`;
 }
 
 /**

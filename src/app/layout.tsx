@@ -20,7 +20,10 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ariane — recherches généalogiques",
+  title: {
+    template: "%s · Ariane",
+    default: "Ariane · Recherches généalogiques",
+  },
   description: "Recensement des trouvailles généalogiques, profil par profil.",
 };
 

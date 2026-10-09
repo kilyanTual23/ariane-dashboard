@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -16,6 +17,10 @@ import { computeLeads } from "@/lib/stats";
 import { ACT_KINDS, PRIORITIES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Tâches & Pistes",
+};
 
 export default async function TasksPage({
   params,
@@ -165,7 +170,7 @@ export default async function TasksPage({
                         <input
                           type="hidden"
                           name="title"
-                          value={`${lead.missing[0]} — ${lead.person.displayName}`}
+                          value={`${lead.missing[0]} : ${lead.person.displayName}`}
                         />
                         <input
                           type="hidden"

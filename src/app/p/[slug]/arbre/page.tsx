@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -8,6 +9,23 @@ import { getProfileBySlug, listPersons } from "@/lib/queries";
 import type { Person } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: PageProps<"/p/[slug]/arbre">): Promise<Metadata> {
+  const { slug } = await params;
+  const query = await searchParams;
+  const profile = await getProfileBySlug(slug);
+  if (!profile) return { title: "Arbre" };
+  const persons = await listPersons(profile.id);
+  const asked = Number(Array.isArray(query.de) ? query.de[0] : query.de);
+  const target = asked ? persons.find((p) => p.id === asked) : null;
+  if (target) {
+    return { title: `Arbre : ${target.displayName}` };
+  }
+  return { title: "Arbre généalogique" };
+}
 
 const GENERATIONS = [3, 4, 5, 6];
 
@@ -69,7 +87,7 @@ export default async function TreePage({ params, searchParams }: PageProps<"/p/[
       <header>
         <h1 className="text-[26px] tracking-[-0.03em]">Arbre</h1>
         <p className="mt-1.5 max-w-3xl text-[13px] text-fg-subtle">
-          Autour de {root.displayName} — enfants à gauche, ascendance à droite sur {generations}{" "}
+          Autour de {root.displayName} : enfants à gauche, ascendance à droite sur {generations}{" "}
           générations, <span className="num">{known}</span>/<span className="num">{possible}</span>{" "}
           cases occupées. Un clic sur une carte recentre l’arbre sur cette personne ; la flèche en
           coin ouvre sa fiche. Les cases en pointillés ouvrent la carte de l’enfant, d’où l’on

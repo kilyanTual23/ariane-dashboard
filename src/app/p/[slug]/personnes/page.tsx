@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PersonGrid, type GridPerson } from "@/components/PersonGrid";
@@ -7,6 +8,16 @@ import { getProfileBySlug, listPersons } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+export async function generateMetadata({
+  searchParams,
+}: PageProps<"/p/[slug]/personnes">): Promise<Metadata> {
+  const sp = await searchParams;
+  if (sp.vue === "kanban") {
+    return { title: "Kanban des fiches" };
+  }
+  return { title: "Fiches & Personnes" };
+}
 
 export default async function PersonsPage({
   params,

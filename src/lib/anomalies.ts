@@ -61,7 +61,7 @@ export function detectPersonAnomalies(
       personId: person.id,
       personName: person.displayName,
       title: "Longévité inhabituelle",
-      description: `Âge au décès de ${person.death_year - person.birth_year} ans (${person.birth_year}–${person.death_year}). À vérifier dans les registres.`,
+      description: `Âge au décès de ${person.death_year - person.birth_year} ans (${person.birth_year} - ${person.death_year}). À vérifier dans les registres.`,
     });
   }
 

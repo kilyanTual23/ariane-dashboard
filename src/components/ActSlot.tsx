@@ -349,7 +349,7 @@ export function ActSlot({
           isOpen={viewerOpen}
           onClose={() => setViewerOpen(false)}
           imageUrl={localImageUrl}
-          title={`${label} — ${slug}`}
+          title={`${label} : ${slug}`}
           originalUrl={value}
           downloadFilename={`acte_${slug}_${actKind}_${personId ?? unionId}.jpg`}
           slug={slug}

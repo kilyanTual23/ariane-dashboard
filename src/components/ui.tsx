@@ -44,7 +44,7 @@ export function StatusBadge({ status }: { status: Status }) {
 }
 
 export function KinshipBadge({ kinship }: { kinship: Kinship | null }) {
-  if (!kinship) return <span className="text-fg-subtle">—</span>;
+  if (!kinship) return <span className="text-fg-subtle">-</span>;
   return (
     <span
       className={`inline-block text-xs ${

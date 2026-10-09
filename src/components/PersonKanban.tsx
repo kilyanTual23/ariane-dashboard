@@ -21,7 +21,7 @@ const HINT: Record<Column, string> = {
   "Pas commencé": "Personne ne s’en est encore occupé",
   "En recherche": "En cours, ou des pistes ouvertes",
   Bloqué: "Plus rien à tirer pour l’instant",
-  Complet: "Terminée — à reporter sur Geneanet",
+  Complet: "Terminée, à reporter sur Geneanet",
   Classées: "Reportées sur Geneanet",
 };
 

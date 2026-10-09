@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { createProfileAction } from "./actions";
@@ -6,6 +7,10 @@ import { buttonClass, completionTone, STATUS_DOT } from "@/components/ui";
 import { STATUSES, type Status } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Profils de recherche",
+};
 
 export default async function HomePage() {
   const rawProfiles = await listProfiles();

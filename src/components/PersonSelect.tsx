@@ -10,7 +10,7 @@ export type PickerPerson = {
 };
 
 export function personLabel(p: PickerPerson) {
-  const years = `${p.birthYear ?? "?"}–${p.deathYear ?? "?"}`;
+  const years = `${p.birthYear ?? "?"} - ${p.deathYear ?? "?"}`;
   return `${p.name} (${years})`;
 }
 
@@ -81,7 +81,7 @@ export function PersonSelect({
       <input type="hidden" name={name} value={match?.id ?? ""} />
       {willCreate && (
         <span className="text-[11px] text-fg-subtle">
-          nouvelle carte « {text.trim()} » — prénoms puis NOM en majuscules
+          nouvelle carte « {text.trim()} » : prénoms puis NOM en majuscules
         </span>
       )}
     </span>

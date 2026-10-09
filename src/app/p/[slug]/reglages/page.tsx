@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import {
@@ -12,6 +13,10 @@ import { buttonClass, Card } from "@/components/ui";
 import { getProfileBySlug, listPersons, listResources } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Réglages",
+};
 
 export default async function SettingsPage({ params }: PageProps<"/p/[slug]/reglages">) {
   const { slug } = await params;

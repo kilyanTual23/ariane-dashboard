@@ -67,7 +67,7 @@ export function GenerationBars({
           </span>
           <span
             className="flex h-1.5 items-center overflow-hidden rounded-full bg-surface-3"
-            title={`${row.found} ancêtre(s) identifié(s) sur ${row.expected} — complétion moyenne ${row.avgCompletion}%`}
+            title={`${row.found} ancêtre(s) identifié(s) sur ${row.expected} (complétion moyenne ${row.avgCompletion}%)`}
           >
             <span
               className="h-1.5 rounded-full bg-fg/35"

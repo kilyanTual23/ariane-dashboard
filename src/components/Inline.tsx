@@ -282,7 +282,7 @@ export function InlineSelect({
   target,
   value,
   options,
-  emptyLabel = "—",
+  emptyLabel = "-",
   className = "",
 }: {
   slug: string;

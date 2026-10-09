@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AncestorsMap } from "@/components/AncestorsMap";
@@ -5,6 +6,10 @@ import { getGeocodedPlaces } from "@/lib/geo";
 import { getProfileBySlug, listPersons } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Carte des ancêtres",
+};
 
 export default async function MapPage({ params }: PageProps<"/p/[slug]/carte">) {
   const { slug } = await params;

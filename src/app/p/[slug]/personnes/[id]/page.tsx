@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -33,6 +34,23 @@ import { summarize } from "@/lib/summary";
 import { ACT_KINDS, KINSHIPS, type Person, type PersonRef } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: PageProps<"/p/[slug]/personnes/[id]">): Promise<Metadata> {
+  const { slug, id } = await params;
+  const profile = await getProfileBySlug(slug);
+  if (!profile) return { title: "Fiche introuvable" };
+  const persons = await listPersons(profile.id);
+  const person = persons.find((p) => p.id === Number(id));
+  if (!person) return { title: "Fiche introuvable" };
+  const years = person.birth_year || person.death_year
+    ? ` (${person.birth_year ?? "?"} - ${person.death_year ?? "?"})`
+    : "";
+  return {
+    title: `${person.displayName}${years}`,
+  };
+}
 
 /** Une case de la carte : son intitulé, sa valeur, et le vide qui se voit. */
 function Slot({
@@ -77,7 +95,7 @@ function Relation({ slug, person }: { slug: string; person: PersonRef }) {
     >
       {person.displayName}
       <span className="num text-[11px] text-fg-subtle">
-        {person.birth_year ?? "?"}–{person.death_year ?? "?"}
+        {person.birth_year ?? "?"} - {person.death_year ?? "?"}
       </span>
     </Link>
   );
@@ -297,7 +315,7 @@ export default async function PersonPage({
                       ? "border border-ok/30 bg-ok/10 font-medium text-ok"
                       : "border border-border bg-surface text-fg-subtle hover:text-fg"
                   }`}
-                  title={person.is_living ? "Marqué comme vivant — cliquer pour déclarer un décès" : "Cliquer pour marquer comme vivant(e)"}
+                  title={person.is_living ? "Marqué comme vivant (cliquer pour déclarer un décès)" : "Cliquer pour marquer comme vivant(e)"}
                 >
                   {person.is_living ? "💚 Vivant(e)" : "✝ Décédé(e)"}
                 </button>
@@ -316,7 +334,7 @@ export default async function PersonPage({
                         ? "border border-border-strong bg-surface-3 font-medium text-fg"
                         : "border border-border bg-surface text-fg-subtle hover:text-fg"
                     }`}
-                    title={person.is_unmarried ? "Marqué comme célibataire — cliquer pour annuler" : "Cliquer pour marquer comme célibataire"}
+                    title={person.is_unmarried ? "Marqué comme célibataire (cliquer pour annuler)" : "Cliquer pour marquer comme célibataire"}
                   >
                     {person.is_unmarried ? "👤 Célibataire" : "💍 Pas d'union"}
                   </button>
@@ -387,7 +405,7 @@ export default async function PersonPage({
               <input
                 type="hidden"
                 name="title"
-                value={`${missing[0]} — ${person.displayName}`}
+                value={`${missing[0]} : ${person.displayName}`}
               />
               <input
                 type="hidden"
@@ -413,7 +431,7 @@ export default async function PersonPage({
           <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[13px]">
             <span className="size-2 shrink-0 rounded-full bg-warn" />
             <span className="text-fg">
-              Carte terminée ({person.status.toLowerCase()}) — il reste à la reporter sur Geneanet.
+              Carte terminée ({person.status.toLowerCase()}). Il reste à la reporter sur Geneanet.
             </span>
             <a
               href={GENEANET_URL}
@@ -438,7 +456,7 @@ export default async function PersonPage({
           <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-surface-2 px-4 py-3 text-[13px] text-fg-muted">
             <span className="text-ok">✓</span>
             <span>
-              Archivée — reportée sur Geneanet le {formatStamp(person.geneanet_at)}. Cette carte est
+              Archivée : reportée sur Geneanet le {formatStamp(person.geneanet_at)}. Cette carte est
               considérée comme terminée.
             </span>
             <form action={markGeneanetAction} className="ml-auto">
@@ -629,7 +647,7 @@ export default async function PersonPage({
                   <span className="flex items-center gap-2">
                     <span>👤</span>
                     <span>
-                      <strong className="font-medium text-fg">Célibataire / sans union</strong> — aucun acte de mariage requis, la carte est dispensée de ces critères.
+                      <strong className="font-medium text-fg">Célibataire / sans union</strong> : aucun acte de mariage requis, la carte est dispensée de ces critères.
                     </span>
                   </span>
                 </div>
@@ -709,7 +727,7 @@ export default async function PersonPage({
                 <span className="flex items-center gap-2">
                   <span className="text-ok">💚</span>
                   <span>
-                    <strong className="font-medium text-fg">Personne vivante</strong> — aucun acte ni date de décès requis. Cette carte peut atteindre 100% de complétion.
+                    <strong className="font-medium text-fg">Personne vivante</strong> : aucun acte ni date de décès requis. Cette carte peut atteindre 100% de complétion.
                   </span>
                 </span>
               </div>

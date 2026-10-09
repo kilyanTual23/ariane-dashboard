@@ -297,7 +297,7 @@ export function GlobalSearchModal({
                       {p.name}
                     </span>
                     <span className="num text-xs text-fg-subtle">
-                      {p.birthYear ?? "?"}–{p.deathYear ?? "?"}
+                      {p.birthYear ?? "?"} - {p.deathYear ?? "?"}
                     </span>
                     {p.sosa && (
                       <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] font-mono text-fg">

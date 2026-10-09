@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -7,6 +8,10 @@ import { buttonClass } from "@/components/ui";
 import { getProfileBySlug, listPlaces } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Nouvelle personne",
+};
 
 export default async function NewPersonPage({ params }: PageProps<"/p/[slug]/personnes/nouvelle">) {
   const { slug } = await params;

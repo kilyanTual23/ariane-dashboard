@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { KinshipCalculator } from "@/components/KinshipCalculator";
 import { getProfileBySlug, listPersons } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Calculateur de parenté",
+};
 
 export default async function KinshipPage({
   params,

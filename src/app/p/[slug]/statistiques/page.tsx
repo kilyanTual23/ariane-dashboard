@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -9,6 +10,10 @@ import { computeComponents, computeStats } from "@/lib/stats";
 import { detectAllAnomalies } from "@/lib/anomalies";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Statistiques",
+};
 
 export default async function StatsPage({ params }: PageProps<"/p/[slug]/statistiques">) {
   const { slug } = await params;
@@ -51,13 +56,13 @@ export default async function StatsPage({ params }: PageProps<"/p/[slug]/statist
         />
         <Stat
           label="Branche la plus ancienne"
-          value={stats.oldestYear ?? "—"}
+          value={stats.oldestYear ?? "-"}
           hint={stats.blocked.length ? `${stats.blocked.length} fiches bloquées` : "aucun blocage"}
         />
       </div>
 
       <Card
-        title={`Audit de cohérence — ${anomalies.length === 0 ? "0 anomalie" : `${anomalies.length} anomalie${anomalies.length > 1 ? "s" : ""}`}`}
+        title={`Audit de cohérence : ${anomalies.length === 0 ? "0 anomalie" : `${anomalies.length} anomalie${anomalies.length > 1 ? "s" : ""}`}`}
         action={
           <span className="text-xs text-fg-subtle">
             {anomalies.length === 0 ? "fiches cohérentes" : "incohérences à vérifier"}
@@ -91,7 +96,7 @@ export default async function StatsPage({ params }: PageProps<"/p/[slug]/statist
                   >
                     {a.personName}
                   </Link>
-                  <span className="text-xs text-fg-muted">— {a.description}</span>
+                  <span className="text-xs text-fg-muted">· {a.description}</span>
                 </div>
                 {a.relatedPersonId && (
                   <Link
@@ -109,7 +114,7 @@ export default async function StatsPage({ params }: PageProps<"/p/[slug]/statist
 
       {components.length > 1 && (
         <Card
-          title={`Morceaux d’arbre — ${components.length}`}
+          title={`Morceaux d’arbre : ${components.length}`}
           action={
             <span className="text-xs text-fg-subtle">
               rien ne relie encore ces ensembles entre eux
@@ -174,7 +179,7 @@ export default async function StatsPage({ params }: PageProps<"/p/[slug]/statist
               label: s.status,
               value: s.count,
               tone: STATUS_DOT[s.status] ?? "bg-neutral",
-              title: `${s.count} personne(s) — ${s.status}`,
+              title: `${s.count} personne(s) : ${s.status}`,
             }))}
           />
         </Card>

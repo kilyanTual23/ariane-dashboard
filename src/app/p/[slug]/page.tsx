@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -10,6 +11,15 @@ import { computeLeads, computeStats } from "@/lib/stats";
 import { STATUSES, type Person } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: PageProps<"/p/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const profile = await getProfileBySlug(slug);
+  if (!profile) return { title: "Profil introuvable" };
+  return { title: profile.name };
+}
 
 function toCard(p: Person): CardPerson {
   return {
@@ -171,7 +181,7 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
             </>
           ) : (
             <span className="text-fg-muted">
-              aucune racine définie — les générations et les numéros Sosa restent vides
+              aucune racine définie : les générations et les numéros Sosa restent vides
             </span>
           )}
           <Link
@@ -272,7 +282,7 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
         <section>
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="eyebrow">
-              Presque terminées — {smallestGap === 1 ? "il ne manque qu’une case" : "les plus proches d’être bouclées"}
+              Presque terminées : {smallestGap === 1 ? "il ne manque qu’une case" : "les plus proches d’être bouclées"}
             </h2>
             <Link
               href={`/p/${slug}/personnes`}
@@ -308,7 +318,7 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
               >
                 <span className="text-sm font-medium">{lead.person.displayName}</span>
                 <span className="mt-0.5 block text-xs text-fg-subtle">
-                  {lead.missing.slice(0, 2).join(", ").toLowerCase()} — {lead.why}
+                  {lead.missing.slice(0, 2).join(", ").toLowerCase()} · {lead.why}
                 </span>
               </Link>
             </li>
