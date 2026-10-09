@@ -329,7 +329,40 @@ export async function profileIdOfPerson(personId: number): Promise<number | null
 }
 
 export async function deletePerson(personId: number): Promise<void> {
-  await execute(`DELETE FROM persons WHERE id = ?`, [personId]);
+  await deletePersons([personId]);
+}
+
+export async function deletePersons(personIds: number[]): Promise<void> {
+  if (personIds.length === 0) return;
+  const placeholders = personIds.map(() => "?").join(",");
+
+  // 1. Détacher les racines de profil si l'une des personnes était root
+  await execute(`UPDATE profiles SET root_person_id = NULL WHERE root_person_id IN (${placeholders})`, personIds);
+  // 2. Nettoyer les relations parent-enfant (pour parer aux cas où CASCADE n'est pas activé côté connexion)
+  await execute(
+    `DELETE FROM parent_child WHERE parent_id IN (${placeholders}) OR child_id IN (${placeholders})`,
+    [...personIds, ...personIds],
+  );
+  // 3. Nettoyer les unions
+  await execute(
+    `DELETE FROM unions WHERE partner1_id IN (${placeholders}) OR partner2_id IN (${placeholders})`,
+    [...personIds, ...personIds],
+  );
+  // 4. Nettoyer les sources attachées
+  await execute(`DELETE FROM sources WHERE person_id IN (${placeholders})`, personIds);
+  // 5. Détacher les tâches
+  await execute(`UPDATE tasks SET person_id = NULL WHERE person_id IN (${placeholders})`, personIds);
+  // 6. Supprimer définitivement les personnes
+  await execute(`DELETE FROM persons WHERE id IN (${placeholders})`, personIds);
+}
+
+export async function bulkUpdateStatus(personIds: number[], status: Status): Promise<void> {
+  if (personIds.length === 0) return;
+  const placeholders = personIds.map(() => "?").join(",");
+  await execute(
+    `UPDATE persons SET status = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`,
+    [status, ...personIds],
+  );
 }
 
 /* ---------------------------------------------------------------- relations */

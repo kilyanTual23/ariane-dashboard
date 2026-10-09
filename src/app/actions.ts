@@ -457,8 +457,53 @@ export async function deletePersonAction(fd: FormData) {
   if (!slug || !personId || !profileId) return;
   await q.deletePerson(personId);
   await q.recomputeSosa(profileId);
-  await refreshProfile(slug);
+  await checkpointDb();
+  revalidatePath(`/p/${slug}/personnes`, "page");
+  revalidatePath(`/p/${slug}`, "page");
   redirect(`/p/${slug}/personnes`);
+}
+
+export async function bulkDeletePersonsAction(input: {
+  slug: string;
+  profileId: number;
+  personIds: number[];
+}): Promise<{ ok: boolean; count?: number; error?: string }> {
+  try {
+    const { slug, profileId, personIds } = input;
+    if (!slug || !profileId || !personIds || personIds.length === 0) {
+      return { ok: false, error: "Paramètres manquants" };
+    }
+    await q.deletePersons(personIds);
+    await q.recomputeSosa(profileId);
+    await refreshProfile(slug);
+    return { ok: true, count: personIds.length };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+export async function bulkSetStatusAction(input: {
+  slug: string;
+  profileId: number;
+  personIds: number[];
+  status: Status;
+}): Promise<{ ok: boolean; count?: number; error?: string }> {
+  try {
+    const { slug, profileId, personIds, status } = input;
+    if (!slug || !profileId || !personIds || personIds.length === 0 || !status) {
+      return { ok: false, error: "Paramètres manquants" };
+    }
+    await q.bulkUpdateStatus(personIds, status);
+    for (const id of personIds) {
+      await q.checkAndUpdatePersonCompletion(id);
+    }
+    await refreshProfile(slug);
+    return { ok: true, count: personIds.length };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
 }
 
 /**

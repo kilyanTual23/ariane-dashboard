@@ -85,6 +85,7 @@ export default async function PersonsPage({
       ) : (
         <PersonGrid
           slug={slug}
+          profileId={profile.id}
           people={people}
           initialQuery={q}
           initialStatus={statut}

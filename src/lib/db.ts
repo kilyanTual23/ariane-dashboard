@@ -9,6 +9,7 @@ function createDbClient(): Client {
     // Sur Windows (où l'Embedded Replica file sync n'est pas supporté par libsql) ou si désactivé : connexion directe
     if (
       process.env.TURSO_DISABLE_REPLICA ||
+      process.platform === "win32" ||
       process.env.NEXT_PHASE === "phase-production-build"
     ) {
       return createClient({

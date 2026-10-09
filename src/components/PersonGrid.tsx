@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { bulkDeletePersonsAction, bulkSetStatusAction } from "@/app/actions";
 import { PersonCard, type CardPerson } from "@/components/PersonCard";
 import { buttonClass } from "@/components/ui";
 import { PUBLICATIONS } from "@/lib/publication";
-import { KINSHIPS, STATUSES } from "@/lib/types";
+import { KINSHIPS, STATUSES, type Status } from "@/lib/types";
 
 export type GridPerson = CardPerson & {
   spouse: string | null;
@@ -148,6 +150,7 @@ export const SYSTEM_PRESETS: SavedView[] = [
 
 export function PersonGrid({
   slug,
+  profileId,
   people,
   initialQuery,
   initialStatus,
@@ -159,6 +162,7 @@ export function PersonGrid({
   initialDesc,
 }: {
   slug: string;
+  profileId?: number;
   people: GridPerson[];
   initialQuery?: string;
   initialStatus?: string;
@@ -169,6 +173,9 @@ export function PersonGrid({
   initialSort?: SortKey;
   initialDesc?: boolean;
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
   const storageKey = `ariane_cards_filters_${slug}`;
   const presetsStorageKey = `ariane_cards_presets_${slug}`;
 
@@ -181,6 +188,18 @@ export function PersonGrid({
   const [sort, setSort] = useState<SortKey>(initialSort ?? "name");
   const [desc, setDesc] = useState(initialDesc ?? false);
   const [moreFilters, setMoreFilters] = useState(false);
+
+  // Sélection groupée
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkStatusMenuOpen, setBulkStatusMenuOpen] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
+
+  useEffect(() => {
+    if (!feedbackMessage) return;
+    const timer = setTimeout(() => setFeedbackMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [feedbackMessage]);
 
   const [customPresets, setCustomPresets] = useState<SavedView[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState<string>("");
@@ -486,6 +505,82 @@ export function PersonGrid({
     URL.revokeObjectURL(url);
   };
 
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filtered.length && filtered.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((p) => p.id)));
+      setIsSelectionMode(true);
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+    setIsSelectionMode(false);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const confirmed = window.confirm(
+      `Êtes-vous sûr de vouloir supprimer définitivement ${count} carte(s) ?\nCette opération est irréversible et supprimera également les rattachements associés.`
+    );
+    if (!confirmed) return;
+
+    startTransition(async () => {
+      const targetProfileId = profileId ?? 1;
+      const res = await bulkDeletePersonsAction({
+        slug,
+        profileId: targetProfileId,
+        personIds: Array.from(selectedIds),
+      });
+      if (res.ok) {
+        setSelectedIds(new Set());
+        setIsSelectionMode(false);
+        setFeedbackMessage({ text: `${count} carte(s) supprimée(s) avec succès.`, type: "ok" });
+        router.refresh();
+      } else {
+        setFeedbackMessage({ text: res.error || "Erreur lors de la suppression.", type: "err" });
+      }
+    });
+  };
+
+  const handleBulkSetStatus = (newStatus: Status) => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    setBulkStatusMenuOpen(false);
+
+    startTransition(async () => {
+      const targetProfileId = profileId ?? 1;
+      const res = await bulkSetStatusAction({
+        slug,
+        profileId: targetProfileId,
+        personIds: Array.from(selectedIds),
+        status: newStatus,
+      });
+      if (res.ok) {
+        setSelectedIds(new Set());
+        setIsSelectionMode(false);
+        setFeedbackMessage({ text: `Statut mis à jour pour ${count} carte(s) : "${newStatus}".`, type: "ok" });
+        router.refresh();
+      } else {
+        setFeedbackMessage({ text: res.error || "Erreur lors de la mise à jour.", type: "err" });
+      }
+    });
+  };
+
   // Pre-calculated counts for quick tabs
   const enRechercheCount = useMemo(() => people.filter((p) => p.status === "En recherche").length, [people]);
   const completsCount = useMemo(
@@ -601,7 +696,32 @@ export function PersonGrid({
           {filtered.length} / {people.length}
         </span>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2">
+          {/* Bouton bascule Sélection multiple */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsSelectionMode((prev) => !prev);
+              if (isSelectionMode) {
+                setSelectedIds(new Set());
+              }
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${
+              isSelectionMode || selectedIds.size > 0
+                ? "border-accent bg-accent/10 text-accent font-semibold"
+                : "border-border bg-surface text-fg-muted hover:bg-surface-2 hover:text-fg shadow-xs"
+            }`}
+            title="Activer la sélection multiple pour modifier ou supprimer des cartes en lot"
+          >
+            <span className="text-sm">☑</span>
+            <span>Sélectionner</span>
+            {selectedIds.size > 0 && (
+              <span className="rounded-full bg-accent px-1.5 py-0.2 text-[10px] text-white font-bold">
+                {selectedIds.size}
+              </span>
+            )}
+          </button>
+
           <div className="inline-flex items-center rounded-xl border border-border bg-surface-2 p-0.5 text-xs">
             <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface px-3 py-1.5 font-medium text-fg shadow-xs">
               <span>⊞</span> Grille
@@ -894,6 +1014,104 @@ export function PersonGrid({
         </div>
       )}
 
+      {/* Message de notification / retour d'action */}
+      {feedbackMessage && (
+        <div
+          className={`flex items-center justify-between rounded-xl px-4 py-2.5 text-xs font-medium shadow-xs transition-all ${
+            feedbackMessage.type === "ok"
+              ? "border border-ok/30 bg-ok/10 text-ok"
+              : "border border-danger/30 bg-danger/10 text-danger"
+          }`}
+        >
+          <span>{feedbackMessage.text}</span>
+          <button
+            type="button"
+            onClick={() => setFeedbackMessage(null)}
+            className="text-fg-subtle hover:text-fg ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Barre d'action groupée / par lot */}
+      {(isSelectionMode || selectedIds.size > 0) && (
+        <div className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/40 bg-surface/95 p-3 shadow-card backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg hover:bg-surface-3 transition-colors"
+            >
+              <span>{selectedIds.size === filtered.length && filtered.length > 0 ? "☑" : "☐"}</span>
+              <span>
+                {selectedIds.size === filtered.length && filtered.length > 0
+                  ? "Tout désélectionner"
+                  : `Tout sélectionner (${filtered.length})`}
+              </span>
+            </button>
+
+            <span className="text-xs text-fg-muted">
+              <strong className="text-fg font-semibold">{selectedIds.size}</strong> carte(s) sélectionnée(s)
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Changer statut */}
+            <div className="relative">
+              <button
+                type="button"
+                disabled={selectedIds.size === 0 || isPending}
+                onClick={() => setBulkStatusMenuOpen((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-fg hover:bg-surface-2 transition-colors disabled:opacity-40"
+              >
+                <span>🏷️</span>
+                <span>Changer statut</span>
+                <span className="text-[10px] text-fg-subtle">▼</span>
+              </button>
+
+              {bulkStatusMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 z-30 w-48 rounded-xl border border-border bg-surface p-1.5 shadow-card">
+                  <div className="px-2 py-1 text-[11px] font-medium text-fg-subtle">
+                    Appliquer le statut :
+                  </div>
+                  {STATUSES.map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => handleBulkSetStatus(st)}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-fg hover:bg-surface-2 transition-colors"
+                    >
+                      <span>{st}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Supprimer */}
+            <button
+              type="button"
+              disabled={selectedIds.size === 0 || isPending}
+              onClick={handleBulkDelete}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/20 transition-colors disabled:opacity-40"
+              title="Supprimer définitivement les cartes sélectionnées"
+            >
+              <span>🗑️</span>
+              <span>Supprimer ({selectedIds.size})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearSelection}
+              className="rounded-lg px-2.5 py-1.5 text-xs text-fg-subtle hover:bg-surface-2 hover:text-fg transition-colors"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Grille ou état vide */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
@@ -915,7 +1133,14 @@ export function PersonGrid({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((person) => (
-            <PersonCard key={person.id} slug={slug} person={person} />
+            <PersonCard
+              key={person.id}
+              slug={slug}
+              person={person}
+              selectable={isSelectionMode || selectedIds.size > 0}
+              selected={selectedIds.has(person.id)}
+              onToggleSelect={toggleSelect}
+            />
           ))}
         </div>
       )}

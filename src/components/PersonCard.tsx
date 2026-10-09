@@ -89,28 +89,75 @@ export function PersonCard({
   slug,
   person,
   className = "",
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: {
   slug: string;
   person: CardPerson;
   className?: string;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }) {
   const archived = person.publication === "archivée";
   const toPublish = person.publication === "à mettre sur Geneanet";
 
   /* Trois allures distinctes : en cours (neutre), à reporter (liseré ambre,
      il reste un geste à faire), archivée (posée à plat, affaire classée). */
-  const skin = archived
-    ? "border-border bg-surface-2 shadow-none"
-    : toPublish
-      ? "border-warn/45 bg-surface shadow-soft"
-      : "border-border bg-surface shadow-soft";
+  const skin = selected
+    ? "border-accent bg-accent/[0.04] ring-2 ring-accent/30 shadow-card"
+    : archived
+      ? "border-border bg-surface-2 shadow-none"
+      : toPublish
+        ? "border-warn/45 bg-surface shadow-soft"
+        : "border-border bg-surface shadow-soft";
 
   return (
     <Link
       href={`/p/${slug}/personnes/${person.id}`}
-      className={`group flex h-full flex-col rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card ${skin} ${className}`}
+      onClick={(e) => {
+        if (selectable && onToggleSelect) {
+          e.preventDefault();
+          onToggleSelect(person.id);
+        }
+      }}
+      className={`group relative flex h-full flex-col rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card ${skin} ${className}`}
     >
-      <SlotStrip score={person.score} total={person.total} missing={person.missing} ignored={person.ignored} />
+      {onToggleSelect && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleSelect(person.id);
+          }}
+          className={`absolute top-2.5 right-2.5 z-10 flex size-5.5 items-center justify-center rounded-md border transition-all ${
+            selected
+              ? "border-accent bg-accent text-white shadow-xs scale-100 opacity-100"
+              : selectable
+                ? "border-border bg-surface/90 text-transparent opacity-90 hover:border-fg/60 hover:opacity-100"
+                : "border-border bg-surface text-transparent opacity-0 group-hover:opacity-90 hover:!opacity-100"
+          }`}
+          title={selected ? "Désélectionner" : "Sélectionner cette carte"}
+        >
+          <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fillRule="evenodd"
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
+      )}
+
+      <SlotStrip
+        score={person.score}
+        total={person.total}
+        missing={person.missing}
+        ignored={person.ignored}
+        className={onToggleSelect ? "pr-6" : ""}
+      />
 
       <div className="mt-3.5 mb-3.5 flex items-start gap-3">
         <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[11px] font-medium tracking-wide text-fg-muted">
