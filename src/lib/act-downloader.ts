@@ -47,6 +47,83 @@ export function getLocalActUrl(target: ActTarget): string | null {
  * - Corrèze (19) : REST API / Originaux
  * - Google Drive : Téléchargement direct
  */
+/**
+ * Convertit un tampon contenant un document PDF en une image JPEG haute résolution.
+ * 1. Extraction ultra-rapide des flux JPEG (DCTDecode) encapsulés (sans perte de qualité).
+ * 2. Extraction des bitmaps internes via unpdf + Sharp.
+ * 3. Rendu vectoriel de la page 1 via unpdf + @napi-rs/canvas.
+ */
+export async function convertPdfToJpeg(pdfBuffer: Buffer): Promise<Buffer> {
+  // 1. Recherche directe des flux JPEG (DCTDecode) imbriqués
+  try {
+    let start = 0;
+    let bestCandidate: { buffer: Buffer; pixels: number } | null = null;
+    while ((start = pdfBuffer.indexOf(Buffer.from([0xff, 0xd8, 0xff]), start)) !== -1) {
+      const end = pdfBuffer.indexOf(Buffer.from([0xff, 0xd9]), start);
+      if (end !== -1 && end > start + 1024) {
+        const candidate = pdfBuffer.subarray(start, end + 2);
+        try {
+          const meta = await sharp(candidate).metadata();
+          if (meta.width && meta.height) {
+            const pixels = meta.width * meta.height;
+            if (!bestCandidate || pixels > bestCandidate.pixels) {
+              bestCandidate = { buffer: candidate, pixels };
+            }
+          }
+        } catch {
+          // Candidat non valide ou flux partiel, continuer
+        }
+      }
+      start += 3;
+    }
+
+    if (bestCandidate && bestCandidate.pixels >= 250 * 250) {
+      return bestCandidate.buffer;
+    }
+  } catch (err) {
+    console.warn("[PDF] Extraction JPEG directe ignorée:", err);
+  }
+
+  // 2. Extraction via unpdf extractImages
+  try {
+    const { extractImages, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(pdfBuffer));
+    if (pdf.numPages > 0) {
+      const images = await extractImages(pdf, 1);
+      if (images.length > 0) {
+        const largest = images.sort((a, b) => b.width * b.height - a.width * a.height)[0];
+        if (largest.width * largest.height >= 100 * 100) {
+          return await sharp(largest.data, {
+            raw: {
+              width: largest.width,
+              height: largest.height,
+              channels: largest.channels,
+            },
+          })
+            .jpeg({ quality: 92 })
+            .toBuffer();
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[PDF] Extraction unpdf images ignorée:", err);
+  }
+
+  // 3. Rendu de la page 1 avec @napi-rs/canvas
+  try {
+    const { renderPageAsImage, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(pdfBuffer));
+    const rawImage = await renderPageAsImage(pdf, 1, {
+      canvasImport: () => import("@napi-rs/canvas"),
+      scale: 2.5,
+    });
+    return await sharp(Buffer.from(rawImage)).jpeg({ quality: 90 }).toBuffer();
+  } catch (err) {
+    console.error("[PDF] Erreur lors du rendu du document PDF:", err);
+    throw new Error("Impossible d'extraire une image lisible du document PDF");
+  }
+}
+
 export async function downloadAct(
   url: string,
   target: ActTarget,
@@ -67,18 +144,28 @@ export async function downloadAct(
       imageBuffer = await downloadMayenne(url);
     } else if (url.includes("correze.fr")) {
       imageBuffer = await downloadCorreze(url);
-    } else if (url.includes("drive.google.com")) {
+    } else if (url.includes("drive.google.com") || url.includes("docs.google.com")) {
       imageBuffer = await downloadGoogleDrive(url);
     } else if (url.includes("archivesdepartementales76.net")) {
       imageBuffer = await downloadSeineMaritime(url);
     } else if (url.includes("archives-manche.fr")) {
       imageBuffer = await downloadManche(url);
+    } else if (url.match(/\.(pdf|jpe?g|png|webp)($|\?)/i)) {
+      const directRes = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (directRes.ok) {
+        imageBuffer = Buffer.from(await directRes.arrayBuffer());
+      }
     } else {
       return { ok: false, error: "Archive non supportée pour le téléchargement automatique" };
     }
 
     if (!imageBuffer || imageBuffer.length < 1024) {
       return { ok: false, error: "Image vide ou non récupérable" };
+    }
+
+    // Détection et conversion automatique si le document reçu est un PDF
+    if (imageBuffer.subarray(0, 5).toString().startsWith("%PDF-")) {
+      imageBuffer = await convertPdfToJpeg(imageBuffer);
     }
 
     fs.writeFileSync(destPath, imageBuffer);
@@ -259,15 +346,67 @@ async function downloadCorreze(url: string): Promise<Buffer> {
 /* --------------------------------------------------------------- Google Drive */
 
 async function downloadGoogleDrive(url: string): Promise<Buffer> {
-  const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-  if (!idMatch) throw new Error("ID de fichier Google Drive introuvable");
+  const idMatch =
+    url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+    url.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
+    url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (!idMatch) throw new Error("ID de fichier Google Drive introuvable dans le lien");
 
   const fileId = idMatch[1];
-  const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-  const res = await fetch(downloadUrl);
-  if (!res.ok) throw new Error(`Échec Google Drive: ${res.status}`);
+  const downloadUrls = [
+    `https://drive.usercontent.google.com/download?id=${fileId}&export=download&authuser=0&confirm=t`,
+    `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`,
+    `https://drive.google.com/uc?export=download&id=${fileId}`,
+  ];
 
-  return Buffer.from(await res.arrayBuffer());
+  let lastError = "";
+  for (const dlUrl of downloadUrls) {
+    try {
+      const res = await fetch(dlUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+        redirect: "follow",
+      });
+
+      if (!res.ok) {
+        lastError = `Statut HTTP ${res.status}`;
+        continue;
+      }
+
+      const contentType = res.headers.get("content-type") || "";
+      const buf = Buffer.from(await res.arrayBuffer());
+
+      // Vérifier si Google a renvoyé une page HTML de confirmation (ex: antivirus sur gros fichier)
+      if (contentType.includes("text/html") && buf.toString().includes("confirm=")) {
+        const text = buf.toString();
+        const confirmMatch =
+          text.match(/href="(\/uc\?export=download[^"]+confirm=[^"&]+[^"]*)"/) ||
+          text.match(/action="([^"]+)"/);
+        if (confirmMatch) {
+          const confirmUrl = confirmMatch[1].startsWith("http")
+            ? confirmMatch[1]
+            : `https://drive.google.com${confirmMatch[1]}`;
+          const confirmRes = await fetch(confirmUrl, { redirect: "follow" });
+          if (confirmRes.ok) {
+            const confirmedBuf = Buffer.from(await confirmRes.arrayBuffer());
+            if (confirmedBuf.length > 500) return confirmedBuf;
+          }
+        }
+      }
+
+      if (buf.length > 500) {
+        return buf;
+      }
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  throw new Error(
+    `Échec Google Drive : ${lastError || "Fichier inaccessible"}. Assurez-vous que le fichier est partagé avec 'Tous les utilisateurs disposant du lien'.`,
+  );
 }
 
 /* ----------------------------------------------------------- Navigateur Chrome */
@@ -280,7 +419,7 @@ function getChromeExecutablePath(): string | null {
     "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
   ];
   for (const p of paths) {
-    if (fs.existsSync(p)) return p;
+    if (fs.existsSync(/*turbopackIgnore: true*/ p)) return p;
   }
   return null;
 }

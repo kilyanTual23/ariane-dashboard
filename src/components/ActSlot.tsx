@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { downloadActAction, toggleActIgnoredAction } from "@/app/actions";
 import { Inline, type InlineTarget } from "@/components/Inline";
+import { ActViewerModal } from "@/components/ActViewerModal";
 
 const COMMON_REASONS = [
   "Introuvable (archives lacunaires)",
@@ -33,7 +34,7 @@ export function ActSlot({
   const [pending, startTransition] = useTransition();
   const [modalOpen, setModalOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [editingUrl, setEditingUrl] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [optimisticIgnored, setOptimisticIgnored] = useState(isIgnored);
   const [selectedReason, setSelectedReason] = useState<string>(COMMON_REASONS[0]);
@@ -111,7 +112,6 @@ export function ActSlot({
         if (unionId) fd.append("unionId", String(unionId));
         fd.append("actKind", actKind);
         fd.append("ignored", "0");
-        // Si la valeur actuelle était simplement un motif d'ignorance, la nettoyer
         if (
           value &&
           (COMMON_REASONS.some((r) => value.includes(r)) ||
@@ -133,7 +133,7 @@ export function ActSlot({
       className={`slot group/slot relative transition-colors ${
         optimisticIgnored
           ? "border-border/60 bg-surface-2/40"
-          : value?.trim()
+          : value?.trim() || (hasLocalCopy && localImageUrl)
             ? ""
             : "slot-empty"
       }`}
@@ -143,21 +143,6 @@ export function ActSlot({
         <span className="slot-label">{label}</span>
 
         <div className="flex items-center gap-1.5">
-          {hasLocalCopy && localImageUrl && (
-            <button
-              type="button"
-              onClick={() => {
-                setZoom(1);
-                setViewerOpen(true);
-              }}
-              className="inline-flex items-center gap-1 rounded bg-fg/10 px-1.5 py-0.5 text-[10.5px] font-medium text-fg transition-colors hover:bg-fg/20"
-              title="Consulter la copie locale enregistrée de cet acte"
-            >
-              <span>🖼️</span>
-              <span className="hidden sm:inline">Copie locale</span>
-            </button>
-          )}
-
           {!hasLocalCopy && value?.startsWith("http") && !optimisticIgnored && (
             <button
               type="button"
@@ -197,7 +182,7 @@ export function ActSlot({
         </div>
       </div>
 
-      {/* Contenu du Slot */}
+      {/* Contenu principal du Slot */}
       <div className="flex min-w-0 flex-1 flex-col text-sm">
         {optimisticIgnored ? (
           <div className="flex flex-col justify-center py-0.5">
@@ -208,15 +193,68 @@ export function ActSlot({
               Dispense accordée · Carte complétable à 100%
             </p>
           </div>
+        ) : hasLocalCopy && localImageUrl && !editingUrl ? (
+          /* Mode par défaut épuré : lien direct vers la visionneuse sans badge encombrant */
+          <div className="flex items-center justify-between gap-1 py-0.5">
+            <button
+              type="button"
+              onClick={() => setViewerOpen(true)}
+              className="group/btn flex min-w-0 flex-1 items-center gap-1.5 rounded text-left text-xs text-fg transition-colors hover:text-accent"
+              title="Consulter l'acte dans la visionneuse interactive"
+            >
+              <span className="text-xs shrink-0">🖼️</span>
+              <span className="truncate font-medium text-fg underline decoration-border-strong underline-offset-4 group-hover/btn:decoration-accent group-hover/btn:text-accent">
+                Consulter l’acte
+              </span>
+            </button>
+
+            {/* Accès discret au lien d'origine et modification */}
+            <div className="flex shrink-0 items-center gap-0.5">
+              {value?.startsWith("http") && (
+                <a
+                  href={value}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex size-5 items-center justify-center rounded text-[11px] text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+                  title={`Ouvrir le permalien d'origine (${value})`}
+                >
+                  ↗
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => setEditingUrl(true)}
+                className="flex size-5 items-center justify-center rounded text-[11px] text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+                title="Modifier l'URL d'origine"
+              >
+                ✎
+              </button>
+            </div>
+          </div>
         ) : (
-          <Inline
-            slug={slug}
-            target={target}
-            value={value}
-            placeholder="lien ou cote"
-            variant="source"
-            fill
-          />
+          /* Mode saisie ou modification d'URL */
+          <div className="flex items-center gap-1.5">
+            <div className="min-w-0 flex-1">
+              <Inline
+                slug={slug}
+                target={target}
+                value={value}
+                placeholder="lien ou cote"
+                variant="source"
+                fill
+              />
+            </div>
+            {editingUrl && (
+              <button
+                type="button"
+                onClick={() => setEditingUrl(false)}
+                className="shrink-0 rounded border border-border bg-surface-2 px-2 py-1 text-[11px] font-medium text-fg hover:bg-surface-3"
+                title="Fermer la modification"
+              >
+                OK
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -305,105 +343,20 @@ export function ActSlot({
         </div>
       )}
 
-      {/* Modal de visualisation de l'acte haute résolution */}
+      {/* Visionneuse interactive complète */}
       {viewerOpen && localImageUrl && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col bg-black/85 p-3 sm:p-6 backdrop-blur-md"
-          onClick={() => setViewerOpen(false)}
-        >
-          {/* Barre d'outils supérieure */}
-          <div
-            className="flex items-center justify-between gap-3 rounded-2xl bg-surface/95 px-4 py-2.5 shadow-xl backdrop-blur-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-base font-semibold text-fg truncate">
-                {label} (copie locale haute définition)
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
-                className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg hover:bg-surface-2"
-                title="Dézoomer"
-              >
-                −
-              </button>
-              <span className="text-xs font-medium text-fg-muted min-w-12 text-center">
-                {Math.round(zoom * 100)} %
-              </span>
-              <button
-                type="button"
-                onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
-                className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg hover:bg-surface-2"
-                title="Zoomer"
-              >
-                +
-              </button>
-              <button
-                type="button"
-                onClick={() => setZoom(1)}
-                className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-fg-subtle hover:bg-surface-2 hover:text-fg"
-                title="Réinitialiser le zoom"
-              >
-                100%
-              </button>
-
-              <span className="h-4 w-px bg-border" />
-
-              <a
-                href={localImageUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-fg hover:bg-surface-2"
-                title="Ouvrir l'image originale dans un nouvel onglet"
-              >
-                Ouvrir ↗
-              </a>
-              <a
-                href={localImageUrl}
-                download
-                className="rounded-lg bg-fg px-3 py-1 text-xs font-medium text-accent-fg hover:opacity-90"
-                title="Télécharger l'image sur votre ordinateur"
-              >
-                Télécharger 💾
-              </a>
-
-              <button
-                type="button"
-                onClick={() => setViewerOpen(false)}
-                className="ml-1 rounded-lg p-1.5 text-fg-subtle hover:bg-surface-2 hover:text-fg"
-                title="Fermer (Échap)"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-
-          {/* Zone d'affichage de l'image */}
-          <div
-            className="flex-1 overflow-auto flex items-center justify-center p-4"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setViewerOpen(false);
-            }}
-          >
-            <img
-              src={localImageUrl}
-              alt={label}
-              style={{
-                transform: `scale(${zoom})`,
-                transformOrigin: "center center",
-                transition: "transform 0.15s ease-out",
-                maxWidth: zoom <= 1 ? "100%" : "none",
-                maxHeight: zoom <= 1 ? "100%" : "none",
-              }}
-              className="rounded-xl shadow-2xl object-contain select-none"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        </div>
+        <ActViewerModal
+          isOpen={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          imageUrl={localImageUrl}
+          title={`${label} — ${slug}`}
+          originalUrl={value}
+          downloadFilename={`acte_${slug}_${actKind}_${personId ?? unionId}.jpg`}
+          slug={slug}
+          personId={personId}
+          unionId={unionId}
+          actKind={actKind}
+        />
       )}
     </div>
   );
