@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 import { completionTone, STATUS_DOT } from "@/components/ui";
@@ -27,22 +29,8 @@ export type CardPerson = {
   isUnmarried?: boolean;
 };
 
-export function monogram(given?: string | null, surname?: string | null) {
-  const a = (given ?? "").trim()[0] ?? "";
-  const b = (surname ?? "").trim()[0] ?? "";
-  return (a + b).toUpperCase() || "?";
-}
-
-export function lifeSpan(
-  p: Pick<CardPerson, "birthYear" | "birthYearEstimated" | "deathYear"> & {
-    isLiving?: boolean;
-  },
-) {
-  const birth = p.birthYear ? `${p.birthYearEstimated ? "~" : ""}${p.birthYear}` : "?";
-  if (p.isLiving) return `${birth} (vivant)`;
-  const death = p.deathYear ? String(p.deathYear) : p.birthYear ? "?" : "?";
-  return `${birth} - ${death}`;
-}
+import { lifeSpan, monogram } from "@/lib/names";
+export { lifeSpan, monogram };
 
 /**
  * Les cases remplies de la fiche, en bandeau. C'est la jauge de la carte :

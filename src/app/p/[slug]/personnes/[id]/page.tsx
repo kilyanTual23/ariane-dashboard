@@ -20,7 +20,8 @@ import {
 import { ActSlot } from "@/components/ActSlot";
 import { Disclosure } from "@/components/Disclosure";
 import { Inline, InlineSelect } from "@/components/Inline";
-import { monogram, SlotStrip } from "@/components/PersonCard";
+import { SlotStrip } from "@/components/PersonCard";
+import { monogram } from "@/lib/names";
 import { PersonSelect, type PickerPerson } from "@/components/PersonSelect";
 import { PlaceField } from "@/components/PlaceField";
 import { StatusPicker } from "@/components/StatusPicker";

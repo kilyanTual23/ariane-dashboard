@@ -81,3 +81,23 @@ export function inferSex(givenNames: string): "M" | "F" | null {
   if (FEMININE.has(first)) return "F";
   return null;
 }
+
+export function monogram(given?: string | null, surname?: string | null): string {
+  const a = (given ?? "").trim()[0] ?? "";
+  const b = (surname ?? "").trim()[0] ?? "";
+  return (a + b).toUpperCase() || "?";
+}
+
+export function lifeSpan(
+  p: {
+    birthYear?: number | null;
+    birthYearEstimated?: boolean;
+    deathYear?: number | null;
+    isLiving?: boolean;
+  },
+): string {
+  const birth = p.birthYear ? `${p.birthYearEstimated ? "~" : ""}${p.birthYear}` : "?";
+  if (p.isLiving) return `${birth} (vivant)`;
+  const death = p.deathYear ? String(p.deathYear) : p.birthYear ? "?" : "?";
+  return `${birth} - ${death}`;
+}
