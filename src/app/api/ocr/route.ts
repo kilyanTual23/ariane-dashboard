@@ -59,10 +59,10 @@ Réponds rigoureusement selon la structure suivante :
 
 RÈGLE ABSOLUE SUR LES NOMS : En généalogie française, les NOMS DE FAMILLE sont TOUJOURS écrits INTÉGRALEMENT EN MAJUSCULES (ex: DUPONT, MARTIN, LE GALL, DE LA HAYE, etc.) tant dans l'analyse que dans tous les champs du bloc JSON.
 
-RÈGLE SUR LES SOURCES / CITATIONS VISUELLES :
-Dans le bloc JSON "sources", pour chaque champ important (date, lieu, prénoms/noms, père, mère, décès parent), fournis :
-1. "text" : l'extrait exact de quelques mots tel qu'il est écrit dans l'acte original (ex: "le quatorze février mil sept cent", "fils de feu françois dupont").
-2. "box" (facultatif mais recommandé si visible) : l'emplacement normalisé [ymin, xmin, ymax, xmax] sur une échelle de 0 à 1000.
+RÈGLE OBLIGATOIRE SUR LES SOURCES ET COORDONNÉES DANS L'IMAGE :
+Dans le bloc JSON "sources", pour chaque champ extrait (date, place, name, occupation, father, mother, spouse, spouse_father, spouse_mother), fournis systématiquement :
+1. "text" : la citation textuelle exacte de quelques mots telle qu'elle est écrite dans l'acte original (ex: "le quatorze février mil sept cent", "fils de deffunt pierre dupont").
+2. "box_2d" : les coordonnées de la ligne ou des mots dans l'image sous la forme [ymin, xmin, ymax, xmax] normalisées entre 0 et 1000 (ex: [210, 80, 245, 590]).
 
 ### Données extraites
 \`\`\`json
@@ -126,14 +126,14 @@ Dans le bloc JSON "sources", pour chaque champ important (date, lieu, prénoms/n
   "marginal_death_place": "lieu de décès en marge",
 
   "sources": {
-    "event_date": { "text": "extrait exact" },
-    "event_place": { "text": "extrait exact" },
-    "given_names": { "text": "extrait exact" },
-    "father": { "text": "extrait exact" },
-    "mother": { "text": "extrait exact" },
-    "spouse": { "text": "extrait exact" },
-    "spouse_father": { "text": "extrait exact" },
-    "spouse_mother": { "text": "extrait exact" }
+    "date": { "text": "citation exacte de la date", "box_2d": [120, 60, 150, 750] },
+    "place": { "text": "citation exacte du lieu", "box_2d": [155, 120, 185, 480] },
+    "name": { "text": "nom et prénom du sujet dans l'acte", "box_2d": [210, 80, 240, 520] },
+    "father": { "text": "mention exacte du père", "box_2d": [280, 70, 310, 620] },
+    "mother": { "text": "mention exacte de la mère", "box_2d": [320, 70, 350, 620] },
+    "spouse": { "text": "mention exacte du conjoint", "box_2d": [380, 80, 410, 590] },
+    "spouse_father": { "text": "mention du père du conjoint", "box_2d": [440, 70, 470, 620] },
+    "spouse_mother": { "text": "mention de la mère du conjoint", "box_2d": [480, 70, 510, 620] }
   }
 }
 \`\`\``;

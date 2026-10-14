@@ -144,9 +144,9 @@ export function ActViewerModal({
   // Contexte existant en base pour la comparaison Avant / Après
   const [currentContext, setCurrentContext] = useState<ActViewerContextData | null>(null);
 
-  // État de survol pour le pointage interactif vers la source (texte et boîte sur l'image)
-  const [hoveredSourceKey, setHoveredSourceKey] = useState<string | null>(null);
-  const [hoveredSourceBox, setHoveredSourceBox] = useState<{ ymin: number; xmin: number; ymax: number; xmax: number } | null>(null);
+  // État de la source épinglée (clic pour cibler et inspecter confortablement sans clignotement)
+  const [pinnedSourceKey, setPinnedSourceKey] = useState<string | null>(null);
+  const [ocrCropRef, setOcrCropRef] = useState<CropBox | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -416,20 +416,45 @@ export function ActViewerModal({
     }
   }, [extractedData]);
 
-  const handleRowHover = useCallback((fieldKey: string) => {
-    const src = getSourceForField(fieldKey);
-    setHoveredSourceKey(fieldKey);
-    if (src?.box) {
-      setHoveredSourceBox(src.box);
-    } else {
-      setHoveredSourceBox(null);
+  const getFieldLabel = (key: string): string => {
+    switch (key) {
+      case "date": return "Date de l'acte";
+      case "place": return "Lieu de l'acte";
+      case "name": return "Nom / Prénom(s)";
+      case "birth_date": return "Date de naissance";
+      case "birth_place": return "Lieu de naissance";
+      case "death_date": return "Date de décès";
+      case "death_place": return "Lieu de décès";
+      case "occupation": return "Profession";
+      case "father": return "Père";
+      case "father_occupation": return "Profession du père";
+      case "father_status": return "État du père (vivant/décédé)";
+      case "father_death_date": return "Date de décès du père";
+      case "father_death_place": return "Lieu de décès du père";
+      case "father_birth_date": return "Date de naissance du père";
+      case "father_birth_place": return "Lieu de naissance du père";
+      case "mother": return "Mère";
+      case "mother_occupation": return "Profession de la mère";
+      case "mother_status": return "État de la mère (vivant/décédée)";
+      case "mother_death_date": return "Date de décès de la mère";
+      case "mother_death_place": return "Lieu de décès de la mère";
+      case "mother_birth_date": return "Date de naissance de la mère";
+      case "mother_birth_place": return "Lieu de naissance de la mère";
+      case "spouse": return "Conjoint(e) / Époux(se)";
+      case "spouse_occupation": return "Profession du conjoint";
+      case "spouse_birth_date": return "Date naiss. conjoint";
+      case "spouse_birth_place": return "Lieu naiss. conjoint";
+      case "marriage_date": return "Date de mariage";
+      case "marriage_place": return "Lieu de mariage";
+      case "spouse_father": return "Père du conjoint";
+      case "spouse_father_occupation": return "Profession père conjoint";
+      case "spouse_father_status": return "État père conjoint";
+      case "spouse_mother": return "Mère du conjoint";
+      case "spouse_mother_occupation": return "Profession mère conjoint";
+      case "spouse_mother_status": return "État mère conjoint";
+      default: return key;
     }
-  }, [getSourceForField]);
-
-  const handleRowLeave = useCallback(() => {
-    setHoveredSourceKey(null);
-    setHoveredSourceBox(null);
-  }, []);
+  };
 
   const toggleFieldKey = (key: string) => {
     setSelectedFieldKeys((prev) => {
@@ -550,6 +575,81 @@ export function ActViewerModal({
     [naturalSize, view, rotation],
   );
 
+  // Coordonnées absolues sur l'image entière pour une source donnée
+  const getSourceImageCoords = useCallback((fieldKey: string): { x1: number; y1: number; x2: number; y2: number } | null => {
+    const src = getSourceForField(fieldKey);
+    if (!src) return null;
+
+    if (src.box && naturalSize.width > 0 && naturalSize.height > 0) {
+      const baseW = ocrCropRef ? ocrCropRef.width : naturalSize.width;
+      const baseH = ocrCropRef ? ocrCropRef.height : naturalSize.height;
+      const offsetX = ocrCropRef ? ocrCropRef.x : 0;
+      const offsetY = ocrCropRef ? ocrCropRef.y : 0;
+
+      return {
+        x1: Math.round(offsetX + (src.box.xmin / 1000) * baseW),
+        y1: Math.round(offsetY + (src.box.ymin / 1000) * baseH),
+        x2: Math.round(offsetX + (src.box.xmax / 1000) * baseW),
+        y2: Math.round(offsetY + (src.box.ymax / 1000) * baseH),
+      };
+    }
+
+    // Si pas de box_2d précis mais un crop utilisateur actif
+    if (ocrCropRef && ocrCropRef.width > 0 && ocrCropRef.height > 0) {
+      return {
+        x1: Math.round(ocrCropRef.x),
+        y1: Math.round(ocrCropRef.y),
+        x2: Math.round(ocrCropRef.x + ocrCropRef.width),
+        y2: Math.round(ocrCropRef.y + ocrCropRef.height),
+      };
+    }
+
+    return null;
+  }, [getSourceForField, naturalSize, ocrCropRef]);
+
+  // Centrer et zoomer confortablement sur la source identifiée
+  const centerOnSource = useCallback((fieldKey: string) => {
+    const coords = getSourceImageCoords(fieldKey);
+    if (!coords || !containerRef.current || naturalSize.width <= 0 || naturalSize.height <= 0) return;
+
+    const cw = containerRef.current.clientWidth;
+    const ch = containerRef.current.clientHeight;
+    const boxCenterX = (coords.x1 + coords.x2) / 2;
+    const boxCenterY = (coords.y1 + coords.y2) / 2;
+    let dx = boxCenterX - naturalSize.width / 2;
+    let dy = boxCenterY - naturalSize.height / 2;
+
+    if (rotation !== 0) {
+      const rad = (rotation * Math.PI) / 180;
+      const rx = dx * Math.cos(rad) - dy * Math.sin(rad);
+      const ry = dx * Math.sin(rad) + dy * Math.cos(rad);
+      dx = rx;
+      dy = ry;
+    }
+
+    const boxW = Math.max(Math.abs(coords.x2 - coords.x1), 80);
+    const boxH = Math.max(Math.abs(coords.y2 - coords.y1), 40);
+    const fitScale = Math.min((cw * 0.65) / boxW, (ch * 0.65) / boxH);
+    const targetScale = Math.max(0.35, Math.min(2.5, fitScale));
+
+    setView({
+      scale: targetScale,
+      pan: {
+        x: Math.round(-dx * targetScale),
+        y: Math.round(-dy * targetScale),
+      },
+    });
+  }, [getSourceImageCoords, naturalSize, rotation]);
+
+  const handleToggleSource = useCallback((fieldKey: string) => {
+    if (pinnedSourceKey === fieldKey) {
+      setPinnedSourceKey(null);
+    } else {
+      setPinnedSourceKey(fieldKey);
+      centerOnSource(fieldKey);
+    }
+  }, [pinnedSourceKey, centerOnSource]);
+
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -594,6 +694,8 @@ export function ActViewerModal({
       setIsDragging(false);
       isDraggingRef.current = false;
       setCropBox(null);
+      setOcrCropRef(null);
+      setPinnedSourceKey(null);
       setMode("pan");
     }
   }, [isOpen]);
@@ -879,6 +981,10 @@ export function ActViewerModal({
       }
     }, 1000);
 
+    const currentCrop = cropBox && cropBox.width > 20 && cropBox.height > 20 ? { ...cropBox } : null;
+    setOcrCropRef(currentCrop);
+    setPinnedSourceKey(null);
+
     try {
       const res = await fetch("/api/ocr", {
         method: "POST",
@@ -886,7 +992,7 @@ export function ActViewerModal({
         signal: ac.signal,
         body: JSON.stringify({
           imageUrl,
-          crop: cropBox && cropBox.width > 20 && cropBox.height > 20 ? cropBox : undefined,
+          crop: currentCrop || undefined,
           engine: ocrEngine,
           apiKey: geminiApiKey.trim() || undefined,
           language: "fra",
@@ -1075,20 +1181,21 @@ export function ActViewerModal({
     };
   }
 
-  let screenSourceBox: { left: number; top: number; width: number; height: number } | null = null;
-  if (hoveredSourceBox && naturalSize.width > 0 && naturalSize.height > 0) {
-    const x1 = (hoveredSourceBox.xmin / 1000) * naturalSize.width;
-    const y1 = (hoveredSourceBox.ymin / 1000) * naturalSize.height;
-    const x2 = (hoveredSourceBox.xmax / 1000) * naturalSize.width;
-    const y2 = (hoveredSourceBox.ymax / 1000) * naturalSize.height;
-    const pt1 = imageToScreen(x1, y1);
-    const pt2 = imageToScreen(x2, y2);
-    screenSourceBox = {
-      left: Math.min(pt1.x, pt2.x),
-      top: Math.min(pt1.y, pt2.y),
-      width: Math.max(Math.abs(pt2.x - pt1.x), 12),
-      height: Math.max(Math.abs(pt2.y - pt1.y), 12),
-    };
+  let screenSourceBox: { left: number; top: number; width: number; height: number; isPrecise: boolean } | null = null;
+  if (pinnedSourceKey && naturalSize.width > 0 && naturalSize.height > 0) {
+    const coords = getSourceImageCoords(pinnedSourceKey);
+    if (coords) {
+      const pt1 = imageToScreen(coords.x1, coords.y1);
+      const pt2 = imageToScreen(coords.x2, coords.y2);
+      const src = getSourceForField(pinnedSourceKey);
+      screenSourceBox = {
+        left: Math.min(pt1.x, pt2.x),
+        top: Math.min(pt1.y, pt2.y),
+        width: Math.max(Math.abs(pt2.x - pt1.x), 16),
+        height: Math.max(Math.abs(pt2.y - pt1.y), 16),
+        isPrecise: Boolean(src?.box),
+      };
+    }
   }
 
   return (
@@ -1344,7 +1451,7 @@ export function ActViewerModal({
             </div>
           )}
 
-          {/* Boîte animée de mise en évidence de la source (survol) */}
+          {/* Boîte de mise en évidence de la source épinglée */}
           {screenSourceBox && (
             <div
               style={{
@@ -1353,11 +1460,53 @@ export function ActViewerModal({
                 width: screenSourceBox.width,
                 height: screenSourceBox.height,
               }}
-              className="absolute pointer-events-none border-2 border-amber-400 bg-amber-400/25 shadow-xl z-20 rounded transition-all duration-150 animate-pulse ring-4 ring-amber-400/30"
+              className="absolute pointer-events-none border-2 border-amber-400 bg-amber-400/20 shadow-2xl z-20 rounded ring-4 ring-amber-400/35 transition-all duration-200"
             >
-              <span className="absolute -top-6 left-0 rounded bg-amber-500 text-slate-950 font-bold px-1.5 py-0.5 text-[10px] tracking-wide shadow-md uppercase">
-                Source dans l'acte
-              </span>
+              <div className="absolute -top-7 left-0 flex items-center gap-1.5 rounded-md bg-amber-500 text-slate-950 font-bold px-2 py-0.5 text-[10.5px] tracking-wide shadow-md uppercase">
+                <span>🔎</span>
+                <span>{screenSourceBox.isPrecise ? "Ligne dans l'acte" : "Zone analysée"}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Bandeau flottant d'inspection de la source */}
+          {pinnedSourceKey && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 max-w-xl w-[92%] sm:w-auto flex items-center gap-2.5 rounded-xl border border-amber-400/60 bg-surface/95 px-3.5 py-2 text-xs shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150">
+              <span className="flex size-2 rounded-full bg-amber-500 animate-ping shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 font-semibold text-fg">
+                  <span className="text-amber-500">Source :</span>
+                  <span className="truncate">{getFieldLabel(pinnedSourceKey)}</span>
+                </div>
+                {getSourceForField(pinnedSourceKey)?.text ? (
+                  <p className="text-[11px] italic text-fg-muted font-serif truncate mt-0.5">
+                    « {getSourceForField(pinnedSourceKey)!.text} »
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-fg-subtle mt-0.5">
+                    Zone ciblée dans l'acte
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                <button
+                  type="button"
+                  onClick={() => centerOnSource(pinnedSourceKey)}
+                  className="rounded-lg border border-border bg-surface-2 px-2 py-1 text-[11px] font-medium text-fg hover:bg-surface-3 transition-colors flex items-center gap-1"
+                  title="Recentrer et zoomer sur cette écriture"
+                >
+                  <span>🎯</span>
+                  <span className="hidden sm:inline">Recentrer</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPinnedSourceKey(null)}
+                  className="rounded-lg p-1 text-fg-muted hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                  title="Fermer l'inspection de la source"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           )}
 
@@ -1616,11 +1765,21 @@ export function ActViewerModal({
                     </div>
                   </div>
 
-                  {/* Indicateur de source survolée */}
-                  {hoveredSourceKey && getSourceForField(hoveredSourceKey)?.text && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-400/10 border border-amber-400/30 text-amber-900 dark:text-amber-200 rounded-lg text-xs animate-in fade-in duration-150">
-                      <span className="font-semibold shrink-0">🔎 Extrait identifié :</span>
-                      <span className="italic truncate font-serif">« {getSourceForField(hoveredSourceKey)!.text} »</span>
+                  {/* Indicateur de source épinglée */}
+                  {pinnedSourceKey && getSourceForField(pinnedSourceKey)?.text && (
+                    <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-amber-400/10 border border-amber-400/30 text-amber-900 dark:text-amber-200 rounded-lg text-xs animate-in fade-in duration-150">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-semibold shrink-0">🔎 Source ({getFieldLabel(pinnedSourceKey)}) :</span>
+                        <span className="italic truncate font-serif">« {getSourceForField(pinnedSourceKey)!.text} »</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPinnedSourceKey(null)}
+                        className="text-xs hover:opacity-75 shrink-0 px-1 font-bold cursor-pointer"
+                        title="Désépingler"
+                      >
+                        ✕
+                      </button>
                     </div>
                   )}
 
@@ -1633,7 +1792,7 @@ export function ActViewerModal({
                       className="field w-full rounded-lg p-2.5 text-xs font-mono leading-relaxed resize-none flex-1 min-h-[220px]"
                     />
                   ) : (() => {
-                    const activeQuote = hoveredSourceKey ? getSourceForField(hoveredSourceKey)?.text?.trim() : undefined;
+                    const activeQuote = pinnedSourceKey ? getSourceForField(pinnedSourceKey)?.text?.trim() : undefined;
                     if (activeQuote && transcription.toLowerCase().includes(activeQuote.toLowerCase())) {
                       const idx = transcription.toLowerCase().indexOf(activeQuote.toLowerCase());
                       const before = transcription.slice(0, idx);
@@ -1755,14 +1914,15 @@ export function ActViewerModal({
                       const src = getSourceForField(key);
                       const isDiff = proposedVal.trim() !== (currentVal || "").trim();
                       const isEmptyProposed = !proposedVal.trim();
+                      const isPinned = pinnedSourceKey === key;
 
                       return (
                         <div
                           key={key}
-                          onMouseEnter={() => handleRowHover(key)}
-                          onMouseLeave={handleRowLeave}
                           className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-2 transition-all ${
-                            isChecked
+                            isPinned
+                              ? "border-amber-400/70 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
+                              : isChecked
                               ? "border-border bg-surface shadow-2xs"
                               : "border-border/40 bg-surface-2/20 opacity-70 hover:opacity-100"
                           }`}
@@ -1815,12 +1975,16 @@ export function ActViewerModal({
                           {src && (src.text || src.box) && (
                             <button
                               type="button"
-                              onClick={() => handleRowHover(key)}
-                              className="shrink-0 flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-400/25 transition-colors cursor-pointer"
-                              title={src.text ? `Extrait : « ${src.text} »` : "Localisation sur l'acte"}
+                              onClick={() => handleToggleSource(key)}
+                              className={`shrink-0 flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-medium transition-colors cursor-pointer ${
+                                isPinned
+                                  ? "border-amber-500 bg-amber-500 text-slate-950 font-semibold shadow-xs ring-2 ring-amber-400/40"
+                                  : "border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-300 hover:bg-amber-400/25"
+                              }`}
+                              title={src.text ? `Extrait : « ${src.text} » (Cliquer pour cibler)` : "Localiser dans l'acte"}
                             >
                               <span>🔎</span>
-                              <span className="hidden md:inline">Source</span>
+                              <span className="hidden md:inline">{isPinned ? "Épinglé" : "Source"}</span>
                             </button>
                           )}
                         </div>
@@ -1837,14 +2001,15 @@ export function ActViewerModal({
                     ) => {
                       const isChecked = selectedFieldKeys.has(key);
                       const src = getSourceForField(key);
+                      const isPinned = pinnedSourceKey === key;
 
                       return (
                         <div
                           key={key}
-                          onMouseEnter={() => handleRowHover(key)}
-                          onMouseLeave={handleRowLeave}
                           className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-2 transition-all ${
-                            isChecked
+                            isPinned
+                              ? "border-amber-400/70 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
+                              : isChecked
                               ? "border-border bg-surface shadow-2xs"
                               : "border-border/40 bg-surface-2/20 opacity-70 hover:opacity-100"
                           }`}
@@ -1892,12 +2057,16 @@ export function ActViewerModal({
                           {src && (src.text || src.box) && (
                             <button
                               type="button"
-                              onClick={() => handleRowHover(key)}
-                              className="shrink-0 flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-400/25 transition-colors cursor-pointer"
-                              title={src.text ? `Extrait : « ${src.text} »` : "Localisation sur l'acte"}
+                              onClick={() => handleToggleSource(key)}
+                              className={`shrink-0 flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-medium transition-colors cursor-pointer ${
+                                isPinned
+                                  ? "border-amber-500 bg-amber-500 text-slate-950 font-semibold shadow-xs ring-2 ring-amber-400/40"
+                                  : "border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-300 hover:bg-amber-400/25"
+                              }`}
+                              title={src.text ? `Extrait : « ${src.text} » (Cliquer pour cibler)` : "Localiser dans l'acte"}
                             >
                               <span>🔎</span>
-                              <span className="hidden md:inline">Source</span>
+                              <span className="hidden md:inline">{isPinned ? "Épinglé" : "Source"}</span>
                             </button>
                           )}
                         </div>
