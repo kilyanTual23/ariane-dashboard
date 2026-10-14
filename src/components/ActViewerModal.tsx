@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import {
   appendTranscriptionToNotesAction,
@@ -50,6 +51,7 @@ export function ActViewerModal({
   unionId?: number;
   actKind?: "birth" | "death" | "marriage";
 }) {
+  const router = useRouter();
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
@@ -1013,10 +1015,18 @@ export function ActViewerModal({
         if (fieldSurname.trim()) fd.append("surname", fieldSurname.trim().toLocaleUpperCase("fr"));
       }
       if (selectedFieldKeys.has("occupation") && fieldOccupation.trim()) fd.append("occupation", fieldOccupation.trim());
-      if (selectedFieldKeys.has("birth_date") && fieldBirthDate.trim()) fd.append("birth_date_raw", fieldBirthDate.trim());
-      if (selectedFieldKeys.has("birth_place") && fieldBirthPlace.trim()) fd.append("birth_place", fieldBirthPlace.trim());
-      if (selectedFieldKeys.has("death_date") && fieldDeathDate.trim()) fd.append("death_date_raw", fieldDeathDate.trim());
-      if (selectedFieldKeys.has("death_place") && fieldDeathPlace.trim()) fd.append("death_place", fieldDeathPlace.trim());
+      if (selectedFieldKeys.has("birth_date") && (fieldBirthDate.trim() || fieldDate.trim())) {
+        fd.append("birth_date_raw", (fieldBirthDate || fieldDate).trim());
+      }
+      if (selectedFieldKeys.has("birth_place") && (fieldBirthPlace.trim() || fieldPlace.trim())) {
+        fd.append("birth_place", (fieldBirthPlace || fieldPlace).trim());
+      }
+      if (selectedFieldKeys.has("death_date") && (fieldDeathDate.trim() || fieldDate.trim())) {
+        fd.append("death_date_raw", (fieldDeathDate || fieldDate).trim());
+      }
+      if (selectedFieldKeys.has("death_place") && (fieldDeathPlace.trim() || fieldPlace.trim())) {
+        fd.append("death_place", (fieldDeathPlace || fieldPlace).trim());
+      }
 
       // Père (du sujet ou époux 1)
       if (selectedFieldKeys.has("father") && fieldFather.trim()) {
@@ -1086,6 +1096,14 @@ export function ActViewerModal({
           ? res.updatedFields.join(", ")
           : "Fiche mise à jour";
         setSaveSuccessMessage(`✓ Enregistré : ${updated} !`);
+        try {
+          const fresh = await getActViewerContextAction(slug, personId, unionId);
+          setCurrentContext(fresh);
+          router.refresh();
+        } catch (err) {
+          console.warn("Erreur rafraîchissement contexte:", err);
+        }
+        setSelectedFieldKeys(new Set());
         setTimeout(() => setSaveSuccessMessage(null), 5000);
       } else {
         setSaveErrorMessage(res.error || "Erreur lors de l'enregistrement");
@@ -1823,29 +1841,53 @@ export function ActViewerModal({
                         "spouse_mother",
                         "spouse_mother_status",
                       ]
-                    : [
-                        "date",
-                        "place",
-                        "name",
-                        "occupation",
+                    : actKind === "birth"
+                    ? [
                         "birth_date",
                         "birth_place",
+                        "name",
+                        "occupation",
                         "death_date",
                         "death_place",
                         "father",
                         "father_occupation",
                         "father_status",
-                        "father_death_date",
-                        "father_death_place",
                         "father_birth_date",
                         "father_birth_place",
+                        "father_death_date",
+                        "father_death_place",
                         "mother",
                         "mother_occupation",
                         "mother_status",
-                        "mother_death_date",
-                        "mother_death_place",
                         "mother_birth_date",
                         "mother_birth_place",
+                        "mother_death_date",
+                        "mother_death_place",
+                        "spouse",
+                        "marriage_date",
+                        "marriage_place",
+                      ]
+                    : [
+                        "death_date",
+                        "death_place",
+                        "name",
+                        "occupation",
+                        "birth_date",
+                        "birth_place",
+                        "father",
+                        "father_occupation",
+                        "father_status",
+                        "father_birth_date",
+                        "father_birth_place",
+                        "father_death_date",
+                        "father_death_place",
+                        "mother",
+                        "mother_occupation",
+                        "mother_status",
+                        "mother_birth_date",
+                        "mother_birth_place",
+                        "mother_death_date",
+                        "mother_death_place",
                         "spouse",
                         "marriage_date",
                         "marriage_place",
@@ -1885,17 +1927,37 @@ export function ActViewerModal({
                     if (Boolean(currentContext?.union?.partner2Father?.is_living === 0) !== spouseFatherIsDeceased) totalChangesCount++;
                     if (isTextDiff(currentContext?.union?.partner2Mother?.displayName, fieldSpouseMother)) totalChangesCount++;
                     if (Boolean(currentContext?.union?.partner2Mother?.is_living === 0) !== spouseMotherIsDeceased) totalChangesCount++;
+                  } else if (actKind === "birth") {
+                    if (isTextDiff(currentContext?.person?.birth_date_raw, fieldBirthDate || fieldDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.birth_place, fieldBirthPlace || fieldPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.displayName, `${fieldGivenNames} ${fieldSurname}`.trim())) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.occupation, fieldOccupation)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.death_date_raw, fieldDeathDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.death_place, fieldDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.displayName, fieldFather)) totalChangesCount++;
+                    if (isTextDiff(null, fieldFatherOccupation)) totalChangesCount++;
+                    if (Boolean(currentContext?.person?.father?.is_living === 0) !== fatherIsDeceased) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.birth_date_raw, fieldFatherBirthDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.birth_place, fieldFatherBirthPlace)) totalChangesCount++;
+                    if (isTextDiff(null, fieldFatherDeathDate)) totalChangesCount++;
+                    if (isTextDiff(null, fieldFatherDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.displayName, fieldMother)) totalChangesCount++;
+                    if (isTextDiff(null, fieldMotherOccupation)) totalChangesCount++;
+                    if (Boolean(currentContext?.person?.mother?.is_living === 0) !== motherIsDeceased) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.birth_date_raw, fieldMotherBirthDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.birth_place, fieldMotherBirthPlace)) totalChangesCount++;
+                    if (isTextDiff(null, fieldMotherDeathDate)) totalChangesCount++;
+                    if (isTextDiff(null, fieldMotherDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner2?.displayName, fieldSpouse)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.date_raw, fieldMarriageDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.place, fieldMarriagePlace)) totalChangesCount++;
                   } else {
-                    const evCurDate = actKind === "death" ? currentContext?.person?.death_date_raw : currentContext?.person?.birth_date_raw;
-                    const evCurPlace = actKind === "death" ? currentContext?.person?.death_place : currentContext?.person?.birth_place;
-                    if (isTextDiff(evCurDate, fieldDate)) totalChangesCount++;
-                    if (isTextDiff(evCurPlace, fieldPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.death_date_raw, fieldDate || fieldDeathDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.death_place, fieldPlace || fieldDeathPlace)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.displayName, `${fieldGivenNames} ${fieldSurname}`.trim())) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.occupation, fieldOccupation)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.birth_date_raw, fieldBirthDate)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.birth_place, fieldBirthPlace)) totalChangesCount++;
-                    if (isTextDiff(currentContext?.person?.death_date_raw, fieldDeathDate)) totalChangesCount++;
-                    if (isTextDiff(currentContext?.person?.death_place, fieldDeathPlace)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.father?.displayName, fieldFather)) totalChangesCount++;
                     if (isTextDiff(null, fieldFatherOccupation)) totalChangesCount++;
                     if (Boolean(currentContext?.person?.father?.is_living === 0) !== fatherIsDeceased) totalChangesCount++;
@@ -2439,25 +2501,56 @@ export function ActViewerModal({
                       ) : (
                         <div className="flex flex-col gap-3">
                           {/* 1. Événement / Acte */}
-                          {renderSection(actKind === "death" ? "Acte de décès" : "Acte de baptême / naissance", [
-                            renderFieldCard(
-                              "date",
-                              "Date de l'acte",
-                              actKind === "death" ? currentContext?.person?.death_date_raw : currentContext?.person?.birth_date_raw,
-                              fieldDate,
-                              setFieldDate
-                            ),
-                            renderFieldCard(
-                              "place",
-                              "Lieu / Paroisse",
-                              actKind === "death" ? currentContext?.person?.death_place : currentContext?.person?.birth_place,
-                              fieldPlace,
-                              setFieldPlace
-                            ),
-                          ])}
+                          {actKind === "birth" ? (
+                            renderSection("Acte de naissance / baptême", [
+                              renderFieldCard(
+                                "birth_date",
+                                "Date de naissance",
+                                currentContext?.person?.birth_date_raw,
+                                fieldBirthDate || fieldDate,
+                                (val) => {
+                                  setFieldBirthDate(val);
+                                  setFieldDate(val);
+                                }
+                              ),
+                              renderFieldCard(
+                                "birth_place",
+                                "Lieu de naissance / Paroisse",
+                                currentContext?.person?.birth_place,
+                                fieldBirthPlace || fieldPlace,
+                                (val) => {
+                                  setFieldBirthPlace(val);
+                                  setFieldPlace(val);
+                                }
+                              ),
+                            ])
+                          ) : (
+                            renderSection("Acte de décès", [
+                              renderFieldCard(
+                                "death_date",
+                                "Date de décès",
+                                currentContext?.person?.death_date_raw,
+                                fieldDate || fieldDeathDate,
+                                (val) => {
+                                  setFieldDate(val);
+                                  setFieldDeathDate(val);
+                                }
+                              ),
+                              renderFieldCard(
+                                "death_place",
+                                "Lieu de décès / Paroisse",
+                                currentContext?.person?.death_place,
+                                fieldPlace || fieldDeathPlace,
+                                (val) => {
+                                  setFieldPlace(val);
+                                  setFieldDeathPlace(val);
+                                }
+                              ),
+                            ])
+                          )}
 
                           {/* 2. Individu concerné */}
-                          {renderSection("Individu concerné", [
+                          {renderSection(actKind === "death" ? "Individu décédé" : "Individu concerné", [
                             renderFieldCard(
                               "name",
                               "Prénom(s) & Nom",
@@ -2476,14 +2569,14 @@ export function ActViewerModal({
                               fieldOccupation,
                               setFieldOccupation
                             ),
-                            (actKind === "death" || fieldBirthDate) ? renderFieldCard(
+                            actKind === "death" && fieldBirthDate ? renderFieldCard(
                               "birth_date",
-                              "Date naissance déduite",
+                              "Date naissance déduite (selon âge au décès)",
                               currentContext?.person?.birth_date_raw,
                               fieldBirthDate,
                               setFieldBirthDate
                             ) : null,
-                            fieldBirthPlace ? renderFieldCard(
+                            actKind === "death" && fieldBirthPlace ? renderFieldCard(
                               "birth_place",
                               "Lieu de naissance",
                               currentContext?.person?.birth_place,

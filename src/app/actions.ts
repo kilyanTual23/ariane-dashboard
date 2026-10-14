@@ -1018,16 +1018,16 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
         updatedFields.push("Lieu de décès");
       }
 
-      // 3. Identité & Métier si non renseignés
-      if (givenNames && (!person.given_names || person.given_names === "Sans nom")) {
+      // 3. Identité & Métier
+      if (givenNames) {
         patch.given_names = givenNames;
         updatedFields.push("Prénoms");
       }
-      if (surname && (!person.surname || person.surname === "Sans nom")) {
+      if (surname) {
         patch.surname = surname;
         updatedFields.push("Nom");
       }
-      if (occupation && !person.occupation) {
+      if (occupation) {
         patch.occupation = occupation;
         updatedFields.push("Métier");
       }
@@ -1077,15 +1077,15 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
         } else {
           // Enrichir la fiche existante du père avec les nouvelles données
           const fUpdate: q.PersonInput = {};
-          if (fatherOccupation && !existingFather.displayName) fUpdate.occupation = fatherOccupation;
+          if (fatherOccupation) fUpdate.occupation = fatherOccupation;
           if (fatherIsDeceased) fUpdate.is_living = 0;
-          if (fatherDeathDateRaw && !existingFather.death_year) {
+          if (fatherDeathDateRaw) {
             const d = parseDateInput(fatherDeathDateRaw);
             fUpdate.death_date_raw = d.canonical;
             fUpdate.death_date_iso = d.iso;
             if (d.year) fUpdate.death_year = d.year;
           }
-          if (fatherBirthDateRaw && !existingFather.birth_year) {
+          if (fatherBirthDateRaw) {
             const d = parseDateInput(fatherBirthDateRaw);
             fUpdate.birth_date_raw = d.canonical;
             fUpdate.birth_date_iso = d.iso;
@@ -1134,13 +1134,13 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
           const mUpdate: q.PersonInput = {};
           if (motherOccupation) mUpdate.occupation = motherOccupation;
           if (motherIsDeceased) mUpdate.is_living = 0;
-          if (motherDeathDateRaw && !existingMother.death_year) {
+          if (motherDeathDateRaw) {
             const d = parseDateInput(motherDeathDateRaw);
             mUpdate.death_date_raw = d.canonical;
             mUpdate.death_date_iso = d.iso;
             if (d.year) mUpdate.death_year = d.year;
           }
-          if (motherBirthDateRaw && !existingMother.birth_year) {
+          if (motherBirthDateRaw) {
             const d = parseDateInput(motherBirthDateRaw);
             mUpdate.birth_date_raw = d.canonical;
             mUpdate.birth_date_iso = d.iso;
@@ -1231,18 +1231,26 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
         const p1 = await q.getPerson(profileId, union.partner1_id);
         if (p1) {
           const p1Patch: q.PersonInput = {};
-          if (occupation && !p1.occupation) {
+          if (givenNames) {
+            p1Patch.given_names = givenNames;
+            updatedFields.push(`Prénom(s) de ${p1.displayName}`);
+          }
+          if (surname) {
+            p1Patch.surname = surname;
+            updatedFields.push(`Nom de ${p1.displayName}`);
+          }
+          if (occupation) {
             p1Patch.occupation = occupation;
             updatedFields.push(`Métier de ${p1.displayName}`);
           }
-          if (birthDateRaw && !p1.birth_year) {
+          if (birthDateRaw) {
             const d = parseDateInput(birthDateRaw);
             p1Patch.birth_date_raw = d.canonical;
             p1Patch.birth_date_iso = d.iso;
             if (d.year) p1Patch.birth_year = d.year;
             updatedFields.push(`Date naiss. de ${p1.displayName}`);
           }
-          if (birthPlace && !p1.birth_place) {
+          if (birthPlace) {
             p1Patch.birth_place = normalizePlace(birthPlace);
             updatedFields.push(`Lieu naiss. de ${p1.displayName}`);
           }
@@ -1260,11 +1268,34 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 sex: "M",
                 status: "En recherche",
                 is_living: fatherIsDeceased ? 0 : 1,
+                occupation: fatherOccupation || null,
+                birth_place: fatherBirthPlace ? normalizePlace(fatherBirthPlace) : null,
               });
+              if (fatherBirthDateRaw) {
+                const d = parseDateInput(fatherBirthDateRaw);
+                await q.updatePerson(fId, {
+                  birth_date_raw: d.canonical,
+                  birth_date_iso: d.iso,
+                  birth_year: d.year,
+                });
+              }
               await q.addParent(fId, p1.id);
               updatedFields.push(`Père de ${p1.displayName} créé et lié`);
-            } else if (fatherIsDeceased) {
-              await q.updatePerson(exFather.id, { is_living: 0 });
+            } else {
+              const fUp: q.PersonInput = {};
+              if (fatherIsDeceased) fUp.is_living = 0;
+              if (fatherOccupation) fUp.occupation = fatherOccupation;
+              if (fatherBirthDateRaw) {
+                const d = parseDateInput(fatherBirthDateRaw);
+                fUp.birth_date_raw = d.canonical;
+                fUp.birth_date_iso = d.iso;
+                if (d.year) fUp.birth_year = d.year;
+              }
+              if (fatherBirthPlace) fUp.birth_place = normalizePlace(fatherBirthPlace);
+              if (Object.keys(fUp).length > 0) {
+                await q.updatePerson(exFather.id, fUp);
+                updatedFields.push(`Fiche du père de ${p1.displayName} mise à jour`);
+              }
             }
           }
 
@@ -1278,11 +1309,34 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 sex: "F",
                 status: "En recherche",
                 is_living: motherIsDeceased ? 0 : 1,
+                occupation: motherOccupation || null,
+                birth_place: motherBirthPlace ? normalizePlace(motherBirthPlace) : null,
               });
+              if (motherBirthDateRaw) {
+                const d = parseDateInput(motherBirthDateRaw);
+                await q.updatePerson(mId, {
+                  birth_date_raw: d.canonical,
+                  birth_date_iso: d.iso,
+                  birth_year: d.year,
+                });
+              }
               await q.addParent(mId, p1.id);
               updatedFields.push(`Mère de ${p1.displayName} créée et liée`);
-            } else if (motherIsDeceased) {
-              await q.updatePerson(exMother.id, { is_living: 0 });
+            } else {
+              const mUp: q.PersonInput = {};
+              if (motherIsDeceased) mUp.is_living = 0;
+              if (motherOccupation) mUp.occupation = motherOccupation;
+              if (motherBirthDateRaw) {
+                const d = parseDateInput(motherBirthDateRaw);
+                mUp.birth_date_raw = d.canonical;
+                mUp.birth_date_iso = d.iso;
+                if (d.year) mUp.birth_year = d.year;
+              }
+              if (motherBirthPlace) mUp.birth_place = normalizePlace(motherBirthPlace);
+              if (Object.keys(mUp).length > 0) {
+                await q.updatePerson(exMother.id, mUp);
+                updatedFields.push(`Fiche de la mère de ${p1.displayName} mise à jour`);
+              }
             }
           }
 
@@ -1294,9 +1348,11 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
       const spouseFatherGivenNames = str(fd, "spouse_father_given_names");
       const spouseFatherSurname = str(fd, "spouse_father_surname")?.toLocaleUpperCase("fr") || null;
       const spouseFatherIsDeceased = str(fd, "spouse_father_is_deceased") === "1" || str(fd, "spouse_father_is_deceased") === "true";
+      const spouseFatherOccupation = str(fd, "spouse_father_occupation");
       const spouseMotherGivenNames = str(fd, "spouse_mother_given_names");
       const spouseMotherSurname = str(fd, "spouse_mother_surname")?.toLocaleUpperCase("fr") || null;
       const spouseMotherIsDeceased = str(fd, "spouse_mother_is_deceased") === "1" || str(fd, "spouse_mother_is_deceased") === "true";
+      const spouseMotherOccupation = str(fd, "spouse_mother_occupation");
       const spouseOccupation = str(fd, "spouse_occupation");
       const spouseBirthDateRaw = str(fd, "spouse_birth_date_raw");
       const spouseBirthPlace = str(fd, "spouse_birth_place");
@@ -1310,7 +1366,16 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
           sex: "F",
           status: "En recherche",
           occupation: spouseOccupation || null,
+          birth_place: spouseBirthPlace ? normalizePlace(spouseBirthPlace) : null,
         });
+        if (spouseBirthDateRaw) {
+          const d = parseDateInput(spouseBirthDateRaw);
+          await q.updatePerson(p2Id, {
+            birth_date_raw: d.canonical,
+            birth_date_iso: d.iso,
+            birth_year: d.year,
+          });
+        }
         await q.updateUnion(unionId, { partner2_id: p2Id });
         updatedFields.push("Épouse créée et liée");
       }
@@ -1319,18 +1384,26 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
         const p2 = await q.getPerson(profileId, p2Id);
         if (p2) {
           const p2Patch: q.PersonInput = {};
-          if (spouseOccupation && !p2.occupation) {
+          if (spouseGivenNames) {
+            p2Patch.given_names = spouseGivenNames;
+            updatedFields.push(`Prénom(s) de ${p2.displayName}`);
+          }
+          if (spouseSurname) {
+            p2Patch.surname = spouseSurname;
+            updatedFields.push(`Nom de ${p2.displayName}`);
+          }
+          if (spouseOccupation) {
             p2Patch.occupation = spouseOccupation;
             updatedFields.push(`Métier de ${p2.displayName}`);
           }
-          if (spouseBirthDateRaw && !p2.birth_year) {
+          if (spouseBirthDateRaw) {
             const d = parseDateInput(spouseBirthDateRaw);
             p2Patch.birth_date_raw = d.canonical;
             p2Patch.birth_date_iso = d.iso;
             if (d.year) p2Patch.birth_year = d.year;
             updatedFields.push(`Date naiss. de ${p2.displayName}`);
           }
-          if (spouseBirthPlace && !p2.birth_place) {
+          if (spouseBirthPlace) {
             p2Patch.birth_place = normalizePlace(spouseBirthPlace);
             updatedFields.push(`Lieu naiss. de ${p2.displayName}`);
           }
@@ -1348,11 +1421,18 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 sex: "M",
                 status: "En recherche",
                 is_living: spouseFatherIsDeceased ? 0 : 1,
+                occupation: spouseFatherOccupation || null,
               });
               await q.addParent(fId, p2.id);
               updatedFields.push(`Père de ${p2.displayName} créé et lié`);
-            } else if (spouseFatherIsDeceased) {
-              await q.updatePerson(exFather.id, { is_living: 0 });
+            } else {
+              const fUp: q.PersonInput = {};
+              if (spouseFatherIsDeceased) fUp.is_living = 0;
+              if (spouseFatherOccupation) fUp.occupation = spouseFatherOccupation;
+              if (Object.keys(fUp).length > 0) {
+                await q.updatePerson(exFather.id, fUp);
+                updatedFields.push(`Père de ${p2.displayName} mis à jour`);
+              }
             }
           }
 
@@ -1366,11 +1446,18 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 sex: "F",
                 status: "En recherche",
                 is_living: spouseMotherIsDeceased ? 0 : 1,
+                occupation: spouseMotherOccupation || null,
               });
               await q.addParent(mId, p2.id);
               updatedFields.push(`Mère de ${p2.displayName} créée et liée`);
-            } else if (spouseMotherIsDeceased) {
-              await q.updatePerson(exMother.id, { is_living: 0 });
+            } else {
+              const mUp: q.PersonInput = {};
+              if (spouseMotherIsDeceased) mUp.is_living = 0;
+              if (spouseMotherOccupation) mUp.occupation = spouseMotherOccupation;
+              if (Object.keys(mUp).length > 0) {
+                await q.updatePerson(exMother.id, mUp);
+                updatedFields.push(`Mère de ${p2.displayName} mise à jour`);
+              }
             }
           }
 
@@ -1379,7 +1466,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
       }
 
       await q.recomputeSosa(profileId);
-      await refreshProfile(slug);
+      await refreshProfile(slug, union.partner1_id ?? undefined);
       return { ok: true, updatedFields };
     }
 
