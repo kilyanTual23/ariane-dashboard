@@ -5,11 +5,14 @@ import ReactMarkdown from "react-markdown";
 import {
   appendTranscriptionToNotesAction,
   saveTranscriptionToRecordAction,
+  getActViewerContextAction,
+  type ActViewerContextData,
 } from "@/app/actions";
 import {
   parseTranscription,
   splitFullName,
   type ExtractedActData,
+  type FieldSource,
 } from "@/lib/transcription-parser";
 
 interface ViewState {
@@ -114,48 +117,105 @@ export function ActViewerModal({
   const [fieldMotherBirthPlace, setFieldMotherBirthPlace] = useState("");
   const [createMother, setCreateMother] = useState(true);
 
-  // Conjoint & Mariage
+  // Conjoint & Mariage (Partenaire 2)
   const [fieldSpouse, setFieldSpouse] = useState("");
+  const [fieldSpouseOccupation, setFieldSpouseOccupation] = useState("");
+  const [fieldSpouseBirthDate, setFieldSpouseBirthDate] = useState("");
+  const [fieldSpouseBirthPlace, setFieldSpouseBirthPlace] = useState("");
   const [fieldMarriageDate, setFieldMarriageDate] = useState("");
   const [fieldMarriagePlace, setFieldMarriagePlace] = useState("");
   const [createUnion, setCreateUnion] = useState(true);
+
+  // Parents du conjoint / épouse (Partenaire 2 pour les mariages)
+  const [fieldSpouseFather, setFieldSpouseFather] = useState("");
+  const [fieldSpouseFatherOccupation, setFieldSpouseFatherOccupation] = useState("");
+  const [spouseFatherIsDeceased, setSpouseFatherIsDeceased] = useState(false);
+  const [fieldSpouseMother, setFieldSpouseMother] = useState("");
+  const [fieldSpouseMotherOccupation, setFieldSpouseMotherOccupation] = useState("");
+  const [spouseMotherIsDeceased, setSpouseMotherIsDeceased] = useState(false);
+
+  // Sélection des cases à valider dans l'Avant / Après
+  const [selectedFieldKeys, setSelectedFieldKeys] = useState<Set<string>>(new Set());
 
   const [appendToNotes, setAppendToNotes] = useState(true);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
 
+  // Contexte existant en base pour la comparaison Avant / Après
+  const [currentContext, setCurrentContext] = useState<ActViewerContextData | null>(null);
+
+  // État de survol pour le pointage interactif vers la source (texte et boîte sur l'image)
+  const [hoveredSourceKey, setHoveredSourceKey] = useState<string | null>(null);
+  const [hoveredSourceBox, setHoveredSourceBox] = useState<{ ymin: number; xmin: number; ymax: number; xmax: number } | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const modalRootRef = useRef<HTMLDivElement>(null);
 
-  // Appliquer les données extraites aux champs de formulaire
+  // Charger le contexte actuel de la personne et/ou union pour la comparaison Avant/Après
+  useEffect(() => {
+    if (!isOpen || !slug) return;
+    getActViewerContextAction(slug, personId, unionId)
+      .then((data) => setCurrentContext(data))
+      .catch((err) => console.warn("Erreur chargement contexte acte:", err));
+  }, [isOpen, slug, personId, unionId]);
+
+  // Appliquer les données extraites aux champs de formulaire et pré-cocher les propositions
   const applyParsedData = useCallback((parsed: ExtractedActData) => {
     setExtractedData(parsed);
+    const newKeys = new Set<string>();
 
     // Événement principal
     const evDate = parsed.event_date || (actKind === "death" ? parsed.death_date_raw : actKind === "marriage" ? parsed.marriage_date_raw : parsed.birth_date_raw) || "";
     const evPlace = parsed.event_place || (actKind === "death" ? parsed.death_place : actKind === "marriage" ? parsed.marriage_place : parsed.birth_place) || "";
-    if (evDate) setFieldDate(evDate);
-    if (evPlace) setFieldPlace(evPlace);
+    if (evDate) {
+      setFieldDate(evDate);
+      newKeys.add("date");
+    }
+    if (evPlace) {
+      setFieldPlace(evPlace);
+      newKeys.add("place");
+    }
 
-    // Sujet
-    if (parsed.given_names) setFieldGivenNames(parsed.given_names);
-    if (parsed.surname) setFieldSurname(parsed.surname.toLocaleUpperCase("fr"));
-    if (parsed.occupation) setFieldOccupation(parsed.occupation);
+    // Sujet / Époux 1
+    if (parsed.given_names) {
+      setFieldGivenNames(parsed.given_names);
+      newKeys.add("name");
+    }
+    if (parsed.surname) {
+      setFieldSurname(parsed.surname.toLocaleUpperCase("fr"));
+      newKeys.add("name");
+    }
+    if (parsed.occupation) {
+      setFieldOccupation(parsed.occupation);
+      newKeys.add("occupation");
+    }
 
-    // Naissance du sujet
+    // Naissance du sujet / Époux 1
     const bDate = parsed.birth_date_raw || (actKind === "birth" ? evDate : "");
     const bPlace = parsed.birth_place || (actKind === "birth" ? evPlace : "");
-    if (bDate) setFieldBirthDate(bDate);
-    if (bPlace) setFieldBirthPlace(bPlace);
+    if (bDate) {
+      setFieldBirthDate(bDate);
+      newKeys.add("birth_date");
+    }
+    if (bPlace) {
+      setFieldBirthPlace(bPlace);
+      newKeys.add("birth_place");
+    }
 
     // Décès du sujet (ou mention marginale de décès)
     const dDate = parsed.death_date_raw || parsed.marginal_death_date || (actKind === "death" ? evDate : "");
     const dPlace = parsed.death_place || parsed.marginal_death_place || (actKind === "death" ? evPlace : "");
-    if (dDate) setFieldDeathDate(dDate);
-    if (dPlace) setFieldDeathPlace(dPlace);
+    if (dDate) {
+      setFieldDeathDate(dDate);
+      newKeys.add("death_date");
+    }
+    if (dPlace) {
+      setFieldDeathPlace(dPlace);
+      newKeys.add("death_place");
+    }
 
-    // Père
+    // Père (du sujet ou de l'époux 1)
     const fSurname = parsed.father_surname ? parsed.father_surname.toLocaleUpperCase("fr") : "";
     const fName = parsed.father_given_names || fSurname
       ? `${parsed.father_given_names || ""} ${fSurname}`.trim()
@@ -163,18 +223,38 @@ export function ActViewerModal({
     if (fName) {
       setFieldFather(fName);
       setCreateFather(true);
+      newKeys.add("father");
     }
-    if (parsed.father_occupation) setFieldFatherOccupation(parsed.father_occupation);
-    if (parsed.father_is_deceased !== undefined) setFatherIsDeceased(Boolean(parsed.father_is_deceased));
-    if (parsed.father_death_date_raw) setFieldFatherDeathDate(parsed.father_death_date_raw);
-    if (parsed.father_death_place) setFieldFatherDeathPlace(parsed.father_death_place);
-    if (parsed.father_birth_date_raw) setFieldFatherBirthDate(parsed.father_birth_date_raw);
-    if (parsed.father_birth_place) setFieldFatherBirthPlace(parsed.father_birth_place);
+    if (parsed.father_occupation) {
+      setFieldFatherOccupation(parsed.father_occupation);
+      newKeys.add("father_occupation");
+    }
+    if (parsed.father_is_deceased !== undefined) {
+      setFatherIsDeceased(Boolean(parsed.father_is_deceased));
+      newKeys.add("father_status");
+    }
+    if (parsed.father_death_date_raw) {
+      setFieldFatherDeathDate(parsed.father_death_date_raw);
+      newKeys.add("father_death_date");
+    }
+    if (parsed.father_death_place) {
+      setFieldFatherDeathPlace(parsed.father_death_place);
+      newKeys.add("father_death_place");
+    }
+    if (parsed.father_birth_date_raw) {
+      setFieldFatherBirthDate(parsed.father_birth_date_raw);
+      newKeys.add("father_birth_date");
+    }
+    if (parsed.father_birth_place) {
+      setFieldFatherBirthPlace(parsed.father_birth_place);
+      newKeys.add("father_birth_place");
+    }
     if (parsed.father_death_date_raw || parsed.father_death_place) {
       setFatherIsDeceased(true);
+      newKeys.add("father_status");
     }
 
-    // Mère
+    // Mère (du sujet ou de l'époux 1)
     const mSurname = parsed.mother_surname ? parsed.mother_surname.toLocaleUpperCase("fr") : "";
     const mName = parsed.mother_given_names || mSurname
       ? `${parsed.mother_given_names || ""} ${mSurname}`.trim()
@@ -182,29 +262,191 @@ export function ActViewerModal({
     if (mName) {
       setFieldMother(mName);
       setCreateMother(true);
+      newKeys.add("mother");
     }
-    if (parsed.mother_occupation) setFieldMotherOccupation(parsed.mother_occupation);
-    if (parsed.mother_is_deceased !== undefined) setMotherIsDeceased(Boolean(parsed.mother_is_deceased));
-    if (parsed.mother_death_date_raw) setFieldMotherDeathDate(parsed.mother_death_date_raw);
-    if (parsed.mother_death_place) setFieldMotherDeathPlace(parsed.mother_death_place);
-    if (parsed.mother_birth_date_raw) setFieldMotherBirthDate(parsed.mother_birth_date_raw);
-    if (parsed.mother_birth_place) setFieldMotherBirthPlace(parsed.mother_birth_place);
+    if (parsed.mother_occupation) {
+      setFieldMotherOccupation(parsed.mother_occupation);
+      newKeys.add("mother_occupation");
+    }
+    if (parsed.mother_is_deceased !== undefined) {
+      setMotherIsDeceased(Boolean(parsed.mother_is_deceased));
+      newKeys.add("mother_status");
+    }
+    if (parsed.mother_death_date_raw) {
+      setFieldMotherDeathDate(parsed.mother_death_date_raw);
+      newKeys.add("mother_death_date");
+    }
+    if (parsed.mother_death_place) {
+      setFieldMotherDeathPlace(parsed.mother_death_place);
+      newKeys.add("mother_death_place");
+    }
+    if (parsed.mother_birth_date_raw) {
+      setFieldMotherBirthDate(parsed.mother_birth_date_raw);
+      newKeys.add("mother_birth_date");
+    }
+    if (parsed.mother_birth_place) {
+      setFieldMotherBirthPlace(parsed.mother_birth_place);
+      newKeys.add("mother_birth_place");
+    }
     if (parsed.mother_death_date_raw || parsed.mother_death_place) {
       setMotherIsDeceased(true);
+      newKeys.add("mother_status");
     }
 
-    // Conjoint & Mariage (ou mention marginale de mariage)
-    const spSurname = parsed.spouse_surname ? parsed.spouse_surname.toLocaleUpperCase("fr") : "";
-    const spName = parsed.spouse_given_names || spSurname
-      ? `${parsed.spouse_given_names || ""} ${spSurname}`.trim()
+    // Conjoint & Mariage (Partenaire 2)
+    const spSurname = (parsed.spouse_surname || parsed.bride?.surname || "").toLocaleUpperCase("fr");
+    const spGiven = parsed.spouse_given_names || parsed.bride?.given_names || "";
+    const spName = spGiven || spSurname
+      ? `${spGiven} ${spSurname}`.trim()
       : (parsed.marginal_marriage_spouse || "");
     const mDate = parsed.marriage_date_raw || parsed.marginal_marriage_date || (actKind === "marriage" ? evDate : "");
     const mPlace = parsed.marriage_place || parsed.marginal_marriage_place || (actKind === "marriage" ? evPlace : "");
-    if (spName) setFieldSpouse(spName);
-    if (mDate) setFieldMarriageDate(mDate);
-    if (mPlace) setFieldMarriagePlace(mPlace);
+    if (spName) {
+      setFieldSpouse(spName);
+      newKeys.add("spouse");
+    }
+    const spOcc = parsed.spouse_occupation || parsed.bride?.occupation || "";
+    if (spOcc) {
+      setFieldSpouseOccupation(spOcc);
+      newKeys.add("spouse_occupation");
+    }
+    const spBDate = parsed.spouse_birth_date_raw || parsed.bride?.birth_date_raw || "";
+    if (spBDate) {
+      setFieldSpouseBirthDate(spBDate);
+      newKeys.add("spouse_birth_date");
+    }
+    const spBPlace = parsed.spouse_birth_place || parsed.bride?.birth_place || "";
+    if (spBPlace) {
+      setFieldSpouseBirthPlace(spBPlace);
+      newKeys.add("spouse_birth_place");
+    }
+    if (mDate) {
+      setFieldMarriageDate(mDate);
+      newKeys.add("marriage_date");
+    }
+    if (mPlace) {
+      setFieldMarriagePlace(mPlace);
+      newKeys.add("marriage_place");
+    }
     if (spName || mDate || mPlace) setCreateUnion(true);
+
+    // Parents de l'épouse / Conjoint (Partenaire 2)
+    const spFSurname = (parsed.spouse_father_surname || parsed.bride?.father_surname || "").toLocaleUpperCase("fr");
+    const spFGiven = parsed.spouse_father_given_names || parsed.bride?.father_given_names || "";
+    const spFName = spFGiven || spFSurname ? `${spFGiven} ${spFSurname}`.trim() : "";
+    if (spFName) {
+      setFieldSpouseFather(spFName);
+      newKeys.add("spouse_father");
+    }
+    const spFOcc = parsed.spouse_father_occupation || parsed.bride?.father_occupation || "";
+    if (spFOcc) {
+      setFieldSpouseFatherOccupation(spFOcc);
+      newKeys.add("spouse_father_occupation");
+    }
+    if (parsed.spouse_father_is_deceased !== undefined || parsed.bride?.father_is_deceased !== undefined) {
+      const dec = Boolean(parsed.spouse_father_is_deceased ?? parsed.bride?.father_is_deceased);
+      setSpouseFatherIsDeceased(dec);
+      newKeys.add("spouse_father_status");
+    }
+
+    const spMSurname = (parsed.spouse_mother_surname || parsed.bride?.mother_surname || "").toLocaleUpperCase("fr");
+    const spMGiven = parsed.spouse_mother_given_names || parsed.bride?.mother_given_names || "";
+    const spMName = spMGiven || spMSurname ? `${spMGiven} ${spMSurname}`.trim() : "";
+    if (spMName) {
+      setFieldSpouseMother(spMName);
+      newKeys.add("spouse_mother");
+    }
+    const spMOcc = parsed.spouse_mother_occupation || parsed.bride?.mother_occupation || "";
+    if (spMOcc) {
+      setFieldSpouseMotherOccupation(spMOcc);
+      newKeys.add("spouse_mother_occupation");
+    }
+    if (parsed.spouse_mother_is_deceased !== undefined || parsed.bride?.mother_is_deceased !== undefined) {
+      const dec = Boolean(parsed.spouse_mother_is_deceased ?? parsed.bride?.mother_is_deceased);
+      setSpouseMotherIsDeceased(dec);
+      newKeys.add("spouse_mother_status");
+    }
+
+    setSelectedFieldKeys(newKeys);
   }, [actKind]);
+
+  // Récupérer la source correspondant à un champ
+  const getSourceForField = useCallback((key: string): FieldSource | undefined => {
+    if (!extractedData?.sources) return undefined;
+    const s = extractedData.sources;
+    switch (key) {
+      case "date":
+      case "event_date":
+      case "birth_date":
+      case "marriage_date":
+      case "death_date":
+        return s["event_date"] || s["date"] || s[key];
+      case "place":
+      case "event_place":
+      case "birth_place":
+      case "marriage_place":
+      case "death_place":
+        return s["event_place"] || s["place"] || s[key];
+      case "name":
+      case "given_names":
+      case "surname":
+        return s["given_names"] || s["person_name"] || s["groom"] || s["groom_name"] || s["subject"];
+      case "occupation":
+        return s["occupation"] || s["groom_occupation"];
+      case "father":
+      case "father_status":
+      case "father_death_date":
+      case "father_death_place":
+        return s["father"] || s["father_name"] || s["groom_father"];
+      case "mother":
+      case "mother_status":
+      case "mother_death_date":
+      case "mother_death_place":
+        return s["mother"] || s["mother_name"] || s["groom_mother"];
+      case "spouse":
+        return s["spouse"] || s["bride"] || s["bride_name"] || s["marginal_marriage_spouse"];
+      case "spouse_father":
+      case "spouse_father_status":
+        return s["spouse_father"] || s["bride_father"];
+      case "spouse_mother":
+      case "spouse_mother_status":
+        return s["spouse_mother"] || s["bride_mother"];
+      default:
+        return s[key];
+    }
+  }, [extractedData]);
+
+  const handleRowHover = useCallback((fieldKey: string) => {
+    const src = getSourceForField(fieldKey);
+    setHoveredSourceKey(fieldKey);
+    if (src?.box) {
+      setHoveredSourceBox(src.box);
+    } else {
+      setHoveredSourceBox(null);
+    }
+  }, [getSourceForField]);
+
+  const handleRowLeave = useCallback(() => {
+    setHoveredSourceKey(null);
+    setHoveredSourceBox(null);
+  }, []);
+
+  const toggleFieldKey = (key: string) => {
+    setSelectedFieldKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selectAllKeys = (keys: string[]) => {
+    setSelectedFieldKeys(new Set(keys));
+  };
+
+  const deselectAllKeys = () => {
+    setSelectedFieldKeys(new Set());
+  };
 
   // Récupérer la clé Gemini enregistrée dans localStorage
   useEffect(() => {
@@ -648,6 +890,7 @@ export function ActViewerModal({
           engine: ocrEngine,
           apiKey: geminiApiKey.trim() || undefined,
           language: "fra",
+          actKind,
         }),
       });
 
@@ -704,54 +947,77 @@ export function ActViewerModal({
       if (actKind) fd.append("actKind", actKind);
 
       // Acte / Événement principal
-      if (fieldDate.trim()) fd.append("date_raw", fieldDate.trim());
-      if (fieldPlace.trim()) fd.append("place", fieldPlace.trim());
+      if (selectedFieldKeys.has("date") && fieldDate.trim()) fd.append("date_raw", fieldDate.trim());
+      if (selectedFieldKeys.has("place") && fieldPlace.trim()) fd.append("place", fieldPlace.trim());
 
-      // Sujet
-      if (fieldGivenNames.trim()) fd.append("given_names", fieldGivenNames.trim());
-      if (fieldSurname.trim()) fd.append("surname", fieldSurname.trim().toLocaleUpperCase("fr"));
-      if (fieldOccupation.trim()) fd.append("occupation", fieldOccupation.trim());
-      if (fieldBirthDate.trim()) fd.append("birth_date_raw", fieldBirthDate.trim());
-      if (fieldBirthPlace.trim()) fd.append("birth_place", fieldBirthPlace.trim());
-      if (fieldDeathDate.trim()) fd.append("death_date_raw", fieldDeathDate.trim());
-      if (fieldDeathPlace.trim()) fd.append("death_place", fieldDeathPlace.trim());
+      // Sujet / Époux 1
+      if (selectedFieldKeys.has("name")) {
+        if (fieldGivenNames.trim()) fd.append("given_names", fieldGivenNames.trim());
+        if (fieldSurname.trim()) fd.append("surname", fieldSurname.trim().toLocaleUpperCase("fr"));
+      }
+      if (selectedFieldKeys.has("occupation") && fieldOccupation.trim()) fd.append("occupation", fieldOccupation.trim());
+      if (selectedFieldKeys.has("birth_date") && fieldBirthDate.trim()) fd.append("birth_date_raw", fieldBirthDate.trim());
+      if (selectedFieldKeys.has("birth_place") && fieldBirthPlace.trim()) fd.append("birth_place", fieldBirthPlace.trim());
+      if (selectedFieldKeys.has("death_date") && fieldDeathDate.trim()) fd.append("death_date_raw", fieldDeathDate.trim());
+      if (selectedFieldKeys.has("death_place") && fieldDeathPlace.trim()) fd.append("death_place", fieldDeathPlace.trim());
 
-      // Père
-      if (fieldFather.trim()) {
+      // Père (du sujet ou époux 1)
+      if (selectedFieldKeys.has("father") && fieldFather.trim()) {
         const fParts = splitFullName(fieldFather.trim());
         fd.append("father_given_names", fParts.given_names);
         fd.append("father_surname", fParts.surname);
         fd.append("create_father", createFather ? "1" : "0");
       }
-      if (fieldFatherOccupation.trim()) fd.append("father_occupation", fieldFatherOccupation.trim());
-      if (fatherIsDeceased) fd.append("father_is_deceased", "1");
-      if (fieldFatherDeathDate.trim()) fd.append("father_death_date_raw", fieldFatherDeathDate.trim());
-      if (fieldFatherDeathPlace.trim()) fd.append("father_death_place", fieldFatherDeathPlace.trim());
-      if (fieldFatherBirthDate.trim()) fd.append("father_birth_date_raw", fieldFatherBirthDate.trim());
-      if (fieldFatherBirthPlace.trim()) fd.append("father_birth_place", fieldFatherBirthPlace.trim());
+      if (selectedFieldKeys.has("father_occupation") && fieldFatherOccupation.trim()) fd.append("father_occupation", fieldFatherOccupation.trim());
+      if (selectedFieldKeys.has("father_status") && fatherIsDeceased) fd.append("father_is_deceased", "1");
+      if (selectedFieldKeys.has("father_death_date") && fieldFatherDeathDate.trim()) fd.append("father_death_date_raw", fieldFatherDeathDate.trim());
+      if (selectedFieldKeys.has("father_death_place") && fieldFatherDeathPlace.trim()) fd.append("father_death_place", fieldFatherDeathPlace.trim());
+      if (selectedFieldKeys.has("father_birth_date") && fieldFatherBirthDate.trim()) fd.append("father_birth_date_raw", fieldFatherBirthDate.trim());
+      if (selectedFieldKeys.has("father_birth_place") && fieldFatherBirthPlace.trim()) fd.append("father_birth_place", fieldFatherBirthPlace.trim());
 
-      // Mère
-      if (fieldMother.trim()) {
+      // Mère (du sujet ou époux 1)
+      if (selectedFieldKeys.has("mother") && fieldMother.trim()) {
         const mParts = splitFullName(fieldMother.trim());
         fd.append("mother_given_names", mParts.given_names);
         fd.append("mother_surname", mParts.surname);
         fd.append("create_mother", createMother ? "1" : "0");
       }
-      if (fieldMotherOccupation.trim()) fd.append("mother_occupation", fieldMotherOccupation.trim());
-      if (motherIsDeceased) fd.append("mother_is_deceased", "1");
-      if (fieldMotherDeathDate.trim()) fd.append("mother_death_date_raw", fieldMotherDeathDate.trim());
-      if (fieldMotherDeathPlace.trim()) fd.append("mother_death_place", fieldMotherDeathPlace.trim());
-      if (fieldMotherBirthDate.trim()) fd.append("mother_birth_date_raw", fieldMotherBirthDate.trim());
-      if (fieldMotherBirthPlace.trim()) fd.append("mother_birth_place", fieldMotherBirthPlace.trim());
+      if (selectedFieldKeys.has("mother_occupation") && fieldMotherOccupation.trim()) fd.append("mother_occupation", fieldMotherOccupation.trim());
+      if (selectedFieldKeys.has("mother_status") && motherIsDeceased) fd.append("mother_is_deceased", "1");
+      if (selectedFieldKeys.has("mother_death_date") && fieldMotherDeathDate.trim()) fd.append("mother_death_date_raw", fieldMotherDeathDate.trim());
+      if (selectedFieldKeys.has("mother_death_place") && fieldMotherDeathPlace.trim()) fd.append("mother_death_place", fieldMotherDeathPlace.trim());
+      if (selectedFieldKeys.has("mother_birth_date") && fieldMotherBirthDate.trim()) fd.append("mother_birth_date_raw", fieldMotherBirthDate.trim());
+      if (selectedFieldKeys.has("mother_birth_place") && fieldMotherBirthPlace.trim()) fd.append("mother_birth_place", fieldMotherBirthPlace.trim());
 
-      // Conjoint & Mariage
-      if (fieldSpouse.trim()) {
+      // Conjoint & Mariage (Partenaire 2)
+      if (selectedFieldKeys.has("spouse") && fieldSpouse.trim()) {
         const sParts = splitFullName(fieldSpouse.trim());
         fd.append("spouse_given_names", sParts.given_names);
         fd.append("spouse_surname", sParts.surname);
       }
-      if (fieldMarriageDate.trim()) fd.append("marriage_date_raw", fieldMarriageDate.trim());
-      if (fieldMarriagePlace.trim()) fd.append("marriage_place", fieldMarriagePlace.trim());
+      if (selectedFieldKeys.has("spouse_occupation") && fieldSpouseOccupation.trim()) fd.append("spouse_occupation", fieldSpouseOccupation.trim());
+      if (selectedFieldKeys.has("spouse_birth_date") && fieldSpouseBirthDate.trim()) fd.append("spouse_birth_date_raw", fieldSpouseBirthDate.trim());
+      if (selectedFieldKeys.has("spouse_birth_place") && fieldSpouseBirthPlace.trim()) fd.append("spouse_birth_place", fieldSpouseBirthPlace.trim());
+
+      // Parents de l'épouse / Conjoint (Partenaire 2)
+      if (selectedFieldKeys.has("spouse_father") && fieldSpouseFather.trim()) {
+        const sfParts = splitFullName(fieldSpouseFather.trim());
+        fd.append("spouse_father_given_names", sfParts.given_names);
+        fd.append("spouse_father_surname", sfParts.surname);
+      }
+      if (selectedFieldKeys.has("spouse_father_occupation") && fieldSpouseFatherOccupation.trim()) fd.append("spouse_father_occupation", fieldSpouseFatherOccupation.trim());
+      if (selectedFieldKeys.has("spouse_father_status") && spouseFatherIsDeceased) fd.append("spouse_father_is_deceased", "1");
+
+      if (selectedFieldKeys.has("spouse_mother") && fieldSpouseMother.trim()) {
+        const smParts = splitFullName(fieldSpouseMother.trim());
+        fd.append("spouse_mother_given_names", smParts.given_names);
+        fd.append("spouse_mother_surname", smParts.surname);
+      }
+      if (selectedFieldKeys.has("spouse_mother_occupation") && fieldSpouseMotherOccupation.trim()) fd.append("spouse_mother_occupation", fieldSpouseMotherOccupation.trim());
+      if (selectedFieldKeys.has("spouse_mother_status") && spouseMotherIsDeceased) fd.append("spouse_mother_is_deceased", "1");
+
+      if (selectedFieldKeys.has("marriage_date") && fieldMarriageDate.trim()) fd.append("marriage_date_raw", fieldMarriageDate.trim());
+      if (selectedFieldKeys.has("marriage_place") && fieldMarriagePlace.trim()) fd.append("marriage_place", fieldMarriagePlace.trim());
       fd.append("create_union", createUnion ? "1" : "0");
 
       fd.append("append_to_notes", appendToNotes ? "1" : "0");
@@ -806,6 +1072,22 @@ export function ActViewerModal({
       top: Math.min(pt1.y, pt2.y),
       width: Math.abs(pt2.x - pt1.x),
       height: Math.abs(pt2.y - pt1.y),
+    };
+  }
+
+  let screenSourceBox: { left: number; top: number; width: number; height: number } | null = null;
+  if (hoveredSourceBox && naturalSize.width > 0 && naturalSize.height > 0) {
+    const x1 = (hoveredSourceBox.xmin / 1000) * naturalSize.width;
+    const y1 = (hoveredSourceBox.ymin / 1000) * naturalSize.height;
+    const x2 = (hoveredSourceBox.xmax / 1000) * naturalSize.width;
+    const y2 = (hoveredSourceBox.ymax / 1000) * naturalSize.height;
+    const pt1 = imageToScreen(x1, y1);
+    const pt2 = imageToScreen(x2, y2);
+    screenSourceBox = {
+      left: Math.min(pt1.x, pt2.x),
+      top: Math.min(pt1.y, pt2.y),
+      width: Math.max(Math.abs(pt2.x - pt1.x), 12),
+      height: Math.max(Math.abs(pt2.y - pt1.y), 12),
     };
   }
 
@@ -1062,6 +1344,23 @@ export function ActViewerModal({
             </div>
           )}
 
+          {/* Boîte animée de mise en évidence de la source (survol) */}
+          {screenSourceBox && (
+            <div
+              style={{
+                left: screenSourceBox.left,
+                top: screenSourceBox.top,
+                width: screenSourceBox.width,
+                height: screenSourceBox.height,
+              }}
+              className="absolute pointer-events-none border-2 border-amber-400 bg-amber-400/25 shadow-xl z-20 rounded transition-all duration-150 animate-pulse ring-4 ring-amber-400/30"
+            >
+              <span className="absolute -top-6 left-0 rounded bg-amber-500 text-slate-950 font-bold px-1.5 py-0.5 text-[10px] tracking-wide shadow-md uppercase">
+                Source dans l'acte
+              </span>
+            </div>
+          )}
+
           {/* Barre d'outils flottante de mode (Main vs Sélection) */}
           <div className="absolute bottom-4 left-6 z-10 flex items-center gap-1.5 rounded-full border border-border bg-surface/90 p-1 backdrop-blur-md shadow-md">
             <button
@@ -1106,7 +1405,7 @@ export function ActViewerModal({
 
         {/* Panneau latéral OCR & Transcription parfaitement intégré à Ariane */}
         {ocrOpen && (
-          <aside className="w-[420px] max-w-[90vw] border-l border-border bg-surface flex flex-col shrink-0 z-20 shadow-xl animate-in slide-in-from-right duration-200">
+          <aside className="w-[640px] max-w-[95vw] lg:w-[700px] border-l border-border bg-surface flex flex-col shrink-0 z-20 shadow-2xl animate-in slide-in-from-right duration-200">
             {/* En-tête du panneau */}
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="flex items-center gap-2">
@@ -1317,6 +1616,14 @@ export function ActViewerModal({
                     </div>
                   </div>
 
+                  {/* Indicateur de source survolée */}
+                  {hoveredSourceKey && getSourceForField(hoveredSourceKey)?.text && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-400/10 border border-amber-400/30 text-amber-900 dark:text-amber-200 rounded-lg text-xs animate-in fade-in duration-150">
+                      <span className="font-semibold shrink-0">🔎 Extrait identifié :</span>
+                      <span className="italic truncate font-serif">« {getSourceForField(hoveredSourceKey)!.text} »</span>
+                    </div>
+                  )}
+
                   {editMode ? (
                     <textarea
                       rows={14}
@@ -1325,43 +1632,61 @@ export function ActViewerModal({
                       placeholder="La transcription s'affiche ici…"
                       className="field w-full rounded-lg p-2.5 text-xs font-mono leading-relaxed resize-none flex-1 min-h-[220px]"
                     />
-                  ) : (
-                    <div className="overflow-y-auto max-h-[380px] p-2 bg-surface-2/40 rounded-lg border border-border/60 text-xs text-fg leading-relaxed">
-                      <ReactMarkdown
-                        components={{
-                          h1: ({ ...props }) => (
-                            <h4 className="font-semibold text-fg text-sm mt-3 mb-1.5 first:mt-0" {...props} />
-                          ),
-                          h2: ({ ...props }) => (
-                            <h4 className="font-semibold text-fg text-sm mt-3 mb-1.5 first:mt-0" {...props} />
-                          ),
-                          h3: ({ ...props }) => (
-                            <h4 className="font-semibold text-fg text-[12.5px] mt-2.5 mb-1 text-fg pb-0.5 border-b border-border/80" {...props} />
-                          ),
-                          p: ({ ...props }) => (
-                            <p className="my-1.5 text-fg leading-relaxed" {...props} />
-                          ),
-                          ul: ({ ...props }) => (
-                            <ul className="list-disc pl-4 my-1.5 space-y-1 text-fg-muted" {...props} />
-                          ),
-                          ol: ({ ...props }) => (
-                            <ol className="list-decimal pl-4 my-1.5 space-y-1 text-fg-muted" {...props} />
-                          ),
-                          li: ({ ...props }) => (
-                            <li className="leading-relaxed" {...props} />
-                          ),
-                          strong: ({ ...props }) => (
-                            <strong className="font-semibold text-fg" {...props} />
-                          ),
-                          blockquote: ({ ...props }) => (
-                            <blockquote className="border-l-2 border-border pl-2.5 my-2 text-fg-muted italic" {...props} />
-                          ),
-                        }}
-                      >
-                        {transcription}
-                      </ReactMarkdown>
-                    </div>
-                  )}
+                  ) : (() => {
+                    const activeQuote = hoveredSourceKey ? getSourceForField(hoveredSourceKey)?.text?.trim() : undefined;
+                    if (activeQuote && transcription.toLowerCase().includes(activeQuote.toLowerCase())) {
+                      const idx = transcription.toLowerCase().indexOf(activeQuote.toLowerCase());
+                      const before = transcription.slice(0, idx);
+                      const match = transcription.slice(idx, idx + activeQuote.length);
+                      const after = transcription.slice(idx + activeQuote.length);
+                      return (
+                        <div className="overflow-y-auto max-h-[360px] p-2.5 bg-surface-2/40 rounded-lg border border-border/60 text-xs text-fg leading-relaxed whitespace-pre-wrap font-sans">
+                          <span>{before}</span>
+                          <mark className="bg-amber-300 dark:bg-amber-500/40 text-amber-950 dark:text-amber-100 px-1 py-0.5 rounded font-semibold ring-2 ring-amber-400 animate-pulse shadow-xs">
+                            {match}
+                          </mark>
+                          <span>{after}</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="overflow-y-auto max-h-[360px] p-2 bg-surface-2/40 rounded-lg border border-border/60 text-xs text-fg leading-relaxed">
+                        <ReactMarkdown
+                          components={{
+                            h1: ({ ...props }) => (
+                              <h4 className="font-semibold text-fg text-sm mt-3 mb-1.5 first:mt-0" {...props} />
+                            ),
+                            h2: ({ ...props }) => (
+                              <h4 className="font-semibold text-fg text-sm mt-3 mb-1.5 first:mt-0" {...props} />
+                            ),
+                            h3: ({ ...props }) => (
+                              <h4 className="font-semibold text-fg text-[12.5px] mt-2.5 mb-1 text-fg pb-0.5 border-b border-border/80" {...props} />
+                            ),
+                            p: ({ ...props }) => (
+                              <p className="my-1.5 text-fg leading-relaxed" {...props} />
+                            ),
+                            ul: ({ ...props }) => (
+                              <ul className="list-disc pl-4 my-1.5 space-y-1 text-fg-muted" {...props} />
+                            ),
+                            ol: ({ ...props }) => (
+                              <ol className="list-decimal pl-4 my-1.5 space-y-1 text-fg-muted" {...props} />
+                            ),
+                            li: ({ ...props }) => (
+                              <li className="leading-relaxed" {...props} />
+                            ),
+                            strong: ({ ...props }) => (
+                              <strong className="font-semibold text-fg" {...props} />
+                            ),
+                            blockquote: ({ ...props }) => (
+                              <blockquote className="border-l-2 border-border pl-2.5 my-2 text-fg-muted italic" {...props} />
+                            ),
+                          }}
+                        >
+                          {transcription}
+                        </ReactMarkdown>
+                      </div>
+                    );
+                  })()}
 
                   <p className="text-[10px] text-fg-subtle">
                     {editMode
@@ -1369,553 +1694,703 @@ export function ActViewerModal({
                       : "Cliquez sur « ✎ Modifier texte » pour ajuster des mots ou corriger la transcription."}
                   </p>
 
-                  {/* Synthèse des données extraites pour injection directe dans la fiche */}
-                  {slug && (personId || unionId) && (
-                    <div className="mt-2 flex flex-col gap-2.5 rounded-xl border border-border bg-surface-2/40 p-3">
-                      <div className="flex items-center justify-between border-b border-border/80 pb-2">
-                        <div className="flex items-center gap-1.5 font-semibold text-fg text-xs">
-                          <span>📋</span>
-                          <span>Champs détectés pour la fiche</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleSyncFromTranscription}
-                          className="text-[11px] text-fg-subtle hover:text-fg underline transition-colors"
-                          title="Ré-analyser le texte pour actualiser les champs"
+                  {/* Synthèse des données extraites avec vue comparative Avant / Après */}
+                  {slug && (personId || unionId) && (() => {
+                    const isMarriage = actKind === "marriage" || Boolean(unionId);
+                    const allAvailableKeys = isMarriage
+                      ? [
+                          "marriage_date",
+                          "marriage_place",
+                          "name",
+                          "occupation",
+                          "birth_date",
+                          "birth_place",
+                          "father",
+                          "father_status",
+                          "mother",
+                          "mother_status",
+                          "spouse",
+                          "spouse_occupation",
+                          "spouse_birth_date",
+                          "spouse_birth_place",
+                          "spouse_father",
+                          "spouse_father_status",
+                          "spouse_mother",
+                          "spouse_mother_status",
+                        ]
+                      : [
+                          "date",
+                          "place",
+                          "name",
+                          "occupation",
+                          "birth_date",
+                          "birth_place",
+                          "death_date",
+                          "death_place",
+                          "father",
+                          "father_occupation",
+                          "father_status",
+                          "father_death_date",
+                          "father_death_place",
+                          "mother",
+                          "mother_occupation",
+                          "mother_status",
+                          "mother_death_date",
+                          "mother_death_place",
+                          "spouse",
+                          "marriage_date",
+                          "marriage_place",
+                        ];
+
+                    const renderRow = (
+                      key: string,
+                      label: string,
+                      currentVal: string | null | undefined,
+                      proposedVal: string,
+                      onChangeProposed: (v: string) => void,
+                      icon?: string,
+                      placeholder?: string
+                    ) => {
+                      const isChecked = selectedFieldKeys.has(key);
+                      const src = getSourceForField(key);
+                      const isDiff = proposedVal.trim() !== (currentVal || "").trim();
+                      const isEmptyProposed = !proposedVal.trim();
+
+                      return (
+                        <div
+                          key={key}
+                          onMouseEnter={() => handleRowHover(key)}
+                          onMouseLeave={handleRowLeave}
+                          className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-2 transition-all ${
+                            isChecked
+                              ? "border-border bg-surface shadow-2xs"
+                              : "border-border/40 bg-surface-2/20 opacity-70 hover:opacity-100"
+                          }`}
                         >
-                          🔄 Ré-analyser
-                        </button>
-                      </div>
-
-                      {/* Formulaire des champs à mettre à jour */}
-                      <div className="flex flex-col gap-3">
-                        {/* 1. Événement / Acte */}
-                        <div className="rounded-lg border border-border/70 bg-surface/50 p-2.5 flex flex-col gap-2">
-                          <span className="text-[11px] font-semibold text-fg flex items-center gap-1.5">
-                            <span>📜</span>
-                            <span>
-                              {actKind === "death"
-                                ? "Acte de décès"
-                                : actKind === "marriage"
-                                  ? "Acte de mariage"
-                                  : "Acte de baptême / naissance"}
+                          {/* 1. Checkbox & Libellé */}
+                          <div className="flex items-center gap-2 min-w-[145px] shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleFieldKey(key)}
+                              disabled={isEmptyProposed}
+                              className="accent-fg rounded size-3.5 cursor-pointer"
+                            />
+                            <span className="font-medium text-fg flex items-center gap-1.5 text-xs truncate">
+                              {icon && <span className="opacity-80 text-[13px]">{icon}</span>}
+                              <span>{label}</span>
                             </span>
-                          </span>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {/* Date principale */}
-                            <div className="flex flex-col gap-1">
-                              <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                <span>📅 Date de l'acte :</span>
-                                {fieldDate && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                              </label>
-                              <input
-                                type="text"
-                                value={fieldDate}
-                                onChange={(e) => setFieldDate(e.target.value)}
-                                placeholder="ex: 14 février 1742"
-                                className="field w-full text-xs"
-                              />
-                            </div>
-
-                            {/* Lieu principal */}
-                            <div className="flex flex-col gap-1">
-                              <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                <span>📍 Lieu / Paroisse :</span>
-                                {fieldPlace && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                              </label>
-                              <input
-                                type="text"
-                                value={fieldPlace}
-                                onChange={(e) => setFieldPlace(e.target.value)}
-                                placeholder="ex: Saint-Malo (Ille-et-Vilaine)"
-                                className="field w-full text-xs"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 2. Individu concerné */}
-                        <div className="rounded-lg border border-border/70 bg-surface/50 p-2.5 flex flex-col gap-2">
-                          <span className="text-[11px] font-semibold text-fg flex items-center gap-1.5">
-                            <span>👤</span>
-                            <span>Individu</span>
-                          </span>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="flex flex-col gap-1">
-                              <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                <span>Prénoms :</span>
-                                {fieldGivenNames && <span className="text-[9px] text-ok">✓</span>}
-                              </label>
-                              <input
-                                type="text"
-                                value={fieldGivenNames}
-                                onChange={(e) => setFieldGivenNames(e.target.value)}
-                                placeholder="ex: Jean"
-                                className="field w-full text-xs"
-                              />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                <span>Nom :</span>
-                                {fieldSurname && <span className="text-[9px] text-ok">✓</span>}
-                              </label>
-                              <input
-                                type="text"
-                                value={fieldSurname}
-                                onChange={(e) => setFieldSurname(e.target.value)}
-                                placeholder="ex: Dupont"
-                                className="field w-full text-xs"
-                              />
-                            </div>
                           </div>
 
-                          <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                              <span>💼 Profession / Métier :</span>
-                              {fieldOccupation && <span className="text-[9px] text-ok">✓</span>}
-                            </label>
+                          {/* 2. Actuel (Base de données) */}
+                          <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-2/60 border border-border/50 text-fg-muted font-normal text-xs">
+                            <span className="text-[10px] text-fg-subtle shrink-0">Actuel :</span>
+                            <span className="truncate" title={currentVal || "Non renseigné"}>
+                              {currentVal ? (
+                                <span className="text-fg font-medium">{currentVal}</span>
+                              ) : (
+                                <span className="italic text-fg-subtle text-[11px]">— Non renseigné</span>
+                              )}
+                            </span>
+                          </div>
+
+                          <span className="hidden sm:inline text-fg-subtle text-[11px] shrink-0">→</span>
+
+                          {/* 3. Proposé (Extrait de l'acte) */}
+                          <div className="flex-1 min-w-0 flex items-center gap-1.5">
                             <input
                               type="text"
-                              value={fieldOccupation}
-                              onChange={(e) => setFieldOccupation(e.target.value)}
-                              placeholder="ex: Laboureur, marinier..."
-                              className="field w-full text-xs"
+                              value={proposedVal}
+                              onChange={(e) => onChangeProposed(e.target.value)}
+                              placeholder={placeholder || "Non détecté"}
+                              className={`field w-full text-xs font-medium py-1 px-2 ${
+                                isDiff && !isEmptyProposed
+                                  ? "border-ok/40 bg-ok/5 text-fg ring-ok/20 font-semibold"
+                                  : "text-fg-muted"
+                              }`}
                             />
                           </div>
 
-                          {/* Dates complémentaires de l'individu (naissance ou décès déduit / mention marginale) */}
-                          {(actKind === "death" || fieldBirthDate || fieldBirthPlace) && (
-                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                  <span>👶 Date naiss. déduite :</span>
-                                  {fieldBirthDate && <span className="text-[9px] text-ok">✓</span>}
-                                </label>
-                                <input
-                                  type="text"
-                                  value={fieldBirthDate}
-                                  onChange={(e) => setFieldBirthDate(e.target.value)}
-                                  placeholder="ex: vers 1712 ou 1712"
-                                  className="field w-full text-xs"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-medium text-fg-muted">
-                                  <span>Lieu naiss. :</span>
-                                </label>
-                                <input
-                                  type="text"
-                                  value={fieldBirthPlace}
-                                  onChange={(e) => setFieldBirthPlace(e.target.value)}
-                                  placeholder="ex: Pleurtuit"
-                                  className="field w-full text-xs"
-                                />
-                              </div>
-                            </div>
+                          {/* 4. Bouton Source interactive */}
+                          {src && (src.text || src.box) && (
+                            <button
+                              type="button"
+                              onClick={() => handleRowHover(key)}
+                              className="shrink-0 flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-400/25 transition-colors cursor-pointer"
+                              title={src.text ? `Extrait : « ${src.text} »` : "Localisation sur l'acte"}
+                            >
+                              <span>🔎</span>
+                              <span className="hidden md:inline">Source</span>
+                            </button>
                           )}
+                        </div>
+                      );
+                    };
 
-                          {(actKind === "birth" && (fieldDeathDate || fieldDeathPlace)) && (
-                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                  <span>✝ Mention décès :</span>
-                                  {fieldDeathDate && <span className="text-[9px] text-ok">✓</span>}
-                                </label>
-                                <input
-                                  type="text"
-                                  value={fieldDeathDate}
-                                  onChange={(e) => setFieldDeathDate(e.target.value)}
-                                  placeholder="ex: 18 mai 1952"
-                                  className="field w-full text-xs"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-medium text-fg-muted">
-                                  <span>Lieu décès :</span>
-                                </label>
-                                <input
-                                  type="text"
-                                  value={fieldDeathPlace}
-                                  onChange={(e) => setFieldDeathPlace(e.target.value)}
-                                  placeholder="ex: Rennes"
-                                  className="field w-full text-xs"
-                                />
-                              </div>
+                    const renderStatusRow = (
+                      key: string,
+                      label: string,
+                      currentDeceased: boolean | undefined,
+                      proposedDeceased: boolean,
+                      onToggleDeceased: (val: boolean) => void,
+                      icon?: string
+                    ) => {
+                      const isChecked = selectedFieldKeys.has(key);
+                      const src = getSourceForField(key);
+
+                      return (
+                        <div
+                          key={key}
+                          onMouseEnter={() => handleRowHover(key)}
+                          onMouseLeave={handleRowLeave}
+                          className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-2 transition-all ${
+                            isChecked
+                              ? "border-border bg-surface shadow-2xs"
+                              : "border-border/40 bg-surface-2/20 opacity-70 hover:opacity-100"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-[145px] shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleFieldKey(key)}
+                              className="accent-fg rounded size-3.5 cursor-pointer"
+                            />
+                            <span className="font-medium text-fg flex items-center gap-1.5 text-xs truncate">
+                              {icon && <span className="opacity-80 text-[13px]">{icon}</span>}
+                              <span>{label}</span>
+                            </span>
+                          </div>
+
+                          <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-2/60 border border-border/50 text-fg-muted font-normal text-xs">
+                            <span className="text-[10px] text-fg-subtle shrink-0">Actuel :</span>
+                            <span className="truncate">
+                              {currentDeceased ? (
+                                <span className="text-danger font-medium">✝ Défunt(e)</span>
+                              ) : (
+                                <span className="text-ok font-medium">Vivant(e) / Non précisé</span>
+                              )}
+                            </span>
+                          </div>
+
+                          <span className="hidden sm:inline text-fg-subtle text-[11px] shrink-0">→</span>
+
+                          <div className="flex-1 min-w-0 flex items-center gap-2">
+                            <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={proposedDeceased}
+                                onChange={(e) => onToggleDeceased(e.target.checked)}
+                                className="accent-fg rounded"
+                              />
+                              <span className={proposedDeceased ? "font-semibold text-danger" : "text-fg-muted"}>
+                                {proposedDeceased ? "✝ Feu / Défunt au moment de l'acte" : "Vivant au moment de l'acte"}
+                              </span>
+                            </label>
+                          </div>
+
+                          {src && (src.text || src.box) && (
+                            <button
+                              type="button"
+                              onClick={() => handleRowHover(key)}
+                              className="shrink-0 flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-400/25 transition-colors cursor-pointer"
+                              title={src.text ? `Extrait : « ${src.text} »` : "Localisation sur l'acte"}
+                            >
+                              <span>🔎</span>
+                              <span className="hidden md:inline">Source</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-border bg-surface-2/40 p-3.5 shadow-xs">
+                        {/* Barre supérieure d'actions */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 pb-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">⚖️</span>
+                              <h4 className="font-semibold text-fg text-sm">
+                                Comparaison Avant / Après
+                              </h4>
+                              <span className="rounded-full bg-surface px-2 py-0.5 text-[10.5px] font-medium text-fg-muted border border-border">
+                                {selectedFieldKeys.size} validé{selectedFieldKeys.size > 1 ? "s" : ""}
+                              </span>
                             </div>
+                            <p className="mt-0.5 text-[11px] text-fg-muted">
+                              Cochez les données à enregistrer. Survolez une ligne pour voir sa source dans l'acte.
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => selectAllKeys(allAvailableKeys)}
+                              className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                            >
+                              ✓ Tout cocher
+                            </button>
+                            <button
+                              type="button"
+                              onClick={deselectAllKeys}
+                              className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                            >
+                              ✕ Décocher
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSyncFromTranscription}
+                              className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                              title="Ré-analyser la transcription"
+                            >
+                              🔄 Ré-analyser
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Listes groupées par profil selon le type d'acte */}
+                        <div className="flex flex-col gap-3.5">
+                          {isMarriage ? (
+                            <>
+                              {/* 1. Mariage (Événement) */}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
+                                  <span>💍</span>
+                                  <span>Événement du mariage</span>
+                                </span>
+                                {renderRow(
+                                  "marriage_date",
+                                  "Date du mariage",
+                                  currentContext?.union?.date_raw,
+                                  fieldMarriageDate,
+                                  setFieldMarriageDate,
+                                  "📅"
+                                )}
+                                {renderRow(
+                                  "marriage_place",
+                                  "Lieu du mariage",
+                                  currentContext?.union?.place,
+                                  fieldMarriagePlace,
+                                  setFieldMarriagePlace,
+                                  "📍"
+                                )}
+                              </div>
+
+                              {/* 2. Époux (Partenaire 1) */}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
+                                  <span>🤵</span>
+                                  <span>Époux (Partenaire 1)</span>
+                                </span>
+                                {renderRow(
+                                  "name",
+                                  "Prénom(s) & Nom",
+                                  currentContext?.union?.partner1?.displayName || currentContext?.person?.displayName,
+                                  `${fieldGivenNames} ${fieldSurname}`.trim(),
+                                  (val) => {
+                                    const p = splitFullName(val);
+                                    setFieldGivenNames(p.given_names);
+                                    setFieldSurname(p.surname);
+                                  },
+                                  "👤"
+                                )}
+                                {renderRow(
+                                  "occupation",
+                                  "Métier époux",
+                                  currentContext?.union?.partner1?.occupation || currentContext?.person?.occupation,
+                                  fieldOccupation,
+                                  setFieldOccupation,
+                                  "💼"
+                                )}
+                                {renderRow(
+                                  "birth_date",
+                                  "Date naiss. époux",
+                                  currentContext?.union?.partner1?.birth_date_raw || currentContext?.person?.birth_date_raw,
+                                  fieldBirthDate,
+                                  setFieldBirthDate,
+                                  "👶"
+                                )}
+                                {renderRow(
+                                  "birth_place",
+                                  "Lieu naiss. époux",
+                                  currentContext?.union?.partner1?.birth_place || currentContext?.person?.birth_place,
+                                  fieldBirthPlace,
+                                  setFieldBirthPlace,
+                                  "📍"
+                                )}
+                              </div>
+
+                              {/* 3. Parents de l'Époux */}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
+                                  <span>👨‍👩‍👦</span>
+                                  <span>Parents de l'Époux</span>
+                                </span>
+                                {renderRow(
+                                  "father",
+                                  "Père de l'époux",
+                                  currentContext?.union?.partner1Father?.displayName || currentContext?.person?.father?.displayName,
+                                  fieldFather,
+                                  setFieldFather,
+                                  "👨"
+                                )}
+                                {renderStatusRow(
+                                  "father_status",
+                                  "Statut père époux",
+                                  currentContext?.union?.partner1Father?.is_living === 0 || currentContext?.person?.father?.is_living === 0,
+                                  fatherIsDeceased,
+                                  setFatherIsDeceased,
+                                  "✝"
+                                )}
+                                {renderRow(
+                                  "mother",
+                                  "Mère de l'époux",
+                                  currentContext?.union?.partner1Mother?.displayName || currentContext?.person?.mother?.displayName,
+                                  fieldMother,
+                                  setFieldMother,
+                                  "👩"
+                                )}
+                                {renderStatusRow(
+                                  "mother_status",
+                                  "Statut mère époux",
+                                  currentContext?.union?.partner1Mother?.is_living === 0 || currentContext?.person?.mother?.is_living === 0,
+                                  motherIsDeceased,
+                                  setMotherIsDeceased,
+                                  "✝"
+                                )}
+                              </div>
+
+                              {/* 4. Épouse (Partenaire 2) */}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
+                                  <span>👰</span>
+                                  <span>Épouse (Partenaire 2)</span>
+                                </span>
+                                {renderRow(
+                                  "spouse",
+                                  "Prénom(s) & Nom",
+                                  currentContext?.union?.partner2?.displayName,
+                                  fieldSpouse,
+                                  setFieldSpouse,
+                                  "👤"
+                                )}
+                                {renderRow(
+                                  "spouse_occupation",
+                                  "Métier épouse",
+                                  currentContext?.union?.partner2?.occupation,
+                                  fieldSpouseOccupation,
+                                  setFieldSpouseOccupation,
+                                  "💼"
+                                )}
+                                {renderRow(
+                                  "spouse_birth_date",
+                                  "Date naiss. épouse",
+                                  currentContext?.union?.partner2?.birth_date_raw,
+                                  fieldSpouseBirthDate,
+                                  setFieldSpouseBirthDate,
+                                  "👶"
+                                )}
+                                {renderRow(
+                                  "spouse_birth_place",
+                                  "Lieu naiss. épouse",
+                                  currentContext?.union?.partner2?.birth_place,
+                                  fieldSpouseBirthPlace,
+                                  setFieldSpouseBirthPlace,
+                                  "📍"
+                                )}
+                              </div>
+
+                              {/* 5. Parents de l'Épouse */}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
+                                  <span>👨‍👩‍👧</span>
+                                  <span>Parents de l'Épouse</span>
+                                </span>
+                                {renderRow(
+                                  "spouse_father",
+                                  "Père de l'épouse",
+                                  currentContext?.union?.partner2Father?.displayName,
+                                  fieldSpouseFather,
+                                  setFieldSpouseFather,
+                                  "👨"
+                                )}
+                                {renderStatusRow(
+                                  "spouse_father_status",
+                                  "Statut père épouse",
+                                  currentContext?.union?.partner2Father?.is_living === 0,
+                                  spouseFatherIsDeceased,
+                                  setSpouseFatherIsDeceased,
+                                  "✝"
+                                )}
+                                {renderRow(
+                                  "spouse_mother",
+                                  "Mère de l'épouse",
+                                  currentContext?.union?.partner2Mother?.displayName,
+                                  fieldSpouseMother,
+                                  setFieldSpouseMother,
+                                  "👩"
+                                )}
+                                {renderStatusRow(
+                                  "spouse_mother_status",
+                                  "Statut mère épouse",
+                                  currentContext?.union?.partner2Mother?.is_living === 0,
+                                  spouseMotherIsDeceased,
+                                  setSpouseMotherIsDeceased,
+                                  "✝"
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* 1. Événement / Acte */}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
+                                  <span>📜</span>
+                                  <span>
+                                    {actKind === "death" ? "Acte de décès" : "Acte de baptême / naissance"}
+                                  </span>
+                                </span>
+                                {renderRow(
+                                  "date",
+                                  "Date de l'acte",
+                                  actKind === "death" ? currentContext?.person?.death_date_raw : currentContext?.person?.birth_date_raw,
+                                  fieldDate,
+                                  setFieldDate,
+                                  "📅"
+                                )}
+                                {renderRow(
+                                  "place",
+                                  "Lieu / Paroisse",
+                                  actKind === "death" ? currentContext?.person?.death_place : currentContext?.person?.birth_place,
+                                  fieldPlace,
+                                  setFieldPlace,
+                                  "📍"
+                                )}
+                              </div>
+
+                              {/* 2. Individu concerné */}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
+                                  <span>👤</span>
+                                  <span>Individu concerné</span>
+                                </span>
+                                {renderRow(
+                                  "name",
+                                  "Prénom(s) & Nom",
+                                  currentContext?.person?.displayName,
+                                  `${fieldGivenNames} ${fieldSurname}`.trim(),
+                                  (val) => {
+                                    const p = splitFullName(val);
+                                    setFieldGivenNames(p.given_names);
+                                    setFieldSurname(p.surname);
+                                  },
+                                  "👤"
+                                )}
+                                {renderRow(
+                                  "occupation",
+                                  "Profession / Métier",
+                                  currentContext?.person?.occupation,
+                                  fieldOccupation,
+                                  setFieldOccupation,
+                                  "💼"
+                                )}
+                                {(actKind === "death" || fieldBirthDate || fieldBirthPlace) && (
+                                  <>
+                                    {renderRow(
+                                      "birth_date",
+                                      "Date naissance déduite",
+                                      currentContext?.person?.birth_date_raw,
+                                      fieldBirthDate,
+                                      setFieldBirthDate,
+                                      "👶"
+                                    )}
+                                    {renderRow(
+                                      "birth_place",
+                                      "Lieu de naissance",
+                                      currentContext?.person?.birth_place,
+                                      fieldBirthPlace,
+                                      setFieldBirthPlace,
+                                      "📍"
+                                    )}
+                                  </>
+                                )}
+                                {(actKind === "birth" && (fieldDeathDate || fieldDeathPlace)) && (
+                                  <>
+                                    {renderRow(
+                                      "death_date",
+                                      "Mention décès marginale",
+                                      currentContext?.person?.death_date_raw,
+                                      fieldDeathDate,
+                                      setFieldDeathDate,
+                                      "✝"
+                                    )}
+                                    {renderRow(
+                                      "death_place",
+                                      "Lieu de décès marginal",
+                                      currentContext?.person?.death_place,
+                                      fieldDeathPlace,
+                                      setFieldDeathPlace,
+                                      "📍"
+                                    )}
+                                  </>
+                                )}
+                              </div>
+
+                              {/* 3. Parents */}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
+                                  <span>👨‍👩‍👦</span>
+                                  <span>Filiation (Parents)</span>
+                                </span>
+                                {renderRow(
+                                  "father",
+                                  "Père",
+                                  currentContext?.person?.father?.displayName,
+                                  fieldFather,
+                                  setFieldFather,
+                                  "👨"
+                                )}
+                                {fieldFatherOccupation && renderRow(
+                                  "father_occupation",
+                                  "Métier du père",
+                                  null,
+                                  fieldFatherOccupation,
+                                  setFieldFatherOccupation,
+                                  "💼"
+                                )}
+                                {renderStatusRow(
+                                  "father_status",
+                                  "Statut père",
+                                  currentContext?.person?.father?.is_living === 0,
+                                  fatherIsDeceased,
+                                  setFatherIsDeceased,
+                                  "✝"
+                                )}
+                                {fieldFatherDeathDate && renderRow(
+                                  "father_death_date",
+                                  "Date décès père",
+                                  null,
+                                  fieldFatherDeathDate,
+                                  setFieldFatherDeathDate,
+                                  "📅"
+                                )}
+                                {renderRow(
+                                  "mother",
+                                  "Mère",
+                                  currentContext?.person?.mother?.displayName,
+                                  fieldMother,
+                                  setFieldMother,
+                                  "👩"
+                                )}
+                                {fieldMotherOccupation && renderRow(
+                                  "mother_occupation",
+                                  "Métier de la mère",
+                                  null,
+                                  fieldMotherOccupation,
+                                  setFieldMotherOccupation,
+                                  "💼"
+                                )}
+                                {renderStatusRow(
+                                  "mother_status",
+                                  "Statut mère",
+                                  currentContext?.person?.mother?.is_living === 0,
+                                  motherIsDeceased,
+                                  setMotherIsDeceased,
+                                  "✝"
+                                )}
+                                {fieldMotherDeathDate && renderRow(
+                                  "mother_death_date",
+                                  "Date décès mère",
+                                  null,
+                                  fieldMotherDeathDate,
+                                  setFieldMotherDeathDate,
+                                  "📅"
+                                )}
+                              </div>
+
+                              {/* 4. Conjoint / Union éventuelle */}
+                              {(fieldSpouse || fieldMarriageDate || fieldMarriagePlace) && (
+                                <div className="flex flex-col gap-1.5">
+                                  <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
+                                    <span>💍</span>
+                                    <span>Conjoint / Union mentionnée</span>
+                                  </span>
+                                  {renderRow(
+                                    "spouse",
+                                    "Conjoint(e)",
+                                    currentContext?.union?.partner2?.displayName,
+                                    fieldSpouse,
+                                    setFieldSpouse,
+                                    "💍"
+                                  )}
+                                  {fieldMarriageDate && renderRow(
+                                    "marriage_date",
+                                    "Date mariage",
+                                    currentContext?.union?.date_raw,
+                                    fieldMarriageDate,
+                                    setFieldMarriageDate,
+                                    "📅"
+                                  )}
+                                  {fieldMarriagePlace && renderRow(
+                                    "marriage_place",
+                                    "Lieu mariage",
+                                    currentContext?.union?.place,
+                                    fieldMarriagePlace,
+                                    setFieldMarriagePlace,
+                                    "📍"
+                                  )}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
 
-                        {/* 3. Parents (si sujet individuel) */}
-                        {personId && (
-                          <div className="flex flex-col gap-2.5">
-                            {/* Père */}
-                            <div className="rounded-lg border border-border/70 bg-surface/50 p-2.5 flex flex-col gap-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-semibold text-fg flex items-center gap-1.5">
-                                  <span>👨</span>
-                                  <span>Père</span>
-                                </span>
-                                <label className="flex items-center gap-1 text-[10.5px] text-fg cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={createFather}
-                                    onChange={(e) => setCreateFather(e.target.checked)}
-                                    className="accent-fg rounded"
-                                  />
-                                  <span className="font-medium">Créer & lier</span>
-                                </label>
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Nom & Prénoms :</span>
-                                    {fieldFather && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldFather}
-                                    onChange={(e) => setFieldFather(e.target.value)}
-                                    placeholder="ex: François Dupont"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Métier :</span>
-                                    {fieldFatherOccupation && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldFatherOccupation}
-                                    onChange={(e) => setFieldFatherOccupation(e.target.value)}
-                                    placeholder="ex: Journalier, laboureur"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Statut décédé */}
-                              <div className="flex items-center justify-between pt-0.5">
-                                <label className="flex items-center gap-1.5 text-[10.5px] text-fg cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={fatherIsDeceased}
-                                    onChange={(e) => setFatherIsDeceased(e.target.checked)}
-                                    className="accent-fg rounded"
-                                  />
-                                  <span>✝ Feu / Défunt au moment de l'acte</span>
-                                </label>
-                              </div>
-
-                              {/* Décès du père */}
-                              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Date décès père :</span>
-                                    {fieldFatherDeathDate && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldFatherDeathDate}
-                                    onChange={(e) => {
-                                      setFieldFatherDeathDate(e.target.value);
-                                      if (e.target.value.trim()) setFatherIsDeceased(true);
-                                    }}
-                                    placeholder="ex: 14 janvier 1740 ou avant 1742"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Lieu décès père :</span>
-                                    {fieldFatherDeathPlace && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldFatherDeathPlace}
-                                    onChange={(e) => {
-                                      setFieldFatherDeathPlace(e.target.value);
-                                      if (e.target.value.trim()) setFatherIsDeceased(true);
-                                    }}
-                                    placeholder="ex: Saint-Malo"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Naissance du père */}
-                              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Date / Âge naiss. père :</span>
-                                    {fieldFatherBirthDate && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldFatherBirthDate}
-                                    onChange={(e) => setFieldFatherBirthDate(e.target.value)}
-                                    placeholder="ex: vers 1680 ou 1680"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Lieu naiss. père :</span>
-                                    {fieldFatherBirthPlace && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldFatherBirthPlace}
-                                    onChange={(e) => setFieldFatherBirthPlace(e.target.value)}
-                                    placeholder="ex: Paramé"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Mère */}
-                            <div className="rounded-lg border border-border/70 bg-surface/50 p-2.5 flex flex-col gap-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-semibold text-fg flex items-center gap-1.5">
-                                  <span>👩</span>
-                                  <span>Mère</span>
-                                </span>
-                                <label className="flex items-center gap-1 text-[10.5px] text-fg cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={createMother}
-                                    onChange={(e) => setCreateMother(e.target.checked)}
-                                    className="accent-fg rounded"
-                                  />
-                                  <span className="font-medium">Créer & lier</span>
-                                </label>
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Nom & Prénoms :</span>
-                                    {fieldMother && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldMother}
-                                    onChange={(e) => setFieldMother(e.target.value)}
-                                    placeholder="ex: Jeanne Martin"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Métier :</span>
-                                    {fieldMotherOccupation && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldMotherOccupation}
-                                    onChange={(e) => setFieldMotherOccupation(e.target.value)}
-                                    placeholder="ex: Ménagère, filandière"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Statut décédée */}
-                              <div className="flex items-center justify-between pt-0.5">
-                                <label className="flex items-center gap-1.5 text-[10.5px] text-fg cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={motherIsDeceased}
-                                    onChange={(e) => setMotherIsDeceased(e.target.checked)}
-                                    className="accent-fg rounded"
-                                  />
-                                  <span>✝ Feue / Défunte au moment de l'acte</span>
-                                </label>
-                              </div>
-
-                              {/* Décès de la mère */}
-                              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Date décès mère :</span>
-                                    {fieldMotherDeathDate && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldMotherDeathDate}
-                                    onChange={(e) => {
-                                      setFieldMotherDeathDate(e.target.value);
-                                      if (e.target.value.trim()) setMotherIsDeceased(true);
-                                    }}
-                                    placeholder="ex: 2 mai 1745 ou avant 1742"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Lieu décès mère :</span>
-                                    {fieldMotherDeathPlace && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldMotherDeathPlace}
-                                    onChange={(e) => {
-                                      setFieldMotherDeathPlace(e.target.value);
-                                      if (e.target.value.trim()) setMotherIsDeceased(true);
-                                    }}
-                                    placeholder="ex: Cancale"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Naissance de la mère */}
-                              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Date / Âge naiss. mère :</span>
-                                    {fieldMotherBirthDate && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldMotherBirthDate}
-                                    onChange={(e) => setFieldMotherBirthDate(e.target.value)}
-                                    placeholder="ex: vers 1685 ou 1685"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                    <span>Lieu naiss. mère :</span>
-                                    {fieldMotherBirthPlace && <span className="text-[9px] text-ok">✓ Détecté</span>}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={fieldMotherBirthPlace}
-                                    onChange={(e) => setFieldMotherBirthPlace(e.target.value)}
-                                    placeholder="ex: Cancale"
-                                    className="field w-full text-xs"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 4. Conjoint & Mariage */}
-                        {(unionId || actKind === "marriage" || fieldSpouse || fieldMarriageDate || fieldMarriagePlace) && (
-                          <div className="rounded-lg border border-border/70 bg-surface/50 p-2.5 flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-semibold text-fg flex items-center gap-1.5">
-                                <span>💍</span>
-                                <span>Conjoint & Mariage</span>
-                              </span>
-                              {(fieldSpouse || fieldMarriageDate || fieldMarriagePlace) && (
-                                <label className="flex items-center gap-1 text-[10.5px] text-fg cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={createUnion}
-                                    onChange={(e) => setCreateUnion(e.target.checked)}
-                                    className="accent-fg rounded"
-                                  />
-                                  <span className="font-medium">Enregistrer l'union</span>
-                                </label>
-                              )}
-                            </div>
-
-                            <div className="flex flex-col gap-1">
-                              <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                <span>Conjoint :</span>
-                                {fieldSpouse && <span className="text-[9px] text-ok">✓</span>}
-                              </label>
-                              <input
-                                type="text"
-                                value={fieldSpouse}
-                                onChange={(e) => setFieldSpouse(e.target.value)}
-                                placeholder="ex: Marie Le Gall"
-                                className="field w-full text-xs"
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-medium text-fg-muted flex items-center justify-between">
-                                  <span>Date mariage :</span>
-                                  {fieldMarriageDate && <span className="text-[9px] text-ok">✓</span>}
-                                </label>
-                                <input
-                                  type="text"
-                                  value={fieldMarriageDate}
-                                  onChange={(e) => setFieldMarriageDate(e.target.value)}
-                                  placeholder="ex: 12 janvier 1745"
-                                  className="field w-full text-xs"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-medium text-fg-muted">
-                                  <span>Lieu mariage :</span>
-                                </label>
-                                <input
-                                  type="text"
-                                  value={fieldMarriagePlace}
-                                  onChange={(e) => setFieldMarriagePlace(e.target.value)}
-                                  placeholder="ex: Cancale"
-                                  className="field w-full text-xs"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Case à cocher : enregistrer dans les notes */}
-                        <label className="mt-0.5 flex items-center gap-2 cursor-pointer text-[11px] text-fg select-none">
+                        {/* Note de transcription intégrale */}
+                        <label className="mt-1 flex items-center gap-2 cursor-pointer text-[11px] text-fg select-none">
                           <input
                             type="checkbox"
                             checked={appendToNotes}
                             onChange={(e) => setAppendToNotes(e.target.checked)}
                             className="accent-fg rounded"
                           />
-                          <span>Ajouter la transcription intégrale dans les notes</span>
+                          <span>Conserver également la transcription intégrale dans les notes</span>
                         </label>
-                      </div>
 
-                      {/* Feedback succès / erreur */}
-                      {saveSuccessMessage && (
-                        <div className="rounded-lg bg-ok/10 border border-ok/30 p-2 text-center text-xs font-medium text-ok animate-in fade-in">
-                          {saveSuccessMessage}
-                        </div>
-                      )}
-                      {saveErrorMessage && (
-                        <div className="rounded-lg bg-danger/10 border border-danger/30 p-2 text-center text-xs font-medium text-danger animate-in fade-in">
-                          ⚠️ {saveErrorMessage}
-                        </div>
-                      )}
-
-                      {/* Bouton Enregistrer dans la fiche */}
-                      <button
-                        type="button"
-                        onClick={handleSaveToRecord}
-                        disabled={pendingSave}
-                        className="w-full mt-1 rounded-xl bg-fg py-2.5 px-3 text-xs font-medium text-accent-fg hover:opacity-90 disabled:opacity-50 transition-opacity shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        {pendingSave ? (
-                          <>
-                            <span className="inline-block size-3 rounded-full border-2 border-accent-fg border-t-transparent animate-spin" />
-                            <span>Enregistrement dans la fiche…</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>💾</span>
-                            <span>Enregistrer dans les champs de la fiche</span>
-                          </>
+                        {/* Messages de retour */}
+                        {saveSuccessMessage && (
+                          <div className="rounded-xl bg-ok/10 border border-ok/30 p-2.5 text-center text-xs font-medium text-ok animate-in fade-in">
+                            {saveSuccessMessage}
+                          </div>
                         )}
-                      </button>
-                    </div>
-                  )}
+                        {saveErrorMessage && (
+                          <div className="rounded-xl bg-danger/10 border border-danger/30 p-2.5 text-center text-xs font-medium text-danger animate-in fade-in">
+                            ⚠️ {saveErrorMessage}
+                          </div>
+                        )}
+
+                        {/* Bouton Enregistrer dans la fiche */}
+                        <button
+                          type="button"
+                          onClick={handleSaveToRecord}
+                          disabled={pendingSave || selectedFieldKeys.size === 0}
+                          className="w-full mt-1 rounded-xl bg-fg py-2.5 px-3 text-xs font-semibold text-accent-fg hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          {pendingSave ? (
+                            <>
+                              <span className="inline-block size-3 rounded-full border-2 border-accent-fg border-t-transparent animate-spin" />
+                              <span>Enregistrement dans la fiche…</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>💾</span>
+                              <span>Valider et enregistrer ({selectedFieldKeys.size} champ{selectedFieldKeys.size > 1 ? "s" : ""})</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>

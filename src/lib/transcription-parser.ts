@@ -1,11 +1,16 @@
-export interface ExtractedActData {
-  act_type?: "birth" | "death" | "marriage" | "other";
+export interface BoundingBox {
+  ymin: number; // 0 à 1000
+  xmin: number; // 0 à 1000
+  ymax: number; // 0 à 1000
+  xmax: number; // 0 à 1000
+}
 
-  // Événement principal de l'acte
-  event_date?: string;
-  event_place?: string;
+export interface FieldSource {
+  text?: string;       // Extrait textuel exact dans l'acte
+  box?: BoundingBox;   // Bounding box approximative normalisée (0-1000)
+}
 
-  // Sujet principal
+export interface IndividualExtraction {
   given_names?: string;
   surname?: string;
   sex?: "M" | "F" | null;
@@ -15,8 +20,46 @@ export interface ExtractedActData {
   birth_place?: string;
   death_date_raw?: string;
   death_place?: string;
+  residence?: string;
+  is_deceased?: boolean;
+  father_given_names?: string;
+  father_surname?: string;
+  father_occupation?: string;
+  father_is_deceased?: boolean;
+  father_death_date_raw?: string;
+  father_death_place?: string;
+  father_birth_date_raw?: string;
+  father_birth_place?: string;
+  mother_given_names?: string;
+  mother_surname?: string;
+  mother_occupation?: string;
+  mother_is_deceased?: boolean;
+  mother_death_date_raw?: string;
+  mother_death_place?: string;
+  mother_birth_date_raw?: string;
+  mother_birth_place?: string;
+}
 
-  // Père
+export interface ExtractedActData {
+  act_type?: "birth" | "death" | "marriage" | "other";
+
+  // Événement principal de l'acte
+  event_date?: string;
+  event_place?: string;
+
+  // Sujet principal (actes individuels : naissance, décès, ou personne 1)
+  given_names?: string;
+  surname?: string;
+  sex?: "M" | "F" | null;
+  occupation?: string;
+  age?: string;
+  birth_date_raw?: string;
+  birth_place?: string;
+  death_date_raw?: string;
+  death_place?: string;
+  residence?: string;
+
+  // Père (du sujet ou de l'époux)
   father_given_names?: string;
   father_surname?: string;
   father_occupation?: string;
@@ -26,7 +69,7 @@ export interface ExtractedActData {
   father_birth_date_raw?: string;
   father_birth_place?: string;
 
-  // Mère
+  // Mère (du sujet ou de l'époux)
   mother_given_names?: string;
   mother_surname?: string;
   mother_occupation?: string;
@@ -36,12 +79,35 @@ export interface ExtractedActData {
   mother_birth_date_raw?: string;
   mother_birth_place?: string;
 
-  // Conjoint & Mariage
+  // Conjoint & Mariage (ou Époux / Épouse)
   spouse_given_names?: string;
   spouse_surname?: string;
   spouse_occupation?: string;
+  spouse_age?: string;
+  spouse_residence?: string;
+  spouse_birth_date_raw?: string;
+  spouse_birth_place?: string;
   marriage_date_raw?: string;
   marriage_place?: string;
+
+  // Parents du conjoint (très important pour les mariages)
+  spouse_father_given_names?: string;
+  spouse_father_surname?: string;
+  spouse_father_occupation?: string;
+  spouse_father_is_deceased?: boolean;
+  spouse_father_death_date_raw?: string;
+  spouse_father_death_place?: string;
+
+  spouse_mother_given_names?: string;
+  spouse_mother_surname?: string;
+  spouse_mother_occupation?: string;
+  spouse_mother_is_deceased?: boolean;
+  spouse_mother_death_date_raw?: string;
+  spouse_mother_death_place?: string;
+
+  // Structure dédiée pour les mariages avec 2 individus complets
+  groom?: IndividualExtraction;
+  bride?: IndividualExtraction;
 
   // Mentions marginales
   marginal_marriage_date?: string;
@@ -49,6 +115,9 @@ export interface ExtractedActData {
   marginal_marriage_spouse?: string;
   marginal_death_date?: string;
   marginal_death_place?: string;
+
+  // Citations textuelles et localisations pour le survol interactif
+  sources?: Record<string, FieldSource>;
 }
 
 /**
@@ -235,6 +304,8 @@ export function parseTranscription(text: string): ExtractedActData {
         if (p.given_names) data.given_names = p.given_names;
         if (p.surname) data.surname = p.surname;
         if (p.occupation) data.occupation = p.occupation;
+        if (p.age) data.age = p.age;
+        if (p.residence) data.residence = p.residence;
         if (p.birth_date_raw || p.birth_date) data.birth_date_raw = p.birth_date_raw || p.birth_date;
         if (p.birth_place) data.birth_place = p.birth_place;
         if (p.death_date_raw || p.death_date) data.death_date_raw = p.death_date_raw || p.death_date;
@@ -260,16 +331,83 @@ export function parseTranscription(text: string): ExtractedActData {
         if (p.mother_birth_date_raw || p.mother_birth_date) data.mother_birth_date_raw = p.mother_birth_date_raw || p.mother_birth_date;
         if (p.mother_birth_place) data.mother_birth_place = p.mother_birth_place;
 
+        // Conjoint
         if (p.spouse_given_names) data.spouse_given_names = p.spouse_given_names;
         if (p.spouse_surname) data.spouse_surname = p.spouse_surname;
+        if (p.spouse_occupation) data.spouse_occupation = p.spouse_occupation;
+        if (p.spouse_age) data.spouse_age = p.spouse_age;
+        if (p.spouse_residence) data.spouse_residence = p.spouse_residence;
+        if (p.spouse_birth_date_raw || p.spouse_birth_date) data.spouse_birth_date_raw = p.spouse_birth_date_raw || p.spouse_birth_date;
+        if (p.spouse_birth_place) data.spouse_birth_place = p.spouse_birth_place;
         if (p.marriage_date_raw || p.marriage_date) data.marriage_date_raw = p.marriage_date_raw || p.marriage_date;
         if (p.marriage_place) data.marriage_place = p.marriage_place;
+
+        // Parents du conjoint
+        if (p.spouse_father_given_names) data.spouse_father_given_names = p.spouse_father_given_names;
+        if (p.spouse_father_surname) data.spouse_father_surname = p.spouse_father_surname;
+        if (p.spouse_father_occupation) data.spouse_father_occupation = p.spouse_father_occupation;
+        if (p.spouse_father_is_deceased !== undefined) data.spouse_father_is_deceased = Boolean(p.spouse_father_is_deceased);
+        if (p.spouse_father_death_date_raw) data.spouse_father_death_date_raw = p.spouse_father_death_date_raw;
+        if (p.spouse_father_death_place) data.spouse_father_death_place = p.spouse_father_death_place;
+
+        if (p.spouse_mother_given_names) data.spouse_mother_given_names = p.spouse_mother_given_names;
+        if (p.spouse_mother_surname) data.spouse_mother_surname = p.spouse_mother_surname;
+        if (p.spouse_mother_occupation) data.spouse_mother_occupation = p.spouse_mother_occupation;
+        if (p.spouse_mother_is_deceased !== undefined) data.spouse_mother_is_deceased = Boolean(p.spouse_mother_is_deceased);
+        if (p.spouse_mother_death_date_raw) data.spouse_mother_death_date_raw = p.spouse_mother_death_date_raw;
+        if (p.spouse_mother_death_place) data.spouse_mother_death_place = p.spouse_mother_death_place;
+
+        // Structure groom / bride
+        if (p.groom && typeof p.groom === "object") {
+          data.groom = p.groom;
+          if (!data.given_names) data.given_names = p.groom.given_names;
+          if (!data.surname) data.surname = p.groom.surname;
+          if (!data.occupation) data.occupation = p.groom.occupation;
+          if (!data.age) data.age = p.groom.age;
+          if (!data.birth_date_raw) data.birth_date_raw = p.groom.birth_date_raw;
+          if (!data.birth_place) data.birth_place = p.groom.birth_place;
+          if (!data.father_given_names) data.father_given_names = p.groom.father_given_names;
+          if (!data.father_surname) data.father_surname = p.groom.father_surname;
+          if (!data.father_occupation) data.father_occupation = p.groom.father_occupation;
+          if (data.father_is_deceased === undefined) data.father_is_deceased = p.groom.father_is_deceased;
+          if (!data.father_death_date_raw) data.father_death_date_raw = p.groom.father_death_date_raw;
+          if (!data.father_death_place) data.father_death_place = p.groom.father_death_place;
+          if (!data.mother_given_names) data.mother_given_names = p.groom.mother_given_names;
+          if (!data.mother_surname) data.mother_surname = p.groom.mother_surname;
+          if (!data.mother_occupation) data.mother_occupation = p.groom.mother_occupation;
+          if (data.mother_is_deceased === undefined) data.mother_is_deceased = p.groom.mother_is_deceased;
+          if (!data.mother_death_date_raw) data.mother_death_date_raw = p.groom.mother_death_date_raw;
+          if (!data.mother_death_place) data.mother_death_place = p.groom.mother_death_place;
+        }
+
+        if (p.bride && typeof p.bride === "object") {
+          data.bride = p.bride;
+          if (!data.spouse_given_names) data.spouse_given_names = p.bride.given_names;
+          if (!data.spouse_surname) data.spouse_surname = p.bride.surname;
+          if (!data.spouse_occupation) data.spouse_occupation = p.bride.occupation;
+          if (!data.spouse_age) data.spouse_age = p.bride.age;
+          if (!data.spouse_birth_date_raw) data.spouse_birth_date_raw = p.bride.birth_date_raw;
+          if (!data.spouse_birth_place) data.spouse_birth_place = p.bride.birth_place;
+          if (!data.spouse_father_given_names) data.spouse_father_given_names = p.bride.father_given_names;
+          if (!data.spouse_father_surname) data.spouse_father_surname = p.bride.father_surname;
+          if (!data.spouse_father_occupation) data.spouse_father_occupation = p.bride.father_occupation;
+          if (data.spouse_father_is_deceased === undefined) data.spouse_father_is_deceased = p.bride.father_is_deceased;
+          if (!data.spouse_father_death_date_raw) data.spouse_father_death_date_raw = p.bride.father_death_date_raw;
+          if (!data.spouse_father_death_place) data.spouse_father_death_place = p.bride.father_death_place;
+          if (!data.spouse_mother_given_names) data.spouse_mother_given_names = p.bride.mother_given_names;
+          if (!data.spouse_mother_surname) data.spouse_mother_surname = p.bride.mother_surname;
+          if (!data.spouse_mother_occupation) data.spouse_mother_occupation = p.bride.mother_occupation;
+          if (data.spouse_mother_is_deceased === undefined) data.spouse_mother_is_deceased = p.bride.mother_is_deceased;
+          if (!data.spouse_mother_death_date_raw) data.spouse_mother_death_date_raw = p.bride.mother_death_date_raw;
+          if (!data.spouse_mother_death_place) data.spouse_mother_death_place = p.bride.mother_death_place;
+        }
 
         // Support structure imbriquée (person, father, mother, spouse, marginal_mentions)
         if (p.person) {
           if (p.person.given_names) data.given_names = p.person.given_names;
           if (p.person.surname) data.surname = p.person.surname;
           if (p.person.occupation) data.occupation = p.person.occupation;
+          if (p.person.age) data.age = p.person.age;
           if (p.person.birth_date) data.birth_date_raw = p.person.birth_date;
           if (p.person.birth_place) data.birth_place = p.person.birth_place;
           if (p.person.death_date) data.death_date_raw = p.person.death_date;
@@ -290,7 +428,7 @@ export function parseTranscription(text: string): ExtractedActData {
         if (p.mother) {
           if (p.mother.given_names) data.mother_given_names = p.mother.given_names;
           if (p.mother.surname) data.mother_surname = p.mother.surname;
-          if (p.mother.occupation) data.mother_occupation = p.mother.occupation;
+          if (p.mother.occupation) data.mother_occupation = p.mother_occupation;
           if (p.mother.is_deceased !== undefined) data.mother_is_deceased = Boolean(p.mother.is_deceased);
           if (p.mother.death_date || p.mother.death_date_raw) data.mother_death_date_raw = p.mother.death_date || p.mother.death_date_raw;
           if (p.mother.death_place) data.mother_death_place = p.mother.death_place;
@@ -311,6 +449,44 @@ export function parseTranscription(text: string): ExtractedActData {
           if (p.marginal_mentions.marriage_spouse) data.marginal_marriage_spouse = p.marginal_mentions.marriage_spouse;
           if (p.marginal_mentions.death_date) data.marginal_death_date = p.marginal_mentions.death_date;
           if (p.marginal_mentions.death_place) data.marginal_death_place = p.marginal_mentions.death_place;
+        }
+
+        // Sources et citations textuelles / bounding boxes
+        if (p.sources && typeof p.sources === "object") {
+          const normSources: Record<string, FieldSource> = {};
+          for (const [k, v] of Object.entries(p.sources)) {
+            if (v && typeof v === "object") {
+              const srcObj = v as Record<string, unknown>;
+              let box: BoundingBox | undefined = undefined;
+              const rawBox = (srcObj.box || srcObj.box_2d) as unknown;
+              if (Array.isArray(rawBox) && rawBox.length >= 4) {
+                box = {
+                  ymin: Number(rawBox[0]),
+                  xmin: Number(rawBox[1]),
+                  ymax: Number(rawBox[2]),
+                  xmax: Number(rawBox[3]),
+                };
+              } else if (
+                rawBox &&
+                typeof rawBox === "object" &&
+                "ymin" in rawBox &&
+                "xmin" in rawBox
+              ) {
+                const b = rawBox as Record<string, unknown>;
+                box = {
+                  ymin: Number(b.ymin),
+                  xmin: Number(b.xmin),
+                  ymax: Number(b.ymax),
+                  xmax: Number(b.xmax),
+                };
+              }
+              normSources[k] = {
+                text: typeof srcObj.text === "string" ? srcObj.text : undefined,
+                box,
+              };
+            }
+          }
+          data.sources = normSources;
         }
       }
     } catch {
@@ -477,6 +653,7 @@ export function parseTranscription(text: string): ExtractedActData {
     birth_place: stripField(data.birth_place || (data.act_type === "birth" ? data.event_place : undefined)),
     death_date_raw: stripField(data.death_date_raw || data.marginal_death_date || (data.act_type === "death" ? data.event_date : undefined)),
     death_place: stripField(data.death_place || data.marginal_death_place || (data.act_type === "death" ? data.event_place : undefined)),
+    residence: stripField(data.residence),
     father_given_names: stripField(data.father_given_names),
     father_surname: uppercaseSurname(stripField(data.father_surname)),
     father_occupation: stripField(data.father_occupation),
@@ -496,13 +673,32 @@ export function parseTranscription(text: string): ExtractedActData {
     spouse_given_names: stripField(data.spouse_given_names || (data.marginal_marriage_spouse ? splitFullName(data.marginal_marriage_spouse).given_names : undefined)),
     spouse_surname: uppercaseSurname(stripField(data.spouse_surname || (data.marginal_marriage_spouse ? splitFullName(data.marginal_marriage_spouse).surname : undefined))),
     spouse_occupation: stripField(data.spouse_occupation),
+    spouse_age: stripField(data.spouse_age),
+    spouse_residence: stripField(data.spouse_residence),
+    spouse_birth_date_raw: stripField(data.spouse_birth_date_raw),
+    spouse_birth_place: stripField(data.spouse_birth_place),
     marriage_date_raw: stripField(data.marriage_date_raw || data.marginal_marriage_date || (data.act_type === "marriage" ? data.event_date : undefined)),
     marriage_place: stripField(data.marriage_place || data.marginal_marriage_place || (data.act_type === "marriage" ? data.event_place : undefined)),
+    spouse_father_given_names: stripField(data.spouse_father_given_names),
+    spouse_father_surname: uppercaseSurname(stripField(data.spouse_father_surname)),
+    spouse_father_occupation: stripField(data.spouse_father_occupation),
+    spouse_father_is_deceased: data.spouse_father_is_deceased,
+    spouse_father_death_date_raw: stripField(data.spouse_father_death_date_raw),
+    spouse_father_death_place: stripField(data.spouse_father_death_place),
+    spouse_mother_given_names: stripField(data.spouse_mother_given_names),
+    spouse_mother_surname: uppercaseSurname(stripField(data.spouse_mother_surname)),
+    spouse_mother_occupation: stripField(data.spouse_mother_occupation),
+    spouse_mother_is_deceased: data.spouse_mother_is_deceased,
+    spouse_mother_death_date_raw: stripField(data.spouse_mother_death_date_raw),
+    spouse_mother_death_place: stripField(data.spouse_mother_death_place),
+    groom: data.groom,
+    bride: data.bride,
     marginal_marriage_date: stripField(data.marginal_marriage_date),
     marginal_marriage_place: stripField(data.marginal_marriage_place),
     marginal_marriage_spouse: stripField(data.marginal_marriage_spouse),
     marginal_death_date: stripField(data.marginal_death_date),
     marginal_death_place: stripField(data.marginal_death_place),
+    sources: data.sources,
   };
 }
 

@@ -816,6 +816,98 @@ export async function appendTranscriptionToNotesAction(fd: FormData): Promise<{ 
   }
 }
 
+export interface ActViewerContextData {
+  person?: {
+    id: number;
+    displayName: string;
+    given_names: string;
+    surname: string;
+    sex: "M" | "F" | null;
+    occupation: string | null;
+    birth_date_raw: string | null;
+    birth_place: string | null;
+    death_date_raw: string | null;
+    death_place: string | null;
+    father?: { id: number; displayName: string; is_living: number } | null;
+    mother?: { id: number; displayName: string; is_living: number } | null;
+  } | null;
+  union?: {
+    id: number;
+    date_raw: string | null;
+    place: string | null;
+    partner1?: { id: number; displayName: string; occupation: string | null; birth_date_raw: string | null; birth_place: string | null } | null;
+    partner2?: { id: number; displayName: string; occupation: string | null; birth_date_raw: string | null; birth_place: string | null } | null;
+    partner1Father?: { id: number; displayName: string; is_living: number } | null;
+    partner1Mother?: { id: number; displayName: string; is_living: number } | null;
+    partner2Father?: { id: number; displayName: string; is_living: number } | null;
+    partner2Mother?: { id: number; displayName: string; is_living: number } | null;
+  } | null;
+}
+
+export async function getActViewerContextAction(
+  slug: string,
+  personId?: number,
+  unionId?: number,
+): Promise<ActViewerContextData> {
+  const result: ActViewerContextData = {};
+  if (!slug) return result;
+
+  if (personId) {
+    const profileId = await q.profileIdOfPerson(personId);
+    if (profileId) {
+      const p = await q.getPerson(profileId, personId);
+      if (p) {
+        const father = p.parents.find((parent) => parent.sex === "M");
+        const mother = p.parents.find((parent) => parent.sex === "F");
+        result.person = {
+          id: p.id,
+          displayName: p.displayName,
+          given_names: p.given_names,
+          surname: p.surname,
+          sex: p.sex,
+          occupation: p.occupation,
+          birth_date_raw: p.birth_date_raw,
+          birth_place: p.birth_place,
+          death_date_raw: p.death_date_raw,
+          death_place: p.death_place,
+          father: father ? { id: father.id, displayName: father.displayName, is_living: 1 } : null,
+          mother: mother ? { id: mother.id, displayName: mother.displayName, is_living: 1 } : null,
+        };
+      }
+    }
+  }
+
+  const targetUnionId =
+    unionId ?? (personId && result.person ? (await q.getPerson(await q.profileIdOfPerson(personId) || 0, personId))?.unions?.[0]?.id : undefined);
+
+  if (targetUnionId) {
+    const u = await q.getUnionRow(targetUnionId);
+    if (u) {
+      const profileId = u.profile_id;
+      let p1 = u.partner1_id ? await q.getPerson(profileId, u.partner1_id) : null;
+      let p2 = u.partner2_id ? await q.getPerson(profileId, u.partner2_id) : null;
+      const p1Father = p1?.parents.find((parent) => parent.sex === "M");
+      const p1Mother = p1?.parents.find((parent) => parent.sex === "F");
+      const p2Father = p2?.parents.find((parent) => parent.sex === "M");
+      const p2Mother = p2?.parents.find((parent) => parent.sex === "F");
+
+      result.union = {
+        id: u.id,
+        date_raw: u.date_raw,
+        place: u.place,
+        partner1: p1 ? { id: p1.id, displayName: p1.displayName, occupation: p1.occupation, birth_date_raw: p1.birth_date_raw, birth_place: p1.birth_place } : null,
+        partner2: p2 ? { id: p2.id, displayName: p2.displayName, occupation: p2.occupation, birth_date_raw: p2.birth_date_raw, birth_place: p2.birth_place } : null,
+        partner1Father: p1Father ? { id: p1Father.id, displayName: p1Father.displayName, is_living: 1 } : null,
+        partner1Mother: p1Mother ? { id: p1Mother.id, displayName: p1Mother.displayName, is_living: 1 } : null,
+        partner2Father: p2Father ? { id: p2Father.id, displayName: p2Father.displayName, is_living: 1 } : null,
+        partner2Mother: p2Mother ? { id: p2Mother.id, displayName: p2Mother.displayName, is_living: 1 } : null,
+      };
+    }
+  }
+
+  return result;
+}
+
 /**
  * Enregistre les données extraites d'un acte directement dans les bons champs
  * de la fiche (date, lieu, prénoms, nom, parents, conjoint, notes).
@@ -1085,7 +1177,9 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
     } else if (unionId) {
       const union = await q.getUnionRow(unionId);
       if (!union) return { ok: false, error: "Union introuvable" };
+      const profileId = union.profile_id;
 
+      // 1. Mise à jour de l'union (date, lieu, notes)
       const patch: q.UnionInput = {};
       const mDate = marriageDateRaw || dateRaw;
       const mPlace = marriagePlace || place;
@@ -1106,15 +1200,166 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
         patch.notes = currentNotes
           ? `${currentNotes}\n\n--- Transcription d'acte ---\n${transcriptionText}`
           : `--- Transcription d'acte ---\n${transcriptionText}`;
-        updatedFields.push("Notes");
+        updatedFields.push("Notes de mariage");
       }
 
       if (Object.keys(patch).length > 0) {
         await q.updateUnion(unionId, patch);
       }
 
-      if (union.partner1_id) await q.checkAndUpdatePersonCompletion(union.partner1_id);
-      if (union.partner2_id) await q.checkAndUpdatePersonCompletion(union.partner2_id);
+      // 2. Mise à jour de l'époux (partner1)
+      if (union.partner1_id) {
+        const p1 = await q.getPerson(profileId, union.partner1_id);
+        if (p1) {
+          const p1Patch: q.PersonInput = {};
+          if (occupation && !p1.occupation) {
+            p1Patch.occupation = occupation;
+            updatedFields.push(`Métier de ${p1.displayName}`);
+          }
+          if (birthDateRaw && !p1.birth_year) {
+            const d = parseDateInput(birthDateRaw);
+            p1Patch.birth_date_raw = d.canonical;
+            p1Patch.birth_date_iso = d.iso;
+            if (d.year) p1Patch.birth_year = d.year;
+            updatedFields.push(`Date naiss. de ${p1.displayName}`);
+          }
+          if (birthPlace && !p1.birth_place) {
+            p1Patch.birth_place = normalizePlace(birthPlace);
+            updatedFields.push(`Lieu naiss. de ${p1.displayName}`);
+          }
+          if (Object.keys(p1Patch).length > 0) {
+            await q.updatePerson(p1.id, p1Patch);
+          }
+
+          // Parents de partner1 (Père)
+          if (createFather && (fatherGivenNames || fatherSurname)) {
+            const exFather = p1.parents.find((p) => p.sex === "M");
+            if (!exFather) {
+              const fId = await q.createPerson(profileId, {
+                given_names: fatherGivenNames || "",
+                surname: fatherSurname || p1.surname || "",
+                sex: "M",
+                status: "En recherche",
+                is_living: fatherIsDeceased ? 0 : 1,
+              });
+              await q.addParent(fId, p1.id);
+              updatedFields.push(`Père de ${p1.displayName} créé et lié`);
+            } else if (fatherIsDeceased) {
+              await q.updatePerson(exFather.id, { is_living: 0 });
+            }
+          }
+
+          // Parents de partner1 (Mère)
+          if (createMother && (motherGivenNames || motherSurname)) {
+            const exMother = p1.parents.find((p) => p.sex === "F");
+            if (!exMother) {
+              const mId = await q.createPerson(profileId, {
+                given_names: motherGivenNames || "",
+                surname: motherSurname || "",
+                sex: "F",
+                status: "En recherche",
+                is_living: motherIsDeceased ? 0 : 1,
+              });
+              await q.addParent(mId, p1.id);
+              updatedFields.push(`Mère de ${p1.displayName} créée et liée`);
+            } else if (motherIsDeceased) {
+              await q.updatePerson(exMother.id, { is_living: 0 });
+            }
+          }
+
+          await q.checkAndUpdatePersonCompletion(p1.id);
+        }
+      }
+
+      // 3. Mise à jour ou création de l'épouse (partner2)
+      const spouseFatherGivenNames = str(fd, "spouse_father_given_names");
+      const spouseFatherSurname = str(fd, "spouse_father_surname")?.toLocaleUpperCase("fr") || null;
+      const spouseFatherIsDeceased = str(fd, "spouse_father_is_deceased") === "1" || str(fd, "spouse_father_is_deceased") === "true";
+      const spouseMotherGivenNames = str(fd, "spouse_mother_given_names");
+      const spouseMotherSurname = str(fd, "spouse_mother_surname")?.toLocaleUpperCase("fr") || null;
+      const spouseMotherIsDeceased = str(fd, "spouse_mother_is_deceased") === "1" || str(fd, "spouse_mother_is_deceased") === "true";
+      const spouseOccupation = str(fd, "spouse_occupation");
+      const spouseBirthDateRaw = str(fd, "spouse_birth_date_raw");
+      const spouseBirthPlace = str(fd, "spouse_birth_place");
+
+      let p2Id = union.partner2_id;
+      if (!p2Id && (spouseGivenNames || spouseSurname)) {
+        // Créer l'épouse si manquante
+        p2Id = await q.createPerson(profileId, {
+          given_names: spouseGivenNames || "",
+          surname: spouseSurname || "",
+          sex: "F",
+          status: "En recherche",
+          occupation: spouseOccupation || null,
+        });
+        await q.updateUnion(unionId, { partner2_id: p2Id });
+        updatedFields.push("Épouse créée et liée");
+      }
+
+      if (p2Id) {
+        const p2 = await q.getPerson(profileId, p2Id);
+        if (p2) {
+          const p2Patch: q.PersonInput = {};
+          if (spouseOccupation && !p2.occupation) {
+            p2Patch.occupation = spouseOccupation;
+            updatedFields.push(`Métier de ${p2.displayName}`);
+          }
+          if (spouseBirthDateRaw && !p2.birth_year) {
+            const d = parseDateInput(spouseBirthDateRaw);
+            p2Patch.birth_date_raw = d.canonical;
+            p2Patch.birth_date_iso = d.iso;
+            if (d.year) p2Patch.birth_year = d.year;
+            updatedFields.push(`Date naiss. de ${p2.displayName}`);
+          }
+          if (spouseBirthPlace && !p2.birth_place) {
+            p2Patch.birth_place = normalizePlace(spouseBirthPlace);
+            updatedFields.push(`Lieu naiss. de ${p2.displayName}`);
+          }
+          if (Object.keys(p2Patch).length > 0) {
+            await q.updatePerson(p2.id, p2Patch);
+          }
+
+          // Parents de partner2 (Père)
+          if (spouseFatherGivenNames || spouseFatherSurname) {
+            const exFather = p2.parents.find((p) => p.sex === "M");
+            if (!exFather) {
+              const fId = await q.createPerson(profileId, {
+                given_names: spouseFatherGivenNames || "",
+                surname: spouseFatherSurname || p2.surname || "",
+                sex: "M",
+                status: "En recherche",
+                is_living: spouseFatherIsDeceased ? 0 : 1,
+              });
+              await q.addParent(fId, p2.id);
+              updatedFields.push(`Père de ${p2.displayName} créé et lié`);
+            } else if (spouseFatherIsDeceased) {
+              await q.updatePerson(exFather.id, { is_living: 0 });
+            }
+          }
+
+          // Parents de partner2 (Mère)
+          if (spouseMotherGivenNames || spouseMotherSurname) {
+            const exMother = p2.parents.find((p) => p.sex === "F");
+            if (!exMother) {
+              const mId = await q.createPerson(profileId, {
+                given_names: spouseMotherGivenNames || "",
+                surname: spouseMotherSurname || "",
+                sex: "F",
+                status: "En recherche",
+                is_living: spouseMotherIsDeceased ? 0 : 1,
+              });
+              await q.addParent(mId, p2.id);
+              updatedFields.push(`Mère de ${p2.displayName} créée et liée`);
+            } else if (spouseMotherIsDeceased) {
+              await q.updatePerson(exMother.id, { is_living: 0 });
+            }
+          }
+
+          await q.checkAndUpdatePersonCompletion(p2.id);
+        }
+      }
+
+      await q.recomputeSosa(profileId);
       await refreshProfile(slug);
       return { ok: true, updatedFields };
     }

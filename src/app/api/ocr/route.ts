@@ -7,9 +7,40 @@ import { GoogleGenAI } from "@google/genai";
 import { getActStorageDir } from "@/lib/act-downloader";
 import { parseTranscription, cleanTranscriptionText } from "@/lib/transcription-parser";
 
-const PALEOGRAPHY_PROMPT = `Tu es un paléographe et généalogiste expert des archives françaises (XVIe au XXe siècle).
+/**
+ * Construit un prompt paléographique spécialisé selon la nature attendue de l'acte (naissance, mariage, décès).
+ */
+function buildPaleographyPrompt(actKind?: "birth" | "death" | "marriage"): string {
+  let kindGuidance = "";
+  if (actKind === "marriage") {
+    kindGuidance = `
+IMPORTANT : CET ACTE EST UN ACTE DE MARIAGE.
+Il comporte obligatoirement DEUX individus principaux (l'Époux / Mari et l'Épouse / Femme), ainsi que leurs parents respectifs :
+- Pour l'Époux : nom, prénoms, âge, profession, lieu d'origine ou paroisse, père (prénom, nom, statut vivant ou défunt/feu, date/lieu de décès si mentionnés), mère (prénom, nom de jeune fille, vivante ou feue).
+- Pour l'Épouse : nom, prénoms, âge, profession, lieu d'origine, père (vivant ou défunt/feu), mère (vivante ou feue).
+- Date et lieu de célébration du mariage.
+Veille à renseigner distinctement le bloc "groom" (époux) et le bloc "bride" (épouse) dans le JSON.`;
+  } else if (actKind === "death") {
+    kindGuidance = `
+IMPORTANT : CET ACTE EST UN ACTE DE DÉCÈS / SÉPULTURE.
+Le sujet principal est la personne décédée :
+- Date du décès ou de l'inhumation (souvent le lendemain).
+- Âge déclaré au décès (ex: 60 ans) -> calcule rigoureusement l'année approximative de naissance dans birth_date_raw (ex: "vers 1682").
+- Conjoint éventuel ("veuf/veuve de ...", ou "époux/épouse de ...").
+- Parents mentionnés le cas échéant.`;
+  } else if (actKind === "birth") {
+    kindGuidance = `
+IMPORTANT : CET ACTE EST UN ACTE DE NAISSANCE / BAPTÊME.
+Le sujet principal est l'enfant né ou baptisé :
+- Date de naissance et/ou de baptême.
+- Filiation : père (nom, prénoms, profession) et mère (nom de jeune fille, prénoms).
+- Mentions marginales ultérieures : surveille attentivement les annotations manuscrites en marge de la page (ex: mariage ultérieur, décès ultérieur avec date et lieu).`;
+  }
+
+  return `Tu es un paléographe et généalogiste expert des archives françaises (XVIe au XXe siècle).
 Transcris fidèlement et exhaustivement le texte manuscrit de cet acte en français.
 Conserve les formulations de l'époque et développe les abréviations évidentes entre crochets (ex: baptiz[atus] fuit, par[rain], etc.).
+${kindGuidance}
 
 Réponds rigoureusement selon la structure suivante :
 
@@ -21,14 +52,17 @@ Réponds rigoureusement selon la structure suivante :
 - **Date de l'acte** : [Jour, mois, année de l'acte]
 - **Lieu / Paroisse** : [Commune, paroisse où l'acte est dressé]
 - **Individu(s) principal(aux)** : [Noms, prénoms, âge, date et lieu de naissance le cas échéant, profession]
-- **Père** : [Noms, prénoms, profession, statut vivant ou décédé/feu, date de décès si précisée (ex: décédé le 12 mai 1740), lieu de décès si précisé (ex: à Saint-Malo), date/lieu de naissance ou âge le cas échéant]
-- **Mère** : [Nom de jeune fille, prénoms, profession, statut vivante ou décédée/feue, date de décès si précisée, lieu de décès si précisé, date/lieu de naissance ou âge le cas échéant]
+- **Père** : [Noms, prénoms, profession, statut vivant ou décédé/feu, date de décès si précisée (ex: décédé le 12 mai 1740), lieu de décès si précisé]
+- **Mère** : [Nom de jeune fille, prénoms, profession, statut vivante ou décédée/feue, date/lieu de décès si précisés]
 - **Conjoint / Mariage** : [Noms, prénoms du conjoint, date et lieu de mariage si indiqués]
 - **Mentions marginales** : [Mariage ou décès ultérieurs inscrits en marge avec date et lieu, le cas échéant]
 
-RÈGLE ABSOLUE SUR LES NOMS : En généalogie française, les NOMS DE FAMILLE sont TOUJOURS écrits INTÉGRALEMENT EN MAJUSCULES (ex: DUPONT, MARTIN, LE GALL, DE LA HAYE, etc.) tant dans l'analyse que dans tous les champs du bloc JSON (surname, father_surname, mother_surname, spouse_surname).
+RÈGLE ABSOLUE SUR LES NOMS : En généalogie française, les NOMS DE FAMILLE sont TOUJOURS écrits INTÉGRALEMENT EN MAJUSCULES (ex: DUPONT, MARTIN, LE GALL, DE LA HAYE, etc.) tant dans l'analyse que dans tous les champs du bloc JSON.
 
-TRÈS IMPORTANT POUR LES PARENTS : Détecte systématiquement si les parents sont indiqués comme défunts ('feu', 'feue', 'défunt', 'décédé'). Repère avec précision toute date ou tout lieu de décès des parents (très fréquent dans les actes de mariage : 'fils de feu X décédé à Y le Z'), ainsi que leur âge ou date/lieu d'origine. Remplis rigoureusement les champs du bloc JSON ci-dessous :
+RÈGLE SUR LES SOURCES / CITATIONS VISUELLES :
+Dans le bloc JSON "sources", pour chaque champ important (date, lieu, prénoms/noms, père, mère, décès parent), fournis :
+1. "text" : l'extrait exact de quelques mots tel qu'il est écrit dans l'acte original (ex: "le quatorze février mil sept cent", "fils de feu françois dupont").
+2. "box" (facultatif mais recommandé si visible) : l'emplacement normalisé [ymin, xmin, ymax, xmax] sur une échelle de 0 à 1000.
 
 ### Données extraites
 \`\`\`json
@@ -36,45 +70,76 @@ TRÈS IMPORTANT POUR LES PARENTS : Détecte systématiquement si les parents son
   "act_type": "birth | death | marriage | other",
   "event_date": "date principale de l'événement (ex: 14 février 1742)",
   "event_place": "lieu ou paroisse principal (ex: Saint-Malo)",
-  "given_names": "prénom(s) du sujet",
-  "surname": "nom de famille du sujet",
-  "occupation": "métier du sujet",
-  "age": "âge du sujet si mentionné",
-  "birth_date_raw": "date de naissance si mentionnée ou calculée",
+  
+  "given_names": "prénom(s) du sujet (ou époux si mariage)",
+  "surname": "nom de famille du sujet (ou époux si mariage)",
+  "occupation": "métier",
+  "age": "âge si mentionné",
+  "residence": "paroisse ou lieu de résidence",
+  "birth_date_raw": "date de naissance si mentionnée ou calculée (ex: vers 1715)",
   "birth_place": "lieu de naissance si mentionné",
   "death_date_raw": "date de décès si mentionnée",
   "death_place": "lieu de décès si mentionné",
+
   "father_given_names": "prénom du père",
   "father_surname": "nom du père",
   "father_occupation": "métier du père",
   "father_is_deceased": true | false,
-  "father_death_date_raw": "date de décès du père si précisée (ex: décédé le 3 mai 1770)",
+  "father_death_date_raw": "date de décès du père si précisée (ex: décédé le 3 mai 1740)",
   "father_death_place": "lieu de décès du père si précisé",
-  "father_birth_date_raw": "date ou année de naissance du père si mentionnée ou déduite de son âge",
-  "father_birth_place": "lieu de naissance du père si précisé",
+
   "mother_given_names": "prénom de la mère",
   "mother_surname": "nom de jeune fille de la mère",
   "mother_occupation": "métier de la mère",
   "mother_is_deceased": true | false,
   "mother_death_date_raw": "date de décès de la mère si précisée",
   "mother_death_place": "lieu de décès de la mère si précisé",
-  "mother_birth_date_raw": "date ou année de naissance de la mère si mentionnée ou déduite de son âge",
-  "mother_birth_place": "lieu de naissance de la mère si précisé",
-  "spouse_given_names": "prénom du conjoint",
-  "spouse_surname": "nom du conjoint",
+
+  "spouse_given_names": "prénom du conjoint (ou épouse si mariage)",
+  "spouse_surname": "nom du conjoint (ou épouse si mariage)",
   "spouse_occupation": "métier du conjoint",
-  "marriage_date_raw": "date du mariage si acte de mariage ou mention marginale",
+  "spouse_age": "âge du conjoint",
+  "spouse_residence": "résidence du conjoint",
+  "spouse_birth_date_raw": "date ou année de naissance calculée du conjoint",
+  "spouse_birth_place": "lieu d'origine du conjoint",
+  "marriage_date_raw": "date du mariage",
   "marriage_place": "lieu du mariage",
-  "marginal_marriage_date": "date de mariage inscrite en mention marginale",
+
+  "spouse_father_given_names": "prénom du père de l'épouse",
+  "spouse_father_surname": "nom du père de l'épouse",
+  "spouse_father_occupation": "métier du père de l'épouse",
+  "spouse_father_is_deceased": true | false,
+  "spouse_father_death_date_raw": "date de décès du père de l'épouse",
+  "spouse_father_death_place": "lieu de décès du père de l'épouse",
+
+  "spouse_mother_given_names": "prénom de la mère de l'épouse",
+  "spouse_mother_surname": "nom de jeune fille de la mère de l'épouse",
+  "spouse_mother_occupation": "métier de la mère de l'épouse",
+  "spouse_mother_is_deceased": true | false,
+  "spouse_mother_death_date_raw": "date de décès de la mère de l'épouse",
+  "spouse_mother_death_place": "lieu de décès de la mère de l'épouse",
+
+  "marginal_marriage_date": "date de mariage inscrite en marge",
   "marginal_marriage_place": "lieu de mariage en marge",
   "marginal_marriage_spouse": "conjoint en marge",
-  "marginal_death_date": "date de décès inscrite en mention marginale",
-  "marginal_death_place": "lieu de décès en marge"
+  "marginal_death_date": "date de décès inscrite en marge",
+  "marginal_death_place": "lieu de décès en marge",
+
+  "sources": {
+    "event_date": { "text": "extrait exact" },
+    "event_place": { "text": "extrait exact" },
+    "given_names": { "text": "extrait exact" },
+    "father": { "text": "extrait exact" },
+    "mother": { "text": "extrait exact" },
+    "spouse": { "text": "extrait exact" },
+    "spouse_father": { "text": "extrait exact" },
+    "spouse_mother": { "text": "extrait exact" }
+  }
 }
 \`\`\``;
+}
 
 // Liste des modèles Gemini recommandés dans l'ordre de priorité
-// gemini-3.8-flash est le modèle moderne le plus rapide et le plus stable.
 const PREFERRED_PRIORITY = [
   "gemini-3.8-flash",
   "gemini-3.5-flash-lite",
@@ -152,17 +217,21 @@ export async function POST(req: NextRequest) {
       engine = "tesseract",
       apiKey: rawApiKey,
       language = "fra",
+      actKind,
     } = body as {
       imageUrl?: string;
       crop?: { x: number; y: number; width: number; height: number };
       engine?: "tesseract" | "ai" | "gemini";
       apiKey?: string;
       language?: string;
+      actKind?: "birth" | "death" | "marriage";
     };
 
     if (!imageUrl) {
       return NextResponse.json({ error: "URL de l'image requise" }, { status: 400 });
     }
+
+    const paleographyPrompt = buildPaleographyPrompt(actKind);
 
     // 1. Récupération du Buffer de l'image source
     let imageBuffer: Buffer;
@@ -249,7 +318,7 @@ export async function POST(req: NextRequest) {
                 {
                   role: "user",
                   content: [
-                    { type: "text", text: PALEOGRAPHY_PROMPT },
+                    { type: "text", text: paleographyPrompt },
                     {
                       type: "image_url",
                       image_url: { url: `data:image/jpeg;base64,${base64Image}` },
@@ -294,7 +363,7 @@ export async function POST(req: NextRequest) {
                 {
                   role: "user",
                   content: [
-                    { type: "text", text: PALEOGRAPHY_PROMPT },
+                    { type: "text", text: paleographyPrompt },
                     {
                       type: "image_url",
                       image_url: { url: `data:image/jpeg;base64,${base64Image}` },
@@ -368,7 +437,7 @@ export async function POST(req: NextRequest) {
             const response = await ai.models.generateContent({
               model: currentModel,
               contents: [
-                PALEOGRAPHY_PROMPT,
+                paleographyPrompt,
                 {
                   inlineData: {
                     mimeType: "image/jpeg",
@@ -420,7 +489,7 @@ export async function POST(req: NextRequest) {
               }
             }
 
-            // Si 503 (haute demande temporaire), ré-essayer le même modèle après 1.5s car les pics durent ~1 seconde
+            // Si 503 (haute demande temporaire), ré-essayer le même modèle après 1.5s
             if (
               errStr.includes("503") ||
               errStr.includes("UNAVAILABLE") ||
@@ -433,7 +502,7 @@ export async function POST(req: NextRequest) {
                 const retry503 = await ai.models.generateContent({
                   model: currentModel,
                   contents: [
-                    PALEOGRAPHY_PROMPT,
+                    paleographyPrompt,
                     { inlineData: { mimeType: "image/jpeg", data: base64Image } },
                   ],
                 });
@@ -452,7 +521,7 @@ export async function POST(req: NextRequest) {
                   console.log(`[Gemini] Seconde tentative réussie sur : ${currentModel}`);
                   break;
                 }
-              } catch (retryErr) {
+              } catch {
                 console.warn(`[Gemini] Seconde tentative 503 échouée sur ${currentModel}, passage au modèle suivant.`);
               }
             }
