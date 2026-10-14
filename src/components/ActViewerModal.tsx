@@ -137,6 +137,11 @@ export function ActViewerModal({
   // Sélection des cases à valider dans l'Avant / Après
   const [selectedFieldKeys, setSelectedFieldKeys] = useState<Set<string>>(new Set());
 
+  // Navigation par onglets dans le panneau latéral
+  const [sidebarTab, setSidebarTab] = useState<"compare" | "transcription" | "settings">("compare");
+  // Filtre d'affichage de la comparaison : "changes" = uniquement nouveautés/modifs, "all" = tous les champs
+  const [filterMode, setFilterMode] = useState<"changes" | "all">("changes");
+
   const [appendToNotes, setAppendToNotes] = useState(true);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
@@ -368,6 +373,8 @@ export function ActViewerModal({
     }
 
     setSelectedFieldKeys(newKeys);
+    setSidebarTab("compare");
+    setFilterMode("changes");
   }, [actKind]);
 
   // Récupérer la source correspondant à un champ
@@ -705,6 +712,8 @@ export function ActViewerModal({
       setOcrCropRef(null);
       setPinnedSourceKey(null);
       setMode("pan");
+      setSidebarTab("compare");
+      setFilterMode("changes");
     }
   }, [isOpen]);
 
@@ -1557,192 +1566,246 @@ export function ActViewerModal({
           </div>
         </main>
 
-        {/* Panneau latéral OCR & Transcription parfaitement intégré à Ariane */}
+        {/* Panneau latéral OCR & Transcription parfaitement remodelé et confortable */}
         {ocrOpen && (
-          <aside className="w-[640px] max-w-[95vw] lg:w-[700px] border-l border-border bg-surface flex flex-col shrink-0 z-20 shadow-2xl animate-in slide-in-from-right duration-200">
-            {/* En-tête du panneau */}
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium text-sm text-fg">Transcription & Analyse</h3>
-              </div>
+          <aside className="w-[680px] max-w-[95vw] lg:w-[780px] xl:w-[860px] border-l border-border bg-surface flex flex-col shrink-0 z-20 shadow-2xl animate-in slide-in-from-right duration-200">
+            {/* En-tête du panneau avec navigation par onglets */}
+            <div className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-surface shrink-0">
+              {transcription ? (
+                <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab("compare")}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      sidebarTab === "compare"
+                        ? "bg-surface text-fg shadow-2xs font-semibold"
+                        : "text-fg-muted hover:text-fg"
+                    }`}
+                  >
+                    <span>Données & Fiche</span>
+                    {selectedFieldKeys.size > 0 && (
+                      <span className="rounded-full bg-fg text-accent-fg px-1.5 py-0.2 text-[10px] font-semibold">
+                        {selectedFieldKeys.size}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab("transcription")}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      sidebarTab === "transcription"
+                        ? "bg-surface text-fg shadow-2xs font-semibold"
+                        : "text-fg-muted hover:text-fg"
+                    }`}
+                  >
+                    <span>Transcription</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab("settings")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      sidebarTab === "settings"
+                        ? "bg-surface text-fg shadow-2xs font-semibold"
+                        : "text-fg-muted hover:text-fg"
+                    }`}
+                    title="Paramètres de transcription et sélection"
+                  >
+                    <span>Paramètres</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-sm text-fg">Transcription & Analyse</h3>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={() => setOcrOpen(false)}
-                className="rounded-lg p-1 text-fg-subtle hover:text-fg hover:bg-surface-2"
+                className="rounded-lg p-1.5 text-fg-subtle hover:text-fg hover:bg-surface-2 cursor-pointer transition-colors"
                 title="Fermer le panneau"
               >
                 ✕
               </button>
             </div>
 
+            {/* Corps du panneau défilant */}
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 text-xs">
-              {/* Choix de la zone */}
-              <div className="rounded-xl border border-border bg-surface-2/50 p-3">
-                <label className="font-medium text-fg block mb-1.5">
-                  1. Zone à transcrire
-                </label>
-                {cropBox && cropBox.width > 20 && cropBox.height > 20 ? (
-                  <div className="flex items-center justify-between gap-2 text-ok font-medium">
-                    <span>
-                      ✓ Rectangle sélectionné ({cropBox.width} × {cropBox.height} px)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setCropBox(null)}
-                      className="text-fg-muted hover:text-fg underline text-[11px] font-normal"
-                    >
-                      Toute la page
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-fg-muted flex flex-col gap-1.5">
-                    <p className="text-[11.5px] leading-relaxed">
-                      Toute la page sera analysée. Pour isoler un acte précis, activez le bouton
-                      « Sélectionner l'acte » en bas à gauche et glissez votre souris.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setMode("select")}
-                      className="self-start rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                    >
-                      Tracer un rectangle sur l’acte
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Choix du moteur */}
-              <div className="rounded-xl border border-border bg-surface-2/50 p-3 flex flex-col gap-2">
-                <label className="font-medium text-fg block">
-                  2. Moteur de transcription
-                </label>
-
-                <label
-                  className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-2.5 transition-colors ${
-                    ocrEngine === "gemini"
-                      ? "border-fg bg-surface font-medium text-fg shadow-2xs"
-                      : "border-border bg-surface/50 hover:bg-surface text-fg-muted"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="ocrEngine"
-                    checked={ocrEngine === "gemini"}
-                    onChange={() => setOcrEngine("gemini")}
-                    className="mt-0.5 accent-fg"
-                  />
-                  <div>
-                    <div className="font-medium text-fg">IA Paléographe (Gemini 3.8 Flash)</div>
-                    <div className="text-[11px] text-fg-muted font-normal mt-0.5">
-                      Transcription experte de l'écriture manuscrite ancienne (XVIe au XXe siècle).
-                    </div>
-                  </div>
-                </label>
-
-                <label
-                  className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-2.5 transition-colors ${
-                    ocrEngine === "tesseract"
-                      ? "border-fg bg-surface font-medium text-fg shadow-2xs"
-                      : "border-border bg-surface/50 hover:bg-surface text-fg-muted"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="ocrEngine"
-                    checked={ocrEngine === "tesseract"}
-                    onChange={() => setOcrEngine("tesseract")}
-                    className="mt-0.5 accent-fg"
-                  />
-                  <div>
-                    <div className="font-medium text-fg">Tesseract (Local hors-ligne)</div>
-                    <div className="text-[11px] text-fg-muted font-normal mt-0.5">
-                      Sans clé requise. Efficace pour les imprimés, tables décennales et formulaires.
-                    </div>
-                  </div>
-                </label>
-
-                {/* Saisie clé IA Vision */}
-                {ocrEngine === "gemini" && (
-                  <div className="mt-2 pt-2.5 border-t border-border flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] text-fg font-medium">
-                        Clé API Vision (Gemini, Groq ou OpenAI) :
-                      </label>
-                      {geminiApiKey && (
-                        <span className="text-[10px] text-ok font-medium">✓ Enregistrée</span>
-                      )}
-                    </div>
-                    <input
-                      type="password"
-                      value={geminiApiKey}
-                      onChange={(e) => handleSaveGeminiKey(e.target.value)}
-                      placeholder="Collez votre clé Google AI Studio (AIza...), Groq (gsk_...) ou OpenAI (sk-...)…"
-                      className="field w-full text-xs"
-                    />
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] pt-0.5">
-                      <a
-                        href="https://aistudio.google.com/apikey"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-fg underline hover:text-fg-muted font-medium"
-                      >
-                        Obtenir une clé Google AI Studio ↗
-                      </a>
-                      <span className="text-fg-subtle">·</span>
-                      <a
-                        href="https://console.groq.com/keys"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-fg-muted underline hover:text-fg"
-                      >
-                        Alternative gratuite : Groq (1s, sans quota) ↗
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Bouton de lancement ou statut actif avec bouton Annuler */}
+              {/* Statut de chargement OCR */}
               {ocrLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-border bg-surface-2 py-2 px-3 text-xs font-medium text-fg shadow-2xs">
-                    <span className="inline-block size-3 shrink-0 rounded-full border-2 border-fg border-t-transparent animate-spin" />
-                    <span className="truncate">{ocrProgress || `Analyse en cours (${ocrElapsed}s)…`}</span>
+                <div className="flex flex-col items-center justify-center py-14 gap-3.5">
+                  <div className="flex items-center justify-center size-12 rounded-2xl bg-surface-2 border border-border shadow-xs">
+                    <span className="inline-block size-6 rounded-full border-2 border-fg border-t-transparent animate-spin" />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-semibold text-fg">
+                      {ocrProgress || `Analyse en cours (${ocrElapsed}s)…`}
+                    </div>
+                    <p className="text-xs text-fg-muted mt-1 max-w-xs leading-relaxed">
+                      {ocrEngine === "gemini"
+                        ? "L'IA paléographe déchiffre l'écriture ancienne et extrait les données généalogiques…"
+                        : "Le moteur Tesseract analyse les caractères du document…"}
+                    </p>
                   </div>
                   <button
                     type="button"
                     onClick={handleCancelOcr}
-                    className="shrink-0 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-medium text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                    title="Interrompre la transcription"
+                    className="mt-2 rounded-xl border border-border bg-surface px-4 py-2 text-xs font-medium text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
                   >
-                    ✕ Annuler
+                    ✕ Annuler l'analyse
                   </button>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleRunOcr}
-                  className="w-full rounded-xl bg-fg py-2.5 text-xs font-medium text-accent-fg transition-opacity hover:opacity-90 cursor-pointer shadow-xs"
-                >
-                  🔍 Lancer la transcription
-                </button>
-              )}
+              ) : sidebarTab === "settings" || !transcription ? (
+                /* Onglet 1 / Mode initial : Paramètres de numérisation & lancement */
+                <div className="flex flex-col gap-4">
+                  {/* Choix de la zone */}
+                  <div className="rounded-2xl border border-border bg-surface-2/40 p-3.5 flex flex-col gap-2">
+                    <span className="font-semibold text-fg text-xs uppercase tracking-wider">
+                      1. Zone à transcrire
+                    </span>
+                    {cropBox && cropBox.width > 20 && cropBox.height > 20 ? (
+                      <div className="flex items-center justify-between gap-2 text-ok font-medium">
+                        <span>
+                          ✓ Rectangle sélectionné ({cropBox.width} × {cropBox.height} px)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCropBox(null)}
+                          className="text-fg-muted hover:text-fg underline text-[11px] font-normal cursor-pointer"
+                        >
+                          Toute la page
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-fg-muted flex flex-col gap-2">
+                        <p className="text-xs leading-relaxed">
+                          Toute la page sera analysée. Pour isoler un acte précis, activez « Sélectionner l'acte » et tracez un rectangle sur le registre.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setMode("select")}
+                          className="self-start rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                        >
+                          Tracer un rectangle sur l'acte
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
-              {/* Résultat de la transcription avec rendu Markdown formaté */}
-              {transcription && (
-                <div className="flex-1 flex flex-col gap-2 rounded-xl border border-border bg-surface p-3 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-border pb-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-fg">Transcription</span>
+                  {/* Choix du moteur */}
+                  <div className="rounded-2xl border border-border bg-surface-2/40 p-3.5 flex flex-col gap-2.5">
+                    <span className="font-semibold text-fg text-xs uppercase tracking-wider">
+                      2. Moteur de transcription
+                    </span>
+
+                    <label
+                      className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors ${
+                        ocrEngine === "gemini"
+                          ? "border-fg bg-surface font-medium text-fg shadow-2xs"
+                          : "border-border bg-surface/50 hover:bg-surface text-fg-muted"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="ocrEngine"
+                        checked={ocrEngine === "gemini"}
+                        onChange={() => setOcrEngine("gemini")}
+                        className="mt-0.5 accent-fg"
+                      />
+                      <div>
+                        <div className="font-semibold text-fg">IA Paléographe (Gemini 3.8 Flash)</div>
+                        <div className="text-[11px] text-fg-muted font-normal mt-0.5">
+                          Transcription experte de l'écriture manuscrite ancienne (XVIe au XXe siècle).
+                        </div>
+                      </div>
+                    </label>
+
+                    <label
+                      className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors ${
+                        ocrEngine === "tesseract"
+                          ? "border-fg bg-surface font-medium text-fg shadow-2xs"
+                          : "border-border bg-surface/50 hover:bg-surface text-fg-muted"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="ocrEngine"
+                        checked={ocrEngine === "tesseract"}
+                        onChange={() => setOcrEngine("tesseract")}
+                        className="mt-0.5 accent-fg"
+                      />
+                      <div>
+                        <div className="font-semibold text-fg">Tesseract (Local hors-ligne)</div>
+                        <div className="text-[11px] text-fg-muted font-normal mt-0.5">
+                          Sans clé requise. Efficace pour les imprimés, tables décennales et formulaires.
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* Clé API */}
+                    {ocrEngine === "gemini" && (
+                      <div className="mt-2 pt-2.5 border-t border-border flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] text-fg font-medium">
+                            Clé API Vision (Gemini, Groq ou OpenAI) :
+                          </label>
+                          {geminiApiKey && (
+                            <span className="text-[10px] text-ok font-medium">✓ Enregistrée</span>
+                          )}
+                        </div>
+                        <input
+                          type="password"
+                          value={geminiApiKey}
+                          onChange={(e) => handleSaveGeminiKey(e.target.value)}
+                          placeholder="Collez votre clé Google AI Studio (AIza...), Groq (gsk_...) ou OpenAI (sk-...)…"
+                          className="field w-full text-xs"
+                        />
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] pt-0.5">
+                          <a
+                            href="https://aistudio.google.com/apikey"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-fg underline hover:text-fg-muted font-medium"
+                          >
+                            Obtenir une clé Google AI Studio ↗
+                          </a>
+                          <span className="text-fg-subtle">·</span>
+                          <a
+                            href="https://console.groq.com/keys"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-fg-muted underline hover:text-fg"
+                          >
+                            Alternative gratuite : Groq (1s, sans quota) ↗
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bouton de lancement */}
+                  <button
+                    type="button"
+                    onClick={handleRunOcr}
+                    className="w-full rounded-xl bg-fg py-3 text-xs font-semibold text-accent-fg transition-opacity hover:opacity-90 cursor-pointer shadow-xs"
+                  >
+                    {transcription ? "Relancer l'analyse" : "Lancer la transcription"}
+                  </button>
+                </div>
+              ) : sidebarTab === "transcription" ? (
+                /* Onglet 2 : Transcription intégrale */
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between border-b border-border pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-fg text-sm">Transcription paléographique</span>
                       <button
                         type="button"
                         onClick={() => setEditMode((v) => !v)}
-                        className={`rounded px-1.5 py-0.5 text-[10.5px] transition-colors ${
+                        className={`rounded-lg px-2 py-1 text-[11px] transition-colors cursor-pointer ${
                           editMode
                             ? "bg-fg text-accent-fg font-medium"
                             : "text-fg-subtle hover:text-fg hover:bg-surface-2"
                         }`}
-                        title="Basculer entre l'affichage formaté et l'éditeur de texte brut"
                       >
                         {editMode ? "Aperçu formaté" : "Modifier texte"}
                       </button>
@@ -1752,7 +1815,7 @@ export function ActViewerModal({
                       <button
                         type="button"
                         onClick={handleCopyTranscription}
-                        className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                        className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
                       >
                         {copySuccess ? "Copié !" : "Copier"}
                       </button>
@@ -1771,7 +1834,7 @@ export function ActViewerModal({
 
                   {/* Indicateur de source épinglée */}
                   {pinnedSourceKey && getSourceForField(pinnedSourceKey)?.text && (
-                    <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-amber-400/10 border border-amber-400/30 text-amber-900 dark:text-amber-200 rounded-lg text-xs animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-400/10 border border-amber-400/30 text-amber-900 dark:text-amber-200 rounded-xl text-xs">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="font-semibold shrink-0">Source ({getFieldLabel(pinnedSourceKey)}) :</span>
                         <span className="italic truncate font-serif">« {getSourceForField(pinnedSourceKey)!.text} »</span>
@@ -1789,11 +1852,11 @@ export function ActViewerModal({
 
                   {editMode ? (
                     <textarea
-                      rows={14}
+                      rows={16}
                       value={transcription}
                       onChange={(e) => setTranscription(e.target.value)}
                       placeholder="La transcription s'affiche ici…"
-                      className="field w-full rounded-lg p-2.5 text-xs font-mono leading-relaxed resize-none flex-1 min-h-[220px]"
+                      className="field w-full rounded-xl p-3 text-xs font-mono leading-relaxed resize-none min-h-[300px]"
                     />
                   ) : (() => {
                     const activeQuote = pinnedSourceKey ? getSourceForField(pinnedSourceKey)?.text?.trim() : undefined;
@@ -1803,7 +1866,7 @@ export function ActViewerModal({
                       const match = transcription.slice(idx, idx + activeQuote.length);
                       const after = transcription.slice(idx + activeQuote.length);
                       return (
-                        <div className="overflow-y-auto max-h-[360px] p-2.5 bg-surface-2/40 rounded-lg border border-border/60 text-xs text-fg leading-relaxed whitespace-pre-wrap font-sans">
+                        <div className="overflow-y-auto max-h-[460px] p-3.5 bg-surface-2/40 rounded-xl border border-border/60 text-xs text-fg leading-relaxed whitespace-pre-wrap font-sans">
                           <span>{before}</span>
                           <mark className="bg-amber-300 dark:bg-amber-500/40 text-amber-950 dark:text-amber-100 px-1 py-0.5 rounded font-semibold ring-2 ring-amber-400 animate-pulse shadow-xs">
                             {match}
@@ -1813,7 +1876,7 @@ export function ActViewerModal({
                       );
                     }
                     return (
-                      <div className="overflow-y-auto max-h-[360px] p-2 bg-surface-2/40 rounded-lg border border-border/60 text-xs text-fg leading-relaxed">
+                      <div className="overflow-y-auto max-h-[460px] p-3.5 bg-surface-2/40 rounded-xl border border-border/60 text-xs text-fg leading-relaxed">
                         <ReactMarkdown
                           components={{
                             h1: ({ ...props }) => (
@@ -1851,206 +1914,350 @@ export function ActViewerModal({
                     );
                   })()}
 
-                  <p className="text-[10px] text-fg-subtle">
+                  <p className="text-[11px] text-fg-subtle">
                     {editMode
-                      ? "Vous éditez le texte source. Cliquez sur « Aperçu formaté » pour revoir le rendu."
-                      : "Cliquez sur « ✎ Modifier texte » pour ajuster des mots ou corriger la transcription."}
+                      ? "Vous éditez le texte source. Vos corrections se répercutent si vous cliquez sur Ré-analyser."
+                      : "Cliquez sur « Modifier texte » pour ajuster des mots ou corriger la transcription."}
                   </p>
+                </div>
+              ) : (
+                /* Onglet 3 : Vue comparative Avant / Après entièrement remodelée */
+                (() => {
+                  if (!slug || (!personId && !unionId)) {
+                    return (
+                      <div className="rounded-2xl border border-border bg-surface-2/30 p-6 text-center text-fg-muted flex flex-col items-center gap-2">
+                        <span className="font-semibold text-fg text-sm">Visionneuse isolée</span>
+                        <p className="max-w-md text-xs">
+                          Ouvrez la visionneuse depuis une personne ou une union pour comparer les données extraites avec la fiche et les injecter directement.
+                        </p>
+                      </div>
+                    );
+                  }
 
-                  {/* Synthèse des données extraites avec vue comparative Avant / Après */}
-                  {slug && (personId || unionId) && (() => {
-                    const isMarriage = actKind === "marriage" || Boolean(unionId);
-                    const allAvailableKeys = isMarriage
-                      ? [
-                          "marriage_date",
-                          "marriage_place",
-                          "name",
-                          "occupation",
-                          "birth_date",
-                          "birth_place",
-                          "father",
-                          "father_occupation",
-                          "father_status",
-                          "father_birth_date",
-                          "father_birth_place",
-                          "mother",
-                          "mother_occupation",
-                          "mother_status",
-                          "mother_birth_date",
-                          "mother_birth_place",
-                          "spouse",
-                          "spouse_occupation",
-                          "spouse_birth_date",
-                          "spouse_birth_place",
-                          "spouse_father",
-                          "spouse_father_status",
-                          "spouse_mother",
-                          "spouse_mother_status",
-                        ]
-                      : [
-                          "date",
-                          "place",
-                          "name",
-                          "occupation",
-                          "birth_date",
-                          "birth_place",
-                          "death_date",
-                          "death_place",
-                          "father",
-                          "father_occupation",
-                          "father_status",
-                          "father_death_date",
-                          "father_death_place",
-                          "father_birth_date",
-                          "father_birth_place",
-                          "mother",
-                          "mother_occupation",
-                          "mother_status",
-                          "mother_death_date",
-                          "mother_death_place",
-                          "mother_birth_date",
-                          "mother_birth_place",
-                          "spouse",
-                          "marriage_date",
-                          "marriage_place",
-                        ];
+                  const isMarriage = actKind === "marriage" || Boolean(unionId);
+                  const allAvailableKeys = isMarriage
+                    ? [
+                        "marriage_date",
+                        "marriage_place",
+                        "name",
+                        "occupation",
+                        "birth_date",
+                        "birth_place",
+                        "father",
+                        "father_occupation",
+                        "father_status",
+                        "father_birth_date",
+                        "father_birth_place",
+                        "mother",
+                        "mother_occupation",
+                        "mother_status",
+                        "mother_birth_date",
+                        "mother_birth_place",
+                        "spouse",
+                        "spouse_occupation",
+                        "spouse_birth_date",
+                        "spouse_birth_place",
+                        "spouse_father",
+                        "spouse_father_status",
+                        "spouse_mother",
+                        "spouse_mother_status",
+                      ]
+                    : [
+                        "date",
+                        "place",
+                        "name",
+                        "occupation",
+                        "birth_date",
+                        "birth_place",
+                        "death_date",
+                        "death_place",
+                        "father",
+                        "father_occupation",
+                        "father_status",
+                        "father_death_date",
+                        "father_death_place",
+                        "father_birth_date",
+                        "father_birth_place",
+                        "mother",
+                        "mother_occupation",
+                        "mother_status",
+                        "mother_death_date",
+                        "mother_death_place",
+                        "mother_birth_date",
+                        "mother_birth_place",
+                        "spouse",
+                        "marriage_date",
+                        "marriage_place",
+                      ];
 
-                    const renderRow = (
-                      key: string,
-                      label: string,
-                      currentVal: string | null | undefined,
-                      proposedVal: string,
-                      onChangeProposed: (v: string) => void,
-                      placeholder?: string
-                    ) => {
-                      const isChecked = selectedFieldKeys.has(key);
-                      const src = getSourceForField(key);
-                      const isDiff = proposedVal.trim() !== (currentVal || "").trim();
-                      const isEmptyProposed = !proposedVal.trim();
-                      const isPinned = pinnedSourceKey === key;
+                  // Helper pour déterminer si un champ textuel apporte une modification
+                  const isTextDiff = (currentVal: string | null | undefined, proposedVal: string) => {
+                    const cur = (currentVal || "").trim();
+                    const prop = proposedVal.trim();
+                    return Boolean(prop && prop !== cur);
+                  };
 
-                      return (
-                        <div
-                          key={key}
-                          className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-2 transition-all ${
-                            isPinned
-                              ? "border-amber-400/80 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
-                              : isChecked
-                              ? "border-border bg-surface shadow-2xs"
-                              : "border-border/40 bg-surface-2/20 opacity-70 hover:opacity-100"
-                          }`}
-                        >
-                          {/* 1. Checkbox & Libellé */}
-                          <div className="flex items-center gap-2 min-w-[155px] shrink-0">
+                  // Calcul du nombre de changements réels détectés
+                  let totalChangesCount = 0;
+                  if (isMarriage) {
+                    if (isTextDiff(currentContext?.union?.date_raw, fieldMarriageDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.place, fieldMarriagePlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1?.displayName || currentContext?.person?.displayName, `${fieldGivenNames} ${fieldSurname}`.trim())) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1?.occupation || currentContext?.person?.occupation, fieldOccupation)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1?.birth_date_raw || currentContext?.person?.birth_date_raw, fieldBirthDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1?.birth_place || currentContext?.person?.birth_place, fieldBirthPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1Father?.displayName || currentContext?.person?.father?.displayName, fieldFather)) totalChangesCount++;
+                    if (isTextDiff(null, fieldFatherOccupation)) totalChangesCount++;
+                    if (Boolean(currentContext?.union?.partner1Father?.is_living === 0 || currentContext?.person?.father?.is_living === 0) !== fatherIsDeceased) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1Father?.birth_date_raw || currentContext?.person?.father?.birth_date_raw, fieldFatherBirthDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1Father?.birth_place || currentContext?.person?.father?.birth_place, fieldFatherBirthPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1Mother?.displayName || currentContext?.person?.mother?.displayName, fieldMother)) totalChangesCount++;
+                    if (isTextDiff(null, fieldMotherOccupation)) totalChangesCount++;
+                    if (Boolean(currentContext?.union?.partner1Mother?.is_living === 0 || currentContext?.person?.mother?.is_living === 0) !== motherIsDeceased) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1Mother?.birth_date_raw || currentContext?.person?.mother?.birth_date_raw, fieldMotherBirthDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner1Mother?.birth_place || currentContext?.person?.mother?.birth_place, fieldMotherBirthPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner2?.displayName, fieldSpouse)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner2?.occupation, fieldSpouseOccupation)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner2?.birth_date_raw, fieldSpouseBirthDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner2?.birth_place, fieldSpouseBirthPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner2Father?.displayName, fieldSpouseFather)) totalChangesCount++;
+                    if (Boolean(currentContext?.union?.partner2Father?.is_living === 0) !== spouseFatherIsDeceased) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner2Mother?.displayName, fieldSpouseMother)) totalChangesCount++;
+                    if (Boolean(currentContext?.union?.partner2Mother?.is_living === 0) !== spouseMotherIsDeceased) totalChangesCount++;
+                  } else {
+                    const evCurDate = actKind === "death" ? currentContext?.person?.death_date_raw : currentContext?.person?.birth_date_raw;
+                    const evCurPlace = actKind === "death" ? currentContext?.person?.death_place : currentContext?.person?.birth_place;
+                    if (isTextDiff(evCurDate, fieldDate)) totalChangesCount++;
+                    if (isTextDiff(evCurPlace, fieldPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.displayName, `${fieldGivenNames} ${fieldSurname}`.trim())) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.occupation, fieldOccupation)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.birth_date_raw, fieldBirthDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.birth_place, fieldBirthPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.death_date_raw, fieldDeathDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.death_place, fieldDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.displayName, fieldFather)) totalChangesCount++;
+                    if (isTextDiff(null, fieldFatherOccupation)) totalChangesCount++;
+                    if (Boolean(currentContext?.person?.father?.is_living === 0) !== fatherIsDeceased) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.birth_date_raw, fieldFatherBirthDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.birth_place, fieldFatherBirthPlace)) totalChangesCount++;
+                    if (isTextDiff(null, fieldFatherDeathDate)) totalChangesCount++;
+                    if (isTextDiff(null, fieldFatherDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.displayName, fieldMother)) totalChangesCount++;
+                    if (isTextDiff(null, fieldMotherOccupation)) totalChangesCount++;
+                    if (Boolean(currentContext?.person?.mother?.is_living === 0) !== motherIsDeceased) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.birth_date_raw, fieldMotherBirthDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.birth_place, fieldMotherBirthPlace)) totalChangesCount++;
+                    if (isTextDiff(null, fieldMotherDeathDate)) totalChangesCount++;
+                    if (isTextDiff(null, fieldMotherDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.partner2?.displayName, fieldSpouse)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.date_raw, fieldMarriageDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.union?.place, fieldMarriagePlace)) totalChangesCount++;
+                  }
+
+                  const renderFieldCard = (
+                    key: string,
+                    label: string,
+                    currentVal: string | null | undefined,
+                    proposedVal: string,
+                    onChangeProposed: (v: string) => void,
+                    placeholder?: string
+                  ) => {
+                    const cur = (currentVal || "").trim();
+                    const prop = proposedVal.trim();
+                    const isEmpty = !prop;
+                    const isNew = Boolean(prop && !cur);
+                    const isModified = Boolean(prop && cur && prop !== cur);
+                    const isSame = Boolean(prop && cur && prop === cur);
+                    const isDiff = isNew || isModified;
+                    const isChecked = selectedFieldKeys.has(key);
+                    const src = getSourceForField(key);
+                    const isPinned = pinnedSourceKey === key;
+
+                    if (filterMode === "changes" && !isDiff && !isChecked && !isPinned) {
+                      return null;
+                    }
+
+                    return (
+                      <div
+                        key={key}
+                        className={`rounded-xl border p-2.5 transition-all flex flex-col gap-2 ${
+                          isPinned
+                            ? "border-amber-400 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
+                            : isChecked
+                            ? "border-border bg-surface shadow-2xs"
+                            : "border-border/40 bg-surface-2/20 opacity-75 hover:opacity-100"
+                        }`}
+                      >
+                        {/* En-tête de la carte */}
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer select-none min-w-0">
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => toggleFieldKey(key)}
-                              disabled={isEmptyProposed}
-                              className="accent-fg rounded size-3.5 cursor-pointer"
+                              disabled={isEmpty}
+                              className="accent-fg rounded size-3.5 cursor-pointer shrink-0"
                             />
-                            <span className="font-medium text-fg text-xs truncate">
+                            <span className="font-semibold text-xs text-fg truncate">
                               {label}
                             </span>
-                          </div>
+                          </label>
 
-                          {/* 2. Actuel (Base de données) */}
-                          <div className="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2/60 border border-border/50 text-fg-muted font-normal text-xs">
-                            <span className="text-[10px] text-fg-subtle shrink-0">Actuel :</span>
-                            <span className="truncate" title={currentVal || "Non renseigné"}>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isNew && (
+                              <span className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                + Nouveau
+                              </span>
+                            )}
+                            {isModified && (
+                              <span className="rounded-md bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                                ✎ Modifié
+                              </span>
+                            )}
+                            {isSame && (
+                              <span className="rounded-md bg-surface-2 border border-border/60 px-1.5 py-0.5 text-[10px] text-fg-subtle">
+                                Identique
+                              </span>
+                            )}
+                            {isEmpty && (
+                              <span className="rounded-md px-1.5 py-0.5 text-[10px] text-fg-subtle italic">
+                                Non détecté
+                              </span>
+                            )}
+
+                            {src && (src.text || src.box) && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSource(key)}
+                                className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-medium transition-colors cursor-pointer ${
+                                  isPinned
+                                    ? "bg-amber-500 text-slate-950 font-semibold shadow-xs ring-1 ring-amber-400"
+                                    : "bg-amber-400/10 text-amber-700 dark:text-amber-300 hover:bg-amber-400/25 border border-amber-400/30"
+                                }`}
+                                title={src.text ? `Extrait : « ${src.text} »` : "Localiser dans l'acte"}
+                              >
+                                <span>{isPinned ? "Épinglé" : "Source"}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Grille comparative : Actuel vs Détecté */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div className="flex flex-col gap-0.5 rounded-lg bg-surface-2/60 border border-border/50 px-2.5 py-1.5 min-w-0">
+                            <span className="text-[10px] text-fg-subtle uppercase tracking-wider font-medium">Actuel dans la fiche</span>
+                            <span className="truncate text-xs font-normal" title={currentVal || "Non renseigné"}>
                               {currentVal ? (
-                                <span className="text-fg font-medium">{currentVal}</span>
+                                <span className="font-medium text-fg">{currentVal}</span>
                               ) : (
                                 <span className="italic text-fg-subtle text-[11px]">— Non renseigné</span>
                               )}
                             </span>
                           </div>
 
-                          <span className="hidden sm:inline text-fg-subtle text-[11px] shrink-0">→</span>
-
-                          {/* 3. Proposé (Extrait de l'acte) */}
-                          <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-[10px] text-fg-subtle uppercase tracking-wider font-medium">Détecté dans l'acte</span>
                             <input
                               type="text"
                               value={proposedVal}
                               onChange={(e) => onChangeProposed(e.target.value)}
                               placeholder={placeholder || "Non détecté"}
                               className={`field w-full text-xs font-medium py-1 px-2.5 ${
-                                isDiff && !isEmptyProposed
-                                  ? "border-ok/40 bg-ok/5 text-fg ring-ok/20 font-semibold"
+                                isDiff && !isEmpty
+                                  ? "border-emerald-500/40 bg-emerald-500/5 text-fg ring-emerald-500/20 font-semibold"
                                   : "text-fg-muted"
                               }`}
                             />
                           </div>
-
-                          {/* 4. Bouton Source interactive */}
-                          {src && (src.text || src.box) && (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleSource(key)}
-                              className={`shrink-0 flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-medium transition-colors cursor-pointer ${
-                                isPinned
-                                  ? "border-amber-500 bg-amber-500 text-slate-950 font-semibold shadow-xs ring-2 ring-amber-400/40"
-                                  : "border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-300 hover:bg-amber-400/25"
-                              }`}
-                              title={src.text ? `Extrait : « ${src.text} » (Cliquer pour cibler)` : "Localiser dans l'acte"}
-                            >
-                              <span>{isPinned ? "Épinglé" : "Source"}</span>
-                            </button>
-                          )}
                         </div>
-                      );
-                    };
+                      </div>
+                    );
+                  };
 
-                    const renderStatusRow = (
-                      key: string,
-                      label: string,
-                      currentDeceased: boolean | undefined,
-                      proposedDeceased: boolean,
-                      onToggleDeceased: (val: boolean) => void
-                    ) => {
-                      const isChecked = selectedFieldKeys.has(key);
-                      const src = getSourceForField(key);
-                      const isPinned = pinnedSourceKey === key;
+                  const renderStatusCard = (
+                    key: string,
+                    label: string,
+                    currentDeceased: boolean | undefined,
+                    proposedDeceased: boolean,
+                    onToggleDeceased: (val: boolean) => void
+                  ) => {
+                    const isDiff = Boolean(currentDeceased !== proposedDeceased);
+                    const isChecked = selectedFieldKeys.has(key);
+                    const src = getSourceForField(key);
+                    const isPinned = pinnedSourceKey === key;
 
-                      return (
-                        <div
-                          key={key}
-                          className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-2 transition-all ${
-                            isPinned
-                              ? "border-amber-400/80 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
-                              : isChecked
-                              ? "border-border bg-surface shadow-2xs"
-                              : "border-border/40 bg-surface-2/20 opacity-70 hover:opacity-100"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-[155px] shrink-0">
+                    if (filterMode === "changes" && !isDiff && !isChecked && !isPinned) {
+                      return null;
+                    }
+
+                    return (
+                      <div
+                        key={key}
+                        className={`rounded-xl border p-2.5 transition-all flex flex-col gap-2 ${
+                          isPinned
+                            ? "border-amber-400 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
+                            : isChecked
+                            ? "border-border bg-surface shadow-2xs"
+                            : "border-border/40 bg-surface-2/20 opacity-75 hover:opacity-100"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer select-none min-w-0">
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => toggleFieldKey(key)}
-                              className="accent-fg rounded size-3.5 cursor-pointer"
+                              className="accent-fg rounded size-3.5 cursor-pointer shrink-0"
                             />
-                            <span className="font-medium text-fg text-xs truncate">
+                            <span className="font-semibold text-xs text-fg truncate">
                               {label}
                             </span>
-                          </div>
+                          </label>
 
-                          <div className="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2/60 border border-border/50 text-fg-muted font-normal text-xs">
-                            <span className="text-[10px] text-fg-subtle shrink-0">Actuel :</span>
-                            <span className="truncate">
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isDiff && (
+                              <span className="rounded-md bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                                ✎ Modifié
+                              </span>
+                            )}
+                            {!isDiff && (
+                              <span className="rounded-md bg-surface-2 border border-border/60 px-1.5 py-0.5 text-[10px] text-fg-subtle">
+                                Identique
+                              </span>
+                            )}
+
+                            {src && (src.text || src.box) && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSource(key)}
+                                className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-medium transition-colors cursor-pointer ${
+                                  isPinned
+                                    ? "bg-amber-500 text-slate-950 font-semibold shadow-xs ring-1 ring-amber-400"
+                                    : "bg-amber-400/10 text-amber-700 dark:text-amber-300 hover:bg-amber-400/25 border border-amber-400/30"
+                                }`}
+                                title={src.text ? `Extrait : « ${src.text} »` : "Localiser dans l'acte"}
+                              >
+                                <span>{isPinned ? "Épinglé" : "Source"}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div className="flex flex-col gap-0.5 rounded-lg bg-surface-2/60 border border-border/50 px-2.5 py-1.5">
+                            <span className="text-[10px] text-fg-subtle uppercase tracking-wider font-medium">Actuel dans la fiche</span>
+                            <span className="text-xs font-medium">
                               {currentDeceased ? (
-                                <span className="text-danger font-medium">Décédé(e)</span>
+                                <span className="text-danger">Décédé(e)</span>
                               ) : (
-                                <span className="text-ok font-medium">Vivant(e) / Non précisé</span>
+                                <span className="text-ok">Vivant(e) / Non précisé</span>
                               )}
                             </span>
                           </div>
 
-                          <span className="hidden sm:inline text-fg-subtle text-[11px] shrink-0">→</span>
-
-                          <div className="flex-1 min-w-0 flex items-center gap-2">
-                            <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                          <div className="flex flex-col gap-0.5 justify-center">
+                            <span className="text-[10px] text-fg-subtle uppercase tracking-wider font-medium">Statut dans l'acte</span>
+                            <label className="flex items-center gap-2 text-xs cursor-pointer select-none py-1">
                               <input
                                 type="checkbox"
                                 checked={proposedDeceased}
@@ -2062,551 +2269,558 @@ export function ActViewerModal({
                               </span>
                             </label>
                           </div>
-
-                          {src && (src.text || src.box) && (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleSource(key)}
-                              className={`shrink-0 flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-medium transition-colors cursor-pointer ${
-                                isPinned
-                                  ? "border-amber-500 bg-amber-500 text-slate-950 font-semibold shadow-xs ring-2 ring-amber-400/40"
-                                  : "border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-300 hover:bg-amber-400/25"
-                              }`}
-                              title={src.text ? `Extrait : « ${src.text} » (Cliquer pour cibler)` : "Localiser dans l'acte"}
-                            >
-                              <span>{isPinned ? "Épinglé" : "Source"}</span>
-                            </button>
-                          )}
                         </div>
-                      );
-                    };
-
-                    return (
-                      <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-border bg-surface-2/40 p-3.5 shadow-xs">
-                        {/* Barre supérieure d'actions */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 pb-3">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-semibold text-fg text-sm">
-                                Comparaison Avant / Après
-                              </h4>
-                              <span className="rounded-full bg-surface px-2 py-0.5 text-[10.5px] font-medium text-fg-muted border border-border">
-                                {selectedFieldKeys.size} validé{selectedFieldKeys.size > 1 ? "s" : ""}
-                              </span>
-                            </div>
-                            <p className="mt-0.5 text-[11px] text-fg-muted">
-                              Sélectionnez les données à injecter dans la généalogie. Cliquez sur Source pour localiser l'écriture.
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => selectAllKeys(allAvailableKeys)}
-                              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                            >
-                              Tout cocher
-                            </button>
-                            <button
-                              type="button"
-                              onClick={deselectAllKeys}
-                              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                            >
-                              Décocher
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleSyncFromTranscription}
-                              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                              title="Ré-analyser la transcription"
-                            >
-                              Ré-analyser
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Listes groupées par profil selon le type d'acte */}
-                        <div className="flex flex-col gap-3.5">
-                          {isMarriage ? (
-                            <>
-                              {/* 1. Mariage (Événement) */}
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
-                                  Événement du mariage
-                                </span>
-                                {renderRow(
-                                  "marriage_date",
-                                  "Date du mariage",
-                                  currentContext?.union?.date_raw,
-                                  fieldMarriageDate,
-                                  setFieldMarriageDate
-                                )}
-                                {renderRow(
-                                  "marriage_place",
-                                  "Lieu du mariage",
-                                  currentContext?.union?.place,
-                                  fieldMarriagePlace,
-                                  setFieldMarriagePlace
-                                )}
-                              </div>
-
-                              {/* 2. Époux (Partenaire 1) */}
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
-                                  Époux (Partenaire 1)
-                                </span>
-                                {renderRow(
-                                  "name",
-                                  "Prénom(s) & Nom",
-                                  currentContext?.union?.partner1?.displayName || currentContext?.person?.displayName,
-                                  `${fieldGivenNames} ${fieldSurname}`.trim(),
-                                  (val) => {
-                                    const p = splitFullName(val);
-                                    setFieldGivenNames(p.given_names);
-                                    setFieldSurname(p.surname);
-                                  }
-                                )}
-                                {renderRow(
-                                  "occupation",
-                                  "Métier époux",
-                                  currentContext?.union?.partner1?.occupation || currentContext?.person?.occupation,
-                                  fieldOccupation,
-                                  setFieldOccupation
-                                )}
-                                {renderRow(
-                                  "birth_date",
-                                  "Date naiss. époux",
-                                  currentContext?.union?.partner1?.birth_date_raw || currentContext?.person?.birth_date_raw,
-                                  fieldBirthDate,
-                                  setFieldBirthDate
-                                )}
-                                {renderRow(
-                                  "birth_place",
-                                  "Lieu naiss. époux",
-                                  currentContext?.union?.partner1?.birth_place || currentContext?.person?.birth_place,
-                                  fieldBirthPlace,
-                                  setFieldBirthPlace
-                                )}
-                              </div>
-
-                              {/* 3. Parents de l'Époux */}
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
-                                  Parents de l'Époux
-                                </span>
-                                {renderRow(
-                                  "father",
-                                  "Père de l'époux",
-                                  currentContext?.union?.partner1Father?.displayName || currentContext?.person?.father?.displayName,
-                                  fieldFather,
-                                  setFieldFather
-                                )}
-                                {fieldFatherOccupation && renderRow(
-                                  "father_occupation",
-                                  "Métier père époux",
-                                  null,
-                                  fieldFatherOccupation,
-                                  setFieldFatherOccupation
-                                )}
-                                {renderStatusRow(
-                                  "father_status",
-                                  "Statut père époux",
-                                  currentContext?.union?.partner1Father?.is_living === 0 || currentContext?.person?.father?.is_living === 0,
-                                  fatherIsDeceased,
-                                  setFatherIsDeceased
-                                )}
-                                {fieldFatherBirthDate && renderRow(
-                                  "father_birth_date",
-                                  "Date naiss. père (déduite)",
-                                  currentContext?.union?.partner1Father?.birth_date_raw || currentContext?.person?.father?.birth_date_raw,
-                                  fieldFatherBirthDate,
-                                  setFieldFatherBirthDate
-                                )}
-                                {fieldFatherBirthPlace && renderRow(
-                                  "father_birth_place",
-                                  "Lieu naiss. père époux",
-                                  currentContext?.union?.partner1Father?.birth_place || currentContext?.person?.father?.birth_place,
-                                  fieldFatherBirthPlace,
-                                  setFieldFatherBirthPlace
-                                )}
-                                {renderRow(
-                                  "mother",
-                                  "Mère de l'époux",
-                                  currentContext?.union?.partner1Mother?.displayName || currentContext?.person?.mother?.displayName,
-                                  fieldMother,
-                                  setFieldMother
-                                )}
-                                {fieldMotherOccupation && renderRow(
-                                  "mother_occupation",
-                                  "Métier mère époux",
-                                  null,
-                                  fieldMotherOccupation,
-                                  setFieldMotherOccupation
-                                )}
-                                {renderStatusRow(
-                                  "mother_status",
-                                  "Statut mère époux",
-                                  currentContext?.union?.partner1Mother?.is_living === 0 || currentContext?.person?.mother?.is_living === 0,
-                                  motherIsDeceased,
-                                  setMotherIsDeceased
-                                )}
-                                {fieldMotherBirthDate && renderRow(
-                                  "mother_birth_date",
-                                  "Date naiss. mère (déduite)",
-                                  currentContext?.union?.partner1Mother?.birth_date_raw || currentContext?.person?.mother?.birth_date_raw,
-                                  fieldMotherBirthDate,
-                                  setFieldMotherBirthDate
-                                )}
-                                {fieldMotherBirthPlace && renderRow(
-                                  "mother_birth_place",
-                                  "Lieu naiss. mère époux",
-                                  currentContext?.union?.partner1Mother?.birth_place || currentContext?.person?.mother?.birth_place,
-                                  fieldMotherBirthPlace,
-                                  setFieldMotherBirthPlace
-                                )}
-                              </div>
-
-                              {/* 4. Épouse (Partenaire 2) */}
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
-                                  Épouse (Partenaire 2)
-                                </span>
-                                {renderRow(
-                                  "spouse",
-                                  "Prénom(s) & Nom",
-                                  currentContext?.union?.partner2?.displayName,
-                                  fieldSpouse,
-                                  setFieldSpouse
-                                )}
-                                {renderRow(
-                                  "spouse_occupation",
-                                  "Métier épouse",
-                                  currentContext?.union?.partner2?.occupation,
-                                  fieldSpouseOccupation,
-                                  setFieldSpouseOccupation
-                                )}
-                                {renderRow(
-                                  "spouse_birth_date",
-                                  "Date naiss. épouse",
-                                  currentContext?.union?.partner2?.birth_date_raw,
-                                  fieldSpouseBirthDate,
-                                  setFieldSpouseBirthDate
-                                )}
-                                {renderRow(
-                                  "spouse_birth_place",
-                                  "Lieu naiss. épouse",
-                                  currentContext?.union?.partner2?.birth_place,
-                                  fieldSpouseBirthPlace,
-                                  setFieldSpouseBirthPlace
-                                )}
-                              </div>
-
-                              {/* 5. Parents de l'Épouse */}
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
-                                  Parents de l'Épouse
-                                </span>
-                                {renderRow(
-                                  "spouse_father",
-                                  "Père de l'épouse",
-                                  currentContext?.union?.partner2Father?.displayName,
-                                  fieldSpouseFather,
-                                  setFieldSpouseFather
-                                )}
-                                {renderStatusRow(
-                                  "spouse_father_status",
-                                  "Statut père épouse",
-                                  currentContext?.union?.partner2Father?.is_living === 0,
-                                  spouseFatherIsDeceased,
-                                  setSpouseFatherIsDeceased
-                                )}
-                                {renderRow(
-                                  "spouse_mother",
-                                  "Mère de l'épouse",
-                                  currentContext?.union?.partner2Mother?.displayName,
-                                  fieldSpouseMother,
-                                  setFieldSpouseMother
-                                )}
-                                {renderStatusRow(
-                                  "spouse_mother_status",
-                                  "Statut mère épouse",
-                                  currentContext?.union?.partner2Mother?.is_living === 0,
-                                  spouseMotherIsDeceased,
-                                  setSpouseMotherIsDeceased
-                                )}
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              {/* 1. Événement / Acte */}
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
-                                  {actKind === "death" ? "Acte de décès" : "Acte de baptême / naissance"}
-                                </span>
-                                {renderRow(
-                                  "date",
-                                  "Date de l'acte",
-                                  actKind === "death" ? currentContext?.person?.death_date_raw : currentContext?.person?.birth_date_raw,
-                                  fieldDate,
-                                  setFieldDate
-                                )}
-                                {renderRow(
-                                  "place",
-                                  "Lieu / Paroisse",
-                                  actKind === "death" ? currentContext?.person?.death_place : currentContext?.person?.birth_place,
-                                  fieldPlace,
-                                  setFieldPlace
-                                )}
-                              </div>
-
-                              {/* 2. Individu concerné */}
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
-                                  Individu concerné
-                                </span>
-                                {renderRow(
-                                  "name",
-                                  "Prénom(s) & Nom",
-                                  currentContext?.person?.displayName,
-                                  `${fieldGivenNames} ${fieldSurname}`.trim(),
-                                  (val) => {
-                                    const p = splitFullName(val);
-                                    setFieldGivenNames(p.given_names);
-                                    setFieldSurname(p.surname);
-                                  }
-                                )}
-                                {renderRow(
-                                  "occupation",
-                                  "Profession / Métier",
-                                  currentContext?.person?.occupation,
-                                  fieldOccupation,
-                                  setFieldOccupation
-                                )}
-                                {(actKind === "death" || fieldBirthDate || fieldBirthPlace) && (
-                                  <>
-                                    {renderRow(
-                                      "birth_date",
-                                      "Date naissance déduite",
-                                      currentContext?.person?.birth_date_raw,
-                                      fieldBirthDate,
-                                      setFieldBirthDate
-                                    )}
-                                    {renderRow(
-                                      "birth_place",
-                                      "Lieu de naissance",
-                                      currentContext?.person?.birth_place,
-                                      fieldBirthPlace,
-                                      setFieldBirthPlace
-                                    )}
-                                  </>
-                                )}
-                                {(actKind === "birth" && (fieldDeathDate || fieldDeathPlace)) && (
-                                  <>
-                                    {renderRow(
-                                      "death_date",
-                                      "Mention décès marginale",
-                                      currentContext?.person?.death_date_raw,
-                                      fieldDeathDate,
-                                      setFieldDeathDate
-                                    )}
-                                    {renderRow(
-                                      "death_place",
-                                      "Lieu de décès marginal",
-                                      currentContext?.person?.death_place,
-                                      fieldDeathPlace,
-                                      setFieldDeathPlace
-                                    )}
-                                  </>
-                                )}
-                              </div>
-
-                              {/* 3. Parents */}
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
-                                  Filiation (Parents)
-                                </span>
-                                {renderRow(
-                                  "father",
-                                  "Père",
-                                  currentContext?.person?.father?.displayName,
-                                  fieldFather,
-                                  setFieldFather
-                                )}
-                                {fieldFatherOccupation && renderRow(
-                                  "father_occupation",
-                                  "Métier du père",
-                                  null,
-                                  fieldFatherOccupation,
-                                  setFieldFatherOccupation
-                                )}
-                                {renderStatusRow(
-                                  "father_status",
-                                  "Statut père",
-                                  currentContext?.person?.father?.is_living === 0,
-                                  fatherIsDeceased,
-                                  setFatherIsDeceased
-                                )}
-                                {fieldFatherBirthDate && renderRow(
-                                  "father_birth_date",
-                                  "Date naiss. père (déduite)",
-                                  currentContext?.person?.father?.birth_date_raw,
-                                  fieldFatherBirthDate,
-                                  setFieldFatherBirthDate
-                                )}
-                                {fieldFatherBirthPlace && renderRow(
-                                  "father_birth_place",
-                                  "Lieu naiss. père",
-                                  currentContext?.person?.father?.birth_place,
-                                  fieldFatherBirthPlace,
-                                  setFieldFatherBirthPlace
-                                )}
-                                {fieldFatherDeathDate && renderRow(
-                                  "father_death_date",
-                                  "Date décès père",
-                                  null,
-                                  fieldFatherDeathDate,
-                                  setFieldFatherDeathDate
-                                )}
-                                {fieldFatherDeathPlace && renderRow(
-                                  "father_death_place",
-                                  "Lieu décès père",
-                                  null,
-                                  fieldFatherDeathPlace,
-                                  setFieldFatherDeathPlace
-                                )}
-
-                                {renderRow(
-                                  "mother",
-                                  "Mère",
-                                  currentContext?.person?.mother?.displayName,
-                                  fieldMother,
-                                  setFieldMother
-                                )}
-                                {fieldMotherOccupation && renderRow(
-                                  "mother_occupation",
-                                  "Métier de la mère",
-                                  null,
-                                  fieldMotherOccupation,
-                                  setFieldMotherOccupation
-                                )}
-                                {renderStatusRow(
-                                  "mother_status",
-                                  "Statut mère",
-                                  currentContext?.person?.mother?.is_living === 0,
-                                  motherIsDeceased,
-                                  setMotherIsDeceased
-                                )}
-                                {fieldMotherBirthDate && renderRow(
-                                  "mother_birth_date",
-                                  "Date naiss. mère (déduite)",
-                                  currentContext?.person?.mother?.birth_date_raw,
-                                  fieldMotherBirthDate,
-                                  setFieldMotherBirthDate
-                                )}
-                                {fieldMotherBirthPlace && renderRow(
-                                  "mother_birth_place",
-                                  "Lieu naiss. mère",
-                                  currentContext?.person?.mother?.birth_place,
-                                  fieldMotherBirthPlace,
-                                  setFieldMotherBirthPlace
-                                )}
-                                {fieldMotherDeathDate && renderRow(
-                                  "mother_death_date",
-                                  "Date décès mère",
-                                  null,
-                                  fieldMotherDeathDate,
-                                  setFieldMotherDeathDate
-                                )}
-                                {fieldMotherDeathPlace && renderRow(
-                                  "mother_death_place",
-                                  "Lieu décès mère",
-                                  null,
-                                  fieldMotherDeathPlace,
-                                  setFieldMotherDeathPlace
-                                )}
-                              </div>
-
-                              {/* 4. Conjoint / Union éventuelle */}
-                              {(fieldSpouse || fieldMarriageDate || fieldMarriagePlace) && (
-                                <div className="flex flex-col gap-1.5">
-                                  <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
-                                    Conjoint / Union mentionnée
-                                  </span>
-                                  {renderRow(
-                                    "spouse",
-                                    "Conjoint(e)",
-                                    currentContext?.union?.partner2?.displayName,
-                                    fieldSpouse,
-                                    setFieldSpouse
-                                  )}
-                                  {fieldMarriageDate && renderRow(
-                                    "marriage_date",
-                                    "Date mariage",
-                                    currentContext?.union?.date_raw,
-                                    fieldMarriageDate,
-                                    setFieldMarriageDate
-                                  )}
-                                  {fieldMarriagePlace && renderRow(
-                                    "marriage_place",
-                                    "Lieu mariage",
-                                    currentContext?.union?.place,
-                                    fieldMarriagePlace,
-                                    setFieldMarriagePlace
-                                  )}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-
-                        {/* Note de transcription intégrale */}
-                        <label className="mt-1 flex items-center gap-2 cursor-pointer text-[11px] text-fg select-none">
-                          <input
-                            type="checkbox"
-                            checked={appendToNotes}
-                            onChange={(e) => setAppendToNotes(e.target.checked)}
-                            className="accent-fg rounded"
-                          />
-                          <span>Conserver également la transcription intégrale dans les notes</span>
-                        </label>
-
-                        {/* Messages de retour */}
-                        {saveSuccessMessage && (
-                          <div className="rounded-xl bg-ok/10 border border-ok/30 p-2.5 text-center text-xs font-medium text-ok animate-in fade-in">
-                            {saveSuccessMessage}
-                          </div>
-                        )}
-                        {saveErrorMessage && (
-                          <div className="rounded-xl bg-danger/10 border border-danger/30 p-2.5 text-center text-xs font-medium text-danger animate-in fade-in">
-                            ⚠️ {saveErrorMessage}
-                          </div>
-                        )}
-
-                        {/* Bouton Enregistrer dans la fiche */}
-                        <button
-                          type="button"
-                          onClick={handleSaveToRecord}
-                          disabled={pendingSave || selectedFieldKeys.size === 0}
-                          className="w-full mt-1 rounded-xl bg-fg py-2.5 px-3 text-xs font-semibold text-accent-fg hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          {pendingSave ? (
-                            <>
-                              <span className="inline-block size-3 rounded-full border-2 border-accent-fg border-t-transparent animate-spin" />
-                              <span>Enregistrement dans la fiche…</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>💾</span>
-                              <span>Valider et enregistrer ({selectedFieldKeys.size} champ{selectedFieldKeys.size > 1 ? "s" : ""})</span>
-                            </>
-                          )}
-                        </button>
                       </div>
                     );
-                  })()}
-                </div>
+                  };
+
+                  const renderSection = (title: string, children: React.ReactNode[]) => {
+                    const validChildren = children.filter(Boolean);
+                    if (validChildren.length === 0) return null;
+
+                    return (
+                      <div key={title} className="rounded-2xl border border-border bg-surface-2/30 p-3.5 flex flex-col gap-2.5 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-border/70 pb-2 px-0.5">
+                          <span className="font-semibold text-fg text-xs uppercase tracking-wider">
+                            {title}
+                          </span>
+                          <span className="text-[10.5px] text-fg-subtle font-medium">
+                            {validChildren.length} champ{validChildren.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-2.5">
+                          {validChildren}
+                        </div>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div className="flex flex-col gap-3.5">
+                      {/* Barre d'outils supérieure de la comparaison */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-border">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-fg text-sm">
+                              Données extraites vs Fiche
+                            </h4>
+                            <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[10.5px] font-medium text-fg border border-border/80">
+                              {totalChangesCount} modification{totalChangesCount > 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-fg-muted">
+                            Vérifiez les données à gauche (actuel) et à droite (proposé) avant d'enregistrer.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Filtre Changements vs Tous */}
+                          <div className="flex items-center rounded-xl border border-border bg-surface-2 p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setFilterMode("changes")}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
+                                filterMode === "changes"
+                                  ? "bg-surface text-fg shadow-2xs font-semibold"
+                                  : "text-fg-muted hover:text-fg"
+                              }`}
+                            >
+                              Changements ({totalChangesCount})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFilterMode("all")}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
+                                filterMode === "all"
+                                  ? "bg-surface text-fg shadow-2xs font-semibold"
+                                  : "text-fg-muted hover:text-fg"
+                              }`}
+                            >
+                              Tous ({allAvailableKeys.length})
+                            </button>
+                          </div>
+
+                          {/* Boutons tout cocher / décocher / ré-analyser */}
+                          <button
+                            type="button"
+                            onClick={() => selectAllKeys(allAvailableKeys)}
+                            className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                          >
+                            Tout cocher
+                          </button>
+                          <button
+                            type="button"
+                            onClick={deselectAllKeys}
+                            className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                          >
+                            Décocher
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSyncFromTranscription}
+                            className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                            title="Ré-analyser la transcription"
+                          >
+                            Ré-analyser
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Message informatif si aucun changement en mode filtre */}
+                      {filterMode === "changes" && totalChangesCount === 0 && (
+                        <div className="rounded-xl border border-border bg-surface-2/40 p-4 text-center text-fg-muted">
+                          <p className="font-semibold text-fg text-xs">Aucune nouvelle modification détectée</p>
+                          <p className="text-[11px] mt-1">
+                            Les informations de l'acte correspondent déjà à la fiche, ou aucune nouvelle donnée n'a été trouvée.
+                            Basculez sur « Tous » pour visualiser ou forcer des valeurs.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Sections structurées en cartes claires */}
+                      {isMarriage ? (
+                        <div className="flex flex-col gap-3">
+                          {/* 1. Événement du mariage */}
+                          {renderSection("Événement du mariage", [
+                            renderFieldCard(
+                              "marriage_date",
+                              "Date du mariage",
+                              currentContext?.union?.date_raw,
+                              fieldMarriageDate,
+                              setFieldMarriageDate
+                            ),
+                            renderFieldCard(
+                              "marriage_place",
+                              "Lieu du mariage",
+                              currentContext?.union?.place,
+                              fieldMarriagePlace,
+                              setFieldMarriagePlace
+                            ),
+                          ])}
+
+                          {/* 2. Époux (Partenaire 1) */}
+                          {renderSection("Époux (Partenaire 1)", [
+                            renderFieldCard(
+                              "name",
+                              "Prénom(s) & Nom époux",
+                              currentContext?.union?.partner1?.displayName || currentContext?.person?.displayName,
+                              `${fieldGivenNames} ${fieldSurname}`.trim(),
+                              (val) => {
+                                const p = splitFullName(val);
+                                setFieldGivenNames(p.given_names);
+                                setFieldSurname(p.surname);
+                              }
+                            ),
+                            renderFieldCard(
+                              "occupation",
+                              "Métier époux",
+                              currentContext?.union?.partner1?.occupation || currentContext?.person?.occupation,
+                              fieldOccupation,
+                              setFieldOccupation
+                            ),
+                            renderFieldCard(
+                              "birth_date",
+                              "Date de naissance époux",
+                              currentContext?.union?.partner1?.birth_date_raw || currentContext?.person?.birth_date_raw,
+                              fieldBirthDate,
+                              setFieldBirthDate
+                            ),
+                            renderFieldCard(
+                              "birth_place",
+                              "Lieu de naissance époux",
+                              currentContext?.union?.partner1?.birth_place || currentContext?.person?.birth_place,
+                              fieldBirthPlace,
+                              setFieldBirthPlace
+                            ),
+                          ])}
+
+                          {/* 3. Parents de l'Époux */}
+                          {renderSection("Parents de l'Époux", [
+                            renderFieldCard(
+                              "father",
+                              "Père de l'époux",
+                              currentContext?.union?.partner1Father?.displayName || currentContext?.person?.father?.displayName,
+                              fieldFather,
+                              setFieldFather
+                            ),
+                            fieldFatherOccupation ? renderFieldCard(
+                              "father_occupation",
+                              "Métier père époux",
+                              null,
+                              fieldFatherOccupation,
+                              setFieldFatherOccupation
+                            ) : null,
+                            renderStatusCard(
+                              "father_status",
+                              "Statut père époux",
+                              currentContext?.union?.partner1Father?.is_living === 0 || currentContext?.person?.father?.is_living === 0,
+                              fatherIsDeceased,
+                              setFatherIsDeceased
+                            ),
+                            fieldFatherBirthDate ? renderFieldCard(
+                              "father_birth_date",
+                              "Date naiss. père (déduite)",
+                              currentContext?.union?.partner1Father?.birth_date_raw || currentContext?.person?.father?.birth_date_raw,
+                              fieldFatherBirthDate,
+                              setFieldFatherBirthDate
+                            ) : null,
+                            fieldFatherBirthPlace ? renderFieldCard(
+                              "father_birth_place",
+                              "Lieu naiss. père époux",
+                              currentContext?.union?.partner1Father?.birth_place || currentContext?.person?.father?.birth_place,
+                              fieldFatherBirthPlace,
+                              setFieldFatherBirthPlace
+                            ) : null,
+                            renderFieldCard(
+                              "mother",
+                              "Mère de l'époux",
+                              currentContext?.union?.partner1Mother?.displayName || currentContext?.person?.mother?.displayName,
+                              fieldMother,
+                              setFieldMother
+                            ),
+                            fieldMotherOccupation ? renderFieldCard(
+                              "mother_occupation",
+                              "Métier mère époux",
+                              null,
+                              fieldMotherOccupation,
+                              setFieldMotherOccupation
+                            ) : null,
+                            renderStatusCard(
+                              "mother_status",
+                              "Statut mère époux",
+                              currentContext?.union?.partner1Mother?.is_living === 0 || currentContext?.person?.mother?.is_living === 0,
+                              motherIsDeceased,
+                              setMotherIsDeceased
+                            ),
+                            fieldMotherBirthDate ? renderFieldCard(
+                              "mother_birth_date",
+                              "Date naiss. mère (déduite)",
+                              currentContext?.union?.partner1Mother?.birth_date_raw || currentContext?.person?.mother?.birth_date_raw,
+                              fieldMotherBirthDate,
+                              setFieldMotherBirthDate
+                            ) : null,
+                            fieldMotherBirthPlace ? renderFieldCard(
+                              "mother_birth_place",
+                              "Lieu naiss. mère époux",
+                              currentContext?.union?.partner1Mother?.birth_place || currentContext?.person?.mother?.birth_place,
+                              fieldMotherBirthPlace,
+                              setFieldMotherBirthPlace
+                            ) : null,
+                          ])}
+
+                          {/* 4. Épouse (Partenaire 2) */}
+                          {renderSection("Épouse (Partenaire 2)", [
+                            renderFieldCard(
+                              "spouse",
+                              "Prénom(s) & Nom épouse",
+                              currentContext?.union?.partner2?.displayName,
+                              fieldSpouse,
+                              setFieldSpouse
+                            ),
+                            renderFieldCard(
+                              "spouse_occupation",
+                              "Métier épouse",
+                              currentContext?.union?.partner2?.occupation,
+                              fieldSpouseOccupation,
+                              setFieldSpouseOccupation
+                            ),
+                            renderFieldCard(
+                              "spouse_birth_date",
+                              "Date de naissance épouse",
+                              currentContext?.union?.partner2?.birth_date_raw,
+                              fieldSpouseBirthDate,
+                              setFieldSpouseBirthDate
+                            ),
+                            renderFieldCard(
+                              "spouse_birth_place",
+                              "Lieu de naissance épouse",
+                              currentContext?.union?.partner2?.birth_place,
+                              fieldSpouseBirthPlace,
+                              setFieldSpouseBirthPlace
+                            ),
+                          ])}
+
+                          {/* 5. Parents de l'Épouse */}
+                          {renderSection("Parents de l'Épouse", [
+                            renderFieldCard(
+                              "spouse_father",
+                              "Père de l'épouse",
+                              currentContext?.union?.partner2Father?.displayName,
+                              fieldSpouseFather,
+                              setFieldSpouseFather
+                            ),
+                            renderStatusCard(
+                              "spouse_father_status",
+                              "Statut père épouse",
+                              currentContext?.union?.partner2Father?.is_living === 0,
+                              spouseFatherIsDeceased,
+                              setSpouseFatherIsDeceased
+                            ),
+                            renderFieldCard(
+                              "spouse_mother",
+                              "Mère de l'épouse",
+                              currentContext?.union?.partner2Mother?.displayName,
+                              fieldSpouseMother,
+                              setFieldSpouseMother
+                            ),
+                            renderStatusCard(
+                              "spouse_mother_status",
+                              "Statut mère épouse",
+                              currentContext?.union?.partner2Mother?.is_living === 0,
+                              spouseMotherIsDeceased,
+                              setSpouseMotherIsDeceased
+                            ),
+                          ])}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          {/* 1. Événement / Acte */}
+                          {renderSection(actKind === "death" ? "Acte de décès" : "Acte de baptême / naissance", [
+                            renderFieldCard(
+                              "date",
+                              "Date de l'acte",
+                              actKind === "death" ? currentContext?.person?.death_date_raw : currentContext?.person?.birth_date_raw,
+                              fieldDate,
+                              setFieldDate
+                            ),
+                            renderFieldCard(
+                              "place",
+                              "Lieu / Paroisse",
+                              actKind === "death" ? currentContext?.person?.death_place : currentContext?.person?.birth_place,
+                              fieldPlace,
+                              setFieldPlace
+                            ),
+                          ])}
+
+                          {/* 2. Individu concerné */}
+                          {renderSection("Individu concerné", [
+                            renderFieldCard(
+                              "name",
+                              "Prénom(s) & Nom",
+                              currentContext?.person?.displayName,
+                              `${fieldGivenNames} ${fieldSurname}`.trim(),
+                              (val) => {
+                                const p = splitFullName(val);
+                                setFieldGivenNames(p.given_names);
+                                setFieldSurname(p.surname);
+                              }
+                            ),
+                            renderFieldCard(
+                              "occupation",
+                              "Profession / Métier",
+                              currentContext?.person?.occupation,
+                              fieldOccupation,
+                              setFieldOccupation
+                            ),
+                            (actKind === "death" || fieldBirthDate) ? renderFieldCard(
+                              "birth_date",
+                              "Date naissance déduite",
+                              currentContext?.person?.birth_date_raw,
+                              fieldBirthDate,
+                              setFieldBirthDate
+                            ) : null,
+                            fieldBirthPlace ? renderFieldCard(
+                              "birth_place",
+                              "Lieu de naissance",
+                              currentContext?.person?.birth_place,
+                              fieldBirthPlace,
+                              setFieldBirthPlace
+                            ) : null,
+                            (actKind === "birth" && (fieldDeathDate || fieldDeathPlace)) ? renderFieldCard(
+                              "death_date",
+                              "Mention décès marginale",
+                              currentContext?.person?.death_date_raw,
+                              fieldDeathDate,
+                              setFieldDeathDate
+                            ) : null,
+                            (actKind === "birth" && fieldDeathPlace) ? renderFieldCard(
+                              "death_place",
+                              "Lieu de décès marginal",
+                              currentContext?.person?.death_place,
+                              fieldDeathPlace,
+                              setFieldDeathPlace
+                            ) : null,
+                          ])}
+
+                          {/* 3. Parents */}
+                          {renderSection("Filiation (Parents)", [
+                            renderFieldCard(
+                              "father",
+                              "Père",
+                              currentContext?.person?.father?.displayName,
+                              fieldFather,
+                              setFieldFather
+                            ),
+                            fieldFatherOccupation ? renderFieldCard(
+                              "father_occupation",
+                              "Métier du père",
+                              null,
+                              fieldFatherOccupation,
+                              setFieldFatherOccupation
+                            ) : null,
+                            renderStatusCard(
+                              "father_status",
+                              "Statut père",
+                              currentContext?.person?.father?.is_living === 0,
+                              fatherIsDeceased,
+                              setFatherIsDeceased
+                            ),
+                            fieldFatherBirthDate ? renderFieldCard(
+                              "father_birth_date",
+                              "Date naiss. père (déduite)",
+                              currentContext?.person?.father?.birth_date_raw,
+                              fieldFatherBirthDate,
+                              setFieldFatherBirthDate
+                            ) : null,
+                            fieldFatherBirthPlace ? renderFieldCard(
+                              "father_birth_place",
+                              "Lieu naiss. père",
+                              currentContext?.person?.father?.birth_place,
+                              fieldFatherBirthPlace,
+                              setFieldFatherBirthPlace
+                            ) : null,
+                            fieldFatherDeathDate ? renderFieldCard(
+                              "father_death_date",
+                              "Date décès père",
+                              null,
+                              fieldFatherDeathDate,
+                              setFieldFatherDeathDate
+                            ) : null,
+                            fieldFatherDeathPlace ? renderFieldCard(
+                              "father_death_place",
+                              "Lieu décès père",
+                              null,
+                              fieldFatherDeathPlace,
+                              setFieldFatherDeathPlace
+                            ) : null,
+                            renderFieldCard(
+                              "mother",
+                              "Mère",
+                              currentContext?.person?.mother?.displayName,
+                              fieldMother,
+                              setFieldMother
+                            ),
+                            fieldMotherOccupation ? renderFieldCard(
+                              "mother_occupation",
+                              "Métier de la mère",
+                              null,
+                              fieldMotherOccupation,
+                              setFieldMotherOccupation
+                            ) : null,
+                            renderStatusCard(
+                              "mother_status",
+                              "Statut mère",
+                              currentContext?.person?.mother?.is_living === 0,
+                              motherIsDeceased,
+                              setMotherIsDeceased
+                            ),
+                            fieldMotherBirthDate ? renderFieldCard(
+                              "mother_birth_date",
+                              "Date naiss. mère (déduite)",
+                              currentContext?.person?.mother?.birth_date_raw,
+                              fieldMotherBirthDate,
+                              setFieldMotherBirthDate
+                            ) : null,
+                            fieldMotherBirthPlace ? renderFieldCard(
+                              "mother_birth_place",
+                              "Lieu naiss. mère",
+                              currentContext?.person?.mother?.birth_place,
+                              fieldMotherBirthPlace,
+                              setFieldMotherBirthPlace
+                            ) : null,
+                            fieldMotherDeathDate ? renderFieldCard(
+                              "mother_death_date",
+                              "Date décès mère",
+                              null,
+                              fieldMotherDeathDate,
+                              setFieldMotherDeathDate
+                            ) : null,
+                            fieldMotherDeathPlace ? renderFieldCard(
+                              "mother_death_place",
+                              "Lieu décès mère",
+                              null,
+                              fieldMotherDeathPlace,
+                              setFieldMotherDeathPlace
+                            ) : null,
+                          ])}
+
+                          {/* 4. Conjoint / Union éventuelle */}
+                          {(fieldSpouse || fieldMarriageDate || fieldMarriagePlace) && (
+                            renderSection("Conjoint / Union mentionnée", [
+                              renderFieldCard(
+                                "spouse",
+                                "Conjoint(e)",
+                                currentContext?.union?.partner2?.displayName,
+                                fieldSpouse,
+                                setFieldSpouse
+                              ),
+                              fieldMarriageDate ? renderFieldCard(
+                                "marriage_date",
+                                "Date mariage",
+                                currentContext?.union?.date_raw,
+                                fieldMarriageDate,
+                                setFieldMarriageDate
+                              ) : null,
+                              fieldMarriagePlace ? renderFieldCard(
+                                "marriage_place",
+                                "Lieu mariage",
+                                currentContext?.union?.place,
+                                fieldMarriagePlace,
+                                setFieldMarriagePlace
+                              ) : null,
+                            ])
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               )}
             </div>
+
+            {/* Pied de panneau fixe (Sticky Footer) pour la validation et l'enregistrement */}
+            {sidebarTab === "compare" && slug && (personId || unionId) && (
+              <div className="border-t border-border bg-surface p-3.5 shrink-0 flex flex-col gap-2.5 shadow-lg z-10">
+                {saveSuccessMessage && (
+                  <div className="rounded-xl bg-ok/10 border border-ok/30 p-2.5 text-center text-xs font-semibold text-ok animate-in fade-in">
+                    {saveSuccessMessage}
+                  </div>
+                )}
+                {saveErrorMessage && (
+                  <div className="rounded-xl bg-danger/10 border border-danger/30 p-2.5 text-center text-xs font-semibold text-danger animate-in fade-in">
+                    ⚠️ {saveErrorMessage}
+                  </div>
+                )}
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-fg select-none">
+                  <input
+                    type="checkbox"
+                    checked={appendToNotes}
+                    onChange={(e) => setAppendToNotes(e.target.checked)}
+                    className="accent-fg rounded size-3.5"
+                  />
+                  <span>Conserver également la transcription intégrale dans les notes</span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleSaveToRecord}
+                  disabled={pendingSave || selectedFieldKeys.size === 0}
+                  className="w-full rounded-xl bg-fg py-2.5 px-3 text-xs font-semibold text-accent-fg hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {pendingSave ? (
+                    <>
+                      <span className="inline-block size-3 rounded-full border-2 border-accent-fg border-t-transparent animate-spin" />
+                      <span>Enregistrement dans la fiche…</span>
+                    </>
+                  ) : (
+                    <span>
+                      Valider et enregistrer {selectedFieldKeys.size > 0 ? `(${selectedFieldKeys.size} champ${selectedFieldKeys.size > 1 ? "s" : ""})` : ""}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
           </aside>
         )}
       </div>
