@@ -142,7 +142,7 @@ export function ActViewerModal({
   // Filtre d'affichage de la comparaison : "changes" = uniquement nouveautés/modifs, "all" = tous les champs
   const [filterMode, setFilterMode] = useState<"changes" | "all">("changes");
 
-  const [appendToNotes, setAppendToNotes] = useState(true);
+  const [appendToNotes, setAppendToNotes] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
 
@@ -372,7 +372,8 @@ export function ActViewerModal({
       newKeys.add("spouse_mother_status");
     }
 
-    setSelectedFieldKeys(newKeys);
+    // De base tout décocher : l'utilisateur sélectionne ce qu'il souhaite ajouter
+    setSelectedFieldKeys(new Set());
     setSidebarTab("compare");
     setFilterMode("changes");
   }, [actKind]);
@@ -590,80 +591,11 @@ export function ActViewerModal({
     [naturalSize, view, rotation],
   );
 
-  // Coordonnées absolues sur l'image entière pour une source donnée
-  const getSourceImageCoords = useCallback((fieldKey: string): { x1: number; y1: number; x2: number; y2: number } | null => {
-    const src = getSourceForField(fieldKey);
-    if (!src) return null;
-
-    if (src.box && naturalSize.width > 0 && naturalSize.height > 0) {
-      const baseW = ocrCropRef ? ocrCropRef.width : naturalSize.width;
-      const baseH = ocrCropRef ? ocrCropRef.height : naturalSize.height;
-      const offsetX = ocrCropRef ? ocrCropRef.x : 0;
-      const offsetY = ocrCropRef ? ocrCropRef.y : 0;
-
-      return {
-        x1: Math.round(offsetX + (src.box.xmin / 1000) * baseW),
-        y1: Math.round(offsetY + (src.box.ymin / 1000) * baseH),
-        x2: Math.round(offsetX + (src.box.xmax / 1000) * baseW),
-        y2: Math.round(offsetY + (src.box.ymax / 1000) * baseH),
-      };
-    }
-
-    // Si pas de box_2d précis mais un crop utilisateur actif
-    if (ocrCropRef && ocrCropRef.width > 0 && ocrCropRef.height > 0) {
-      return {
-        x1: Math.round(ocrCropRef.x),
-        y1: Math.round(ocrCropRef.y),
-        x2: Math.round(ocrCropRef.x + ocrCropRef.width),
-        y2: Math.round(ocrCropRef.y + ocrCropRef.height),
-      };
-    }
-
-    return null;
-  }, [getSourceForField, naturalSize, ocrCropRef]);
-
-  // Centrer et zoomer confortablement sur la source identifiée
-  const centerOnSource = useCallback((fieldKey: string) => {
-    const coords = getSourceImageCoords(fieldKey);
-    if (!coords || !containerRef.current || naturalSize.width <= 0 || naturalSize.height <= 0) return;
-
-    const cw = containerRef.current.clientWidth;
-    const ch = containerRef.current.clientHeight;
-    const boxCenterX = (coords.x1 + coords.x2) / 2;
-    const boxCenterY = (coords.y1 + coords.y2) / 2;
-    let dx = boxCenterX - naturalSize.width / 2;
-    let dy = boxCenterY - naturalSize.height / 2;
-
-    if (rotation !== 0) {
-      const rad = (rotation * Math.PI) / 180;
-      const rx = dx * Math.cos(rad) - dy * Math.sin(rad);
-      const ry = dx * Math.sin(rad) + dy * Math.cos(rad);
-      dx = rx;
-      dy = ry;
-    }
-
-    const boxW = Math.max(Math.abs(coords.x2 - coords.x1), 80);
-    const boxH = Math.max(Math.abs(coords.y2 - coords.y1), 40);
-    const fitScale = Math.min((cw * 0.65) / boxW, (ch * 0.65) / boxH);
-    const targetScale = Math.max(0.35, Math.min(2.5, fitScale));
-
-    setView({
-      scale: targetScale,
-      pan: {
-        x: Math.round(-dx * targetScale),
-        y: Math.round(-dy * targetScale),
-      },
-    });
-  }, [getSourceImageCoords, naturalSize, rotation]);
-
+  // Afficher et mettre en valeur la source dans l'onglet Transcription
   const handleToggleSource = useCallback((fieldKey: string) => {
-    if (pinnedSourceKey === fieldKey) {
-      setPinnedSourceKey(null);
-    } else {
-      setPinnedSourceKey(fieldKey);
-      centerOnSource(fieldKey);
-    }
-  }, [pinnedSourceKey, centerOnSource]);
+    setPinnedSourceKey(fieldKey);
+    setSidebarTab("transcription");
+  }, []);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -714,6 +646,8 @@ export function ActViewerModal({
       setMode("pan");
       setSidebarTab("compare");
       setFilterMode("changes");
+      setSelectedFieldKeys(new Set());
+      setAppendToNotes(false);
     }
   }, [isOpen]);
 
@@ -1198,22 +1132,6 @@ export function ActViewerModal({
     };
   }
 
-  let screenSourceBox: { left: number; top: number; width: number; height: number; isPrecise: boolean } | null = null;
-  if (pinnedSourceKey && naturalSize.width > 0 && naturalSize.height > 0) {
-    const coords = getSourceImageCoords(pinnedSourceKey);
-    if (coords) {
-      const pt1 = imageToScreen(coords.x1, coords.y1);
-      const pt2 = imageToScreen(coords.x2, coords.y2);
-      const src = getSourceForField(pinnedSourceKey);
-      screenSourceBox = {
-        left: Math.min(pt1.x, pt2.x),
-        top: Math.min(pt1.y, pt2.y),
-        width: Math.max(Math.abs(pt2.x - pt1.x), 16),
-        height: Math.max(Math.abs(pt2.y - pt1.y), 16),
-        isPrecise: Boolean(src?.box),
-      };
-    }
-  }
 
   return (
     <div
@@ -1468,63 +1386,6 @@ export function ActViewerModal({
             </div>
           )}
 
-          {/* Boîte de mise en évidence de la source épinglée */}
-          {screenSourceBox && (
-            <div
-              style={{
-                left: screenSourceBox.left,
-                top: screenSourceBox.top,
-                width: screenSourceBox.width,
-                height: screenSourceBox.height,
-              }}
-              className="absolute pointer-events-none border-2 border-amber-400 bg-amber-400/20 shadow-2xl z-20 rounded ring-4 ring-amber-400/35 transition-all duration-200"
-            >
-              <div className="absolute -top-7 left-0 flex items-center gap-1.5 rounded-md bg-amber-500 text-slate-950 font-bold px-2 py-0.5 text-[10.5px] tracking-wide shadow-md uppercase">
-                <span>🔎</span>
-                <span>{screenSourceBox.isPrecise ? "Ligne dans l'acte" : "Zone analysée"}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Bandeau flottant d'inspection de la source */}
-          {pinnedSourceKey && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 max-w-xl w-[92%] sm:w-auto flex items-center gap-2.5 rounded-xl border border-amber-400/60 bg-surface/95 px-3.5 py-2 text-xs shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150">
-              <span className="flex size-2 rounded-full bg-amber-500 animate-ping shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 font-semibold text-fg">
-                  <span className="text-amber-500">Source :</span>
-                  <span className="truncate">{getFieldLabel(pinnedSourceKey)}</span>
-                </div>
-                {getSourceForField(pinnedSourceKey)?.text ? (
-                  <p className="text-[11px] italic text-fg-muted font-serif truncate mt-0.5">
-                    « {getSourceForField(pinnedSourceKey)!.text} »
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-fg-subtle mt-0.5">
-                    Zone ciblée dans l'acte
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <button
-                  type="button"
-                  onClick={() => centerOnSource(pinnedSourceKey)}
-                  className="rounded-lg border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-fg hover:bg-surface-3 transition-colors cursor-pointer"
-                  title="Recentrer et zoomer sur cette écriture"
-                >
-                  Recentrer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPinnedSourceKey(null)}
-                  className="rounded-lg p-1 text-fg-muted hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                  title="Fermer l'inspection de la source"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Barre d'outils flottante de mode (Main vs Sélection) */}
           <div className="absolute bottom-4 left-6 z-10 flex items-center gap-1.5 rounded-full border border-border bg-surface/90 p-1 backdrop-blur-md shadow-md">
@@ -2073,19 +1934,17 @@ export function ActViewerModal({
                     const src = getSourceForField(key);
                     const isPinned = pinnedSourceKey === key;
 
-                    if (filterMode === "changes" && !isDiff && !isChecked && !isPinned) {
+                    if (filterMode === "changes" && !isDiff && !isChecked) {
                       return null;
                     }
 
                     return (
                       <div
                         key={key}
-                        className={`rounded-xl border p-2.5 transition-all flex flex-col gap-2 ${
-                          isPinned
-                            ? "border-amber-400 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
-                            : isChecked
-                            ? "border-border bg-surface shadow-2xs"
-                            : "border-border/40 bg-surface-2/20 opacity-75 hover:opacity-100"
+                        className={`rounded-xl border p-3 transition-all flex flex-col gap-2.5 ${
+                          isChecked
+                            ? "border-border bg-surface shadow-xs"
+                            : "border-border/40 bg-surface-2/20 opacity-80 hover:opacity-100"
                         }`}
                       >
                         {/* En-tête de la carte */}
@@ -2105,39 +1964,24 @@ export function ActViewerModal({
 
                           <div className="flex items-center gap-1.5 shrink-0">
                             {isNew && (
-                              <span className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              <span className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                                 + Nouveau
                               </span>
                             )}
                             {isModified && (
-                              <span className="rounded-md bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                              <span className="rounded-md bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
                                 ✎ Modifié
                               </span>
                             )}
                             {isSame && (
-                              <span className="rounded-md bg-surface-2 border border-border/60 px-1.5 py-0.5 text-[10px] text-fg-subtle">
+                              <span className="rounded-md bg-surface-2 border border-border/60 px-2 py-0.5 text-[10px] text-fg-subtle">
                                 Identique
                               </span>
                             )}
                             {isEmpty && (
-                              <span className="rounded-md px-1.5 py-0.5 text-[10px] text-fg-subtle italic">
+                              <span className="rounded-md px-2 py-0.5 text-[10px] text-fg-subtle italic">
                                 Non détecté
                               </span>
-                            )}
-
-                            {src && (src.text || src.box) && (
-                              <button
-                                type="button"
-                                onClick={() => handleToggleSource(key)}
-                                className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-medium transition-colors cursor-pointer ${
-                                  isPinned
-                                    ? "bg-amber-500 text-slate-950 font-semibold shadow-xs ring-1 ring-amber-400"
-                                    : "bg-amber-400/10 text-amber-700 dark:text-amber-300 hover:bg-amber-400/25 border border-amber-400/30"
-                                }`}
-                                title={src.text ? `Extrait : « ${src.text} »` : "Localiser dans l'acte"}
-                              >
-                                <span>{isPinned ? "Épinglé" : "Source"}</span>
-                              </button>
                             )}
                           </div>
                         </div>
@@ -2170,6 +2014,25 @@ export function ActViewerModal({
                             />
                           </div>
                         </div>
+
+                        {/* Citation textuelle longue dans la transcription */}
+                        {src?.text && (
+                          <div
+                            onClick={() => handleToggleSource(key)}
+                            className="flex items-start gap-2 rounded-lg bg-surface-2/60 hover:bg-surface-2 border border-border/60 px-3 py-2 text-xs transition-colors cursor-pointer group"
+                            title="Cliquer pour afficher dans la transcription intégrale"
+                          >
+                            <span className="font-semibold text-fg-subtle shrink-0 group-hover:text-fg">
+                              Source :
+                            </span>
+                            <span className="italic font-serif leading-relaxed text-fg">
+                              « {src.text} »
+                            </span>
+                            <span className="text-[10px] text-fg-subtle group-hover:text-fg underline shrink-0 ml-auto">
+                              Transcription ↗
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   };
@@ -2184,21 +2047,18 @@ export function ActViewerModal({
                     const isDiff = Boolean(currentDeceased !== proposedDeceased);
                     const isChecked = selectedFieldKeys.has(key);
                     const src = getSourceForField(key);
-                    const isPinned = pinnedSourceKey === key;
 
-                    if (filterMode === "changes" && !isDiff && !isChecked && !isPinned) {
+                    if (filterMode === "changes" && !isDiff && !isChecked) {
                       return null;
                     }
 
                     return (
                       <div
                         key={key}
-                        className={`rounded-xl border p-2.5 transition-all flex flex-col gap-2 ${
-                          isPinned
-                            ? "border-amber-400 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
-                            : isChecked
-                            ? "border-border bg-surface shadow-2xs"
-                            : "border-border/40 bg-surface-2/20 opacity-75 hover:opacity-100"
+                        className={`rounded-xl border p-3 transition-all flex flex-col gap-2.5 ${
+                          isChecked
+                            ? "border-border bg-surface shadow-xs"
+                            : "border-border/40 bg-surface-2/20 opacity-80 hover:opacity-100"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -2216,29 +2076,14 @@ export function ActViewerModal({
 
                           <div className="flex items-center gap-1.5 shrink-0">
                             {isDiff && (
-                              <span className="rounded-md bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                              <span className="rounded-md bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
                                 ✎ Modifié
                               </span>
                             )}
                             {!isDiff && (
-                              <span className="rounded-md bg-surface-2 border border-border/60 px-1.5 py-0.5 text-[10px] text-fg-subtle">
+                              <span className="rounded-md bg-surface-2 border border-border/60 px-2 py-0.5 text-[10px] text-fg-subtle">
                                 Identique
                               </span>
-                            )}
-
-                            {src && (src.text || src.box) && (
-                              <button
-                                type="button"
-                                onClick={() => handleToggleSource(key)}
-                                className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-medium transition-colors cursor-pointer ${
-                                  isPinned
-                                    ? "bg-amber-500 text-slate-950 font-semibold shadow-xs ring-1 ring-amber-400"
-                                    : "bg-amber-400/10 text-amber-700 dark:text-amber-300 hover:bg-amber-400/25 border border-amber-400/30"
-                                }`}
-                                title={src.text ? `Extrait : « ${src.text} »` : "Localiser dans l'acte"}
-                              >
-                                <span>{isPinned ? "Épinglé" : "Source"}</span>
-                              </button>
                             )}
                           </div>
                         </div>
@@ -2270,6 +2115,25 @@ export function ActViewerModal({
                             </label>
                           </div>
                         </div>
+
+                        {/* Citation textuelle longue dans la transcription */}
+                        {src?.text && (
+                          <div
+                            onClick={() => handleToggleSource(key)}
+                            className="flex items-start gap-2 rounded-lg bg-surface-2/60 hover:bg-surface-2 border border-border/60 px-3 py-2 text-xs transition-colors cursor-pointer group"
+                            title="Cliquer pour afficher dans la transcription intégrale"
+                          >
+                            <span className="font-semibold text-fg-subtle shrink-0 group-hover:text-fg">
+                              Source :
+                            </span>
+                            <span className="italic font-serif leading-relaxed text-fg">
+                              « {src.text} »
+                            </span>
+                            <span className="text-[10px] text-fg-subtle group-hover:text-fg underline shrink-0 ml-auto">
+                              Transcription ↗
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   };

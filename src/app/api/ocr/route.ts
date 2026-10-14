@@ -65,10 +65,9 @@ Dès qu'un âge est mentionné :
 1. Renseigne le champ âge correspondant ("age", "father_age", "mother_age", "spouse_age").
 2. Calcule systématiquement l'année de naissance approximative par rapport à l'année de l'acte sous la forme "vers YYYY" (ex: si l'acte est de 1884 et que le père a 34 ans -> father_birth_date_raw: "vers 1850") et place-la dans "father_birth_date_raw", "mother_birth_date_raw", etc.
 
-RÈGLE OBLIGATOIRE SUR LES SOURCES ET COORDONNÉES DANS L'IMAGE :
-Dans le bloc JSON "sources", pour chaque champ extrait (date, place, name, occupation, father, father_birth_date, mother, mother_birth_date, spouse, spouse_father, spouse_mother), fournis systématiquement :
-1. "text" : la citation textuelle exacte de quelques mots telle qu'elle est écrite dans l'acte original (ex: "le quatorze février mil sept cent", "fils de deffunt pierre dupont", "âgé de trente ans").
-2. "box_2d" : les coordonnées de la ligne ou des mots dans l'image sous la forme [ymin, xmin, ymax, xmax] normalisées entre 0 et 1000 (ex: [210, 80, 245, 590]).
+RÈGLE OBLIGATOIRE SUR LES CITATIONS SOURCES (CONTEXTE LONG) :
+Dans le bloc JSON "sources", pour chaque champ extrait (date, place, name, occupation, birth_date, death_date, father, father_birth_date, father_occupation, father_status, mother, mother_birth_date, mother_occupation, mother_status, spouse, spouse_father, spouse_mother, marriage_date, marriage_place) :
+Fournis systématiquement dans "text" une phrase complète ou une proposition longue (15 à 30 mots) tirée directement et fidèlement de la transcription avec son contexte environnant (ex: "a comparu Pierre DUPONT, âgé de trente-quatre ans, profession de cultivateur, demeurant au bourg, lequel nous a présenté un enfant", "fils légitime et naturel de défunt Jean MARTIN en son vivant journalier et de vivante Marie LE GALL sa veuve"). Le contexte doit être suffisamment complet pour comprendre d'où vient l'information sans ambiguïté.
 
 ### Données extraites
 \`\`\`json
@@ -138,14 +137,14 @@ Dans le bloc JSON "sources", pour chaque champ extrait (date, place, name, occup
   "marginal_death_place": "lieu de décès en marge",
 
   "sources": {
-    "date": { "text": "citation exacte de la date", "box_2d": [120, 60, 150, 750] },
-    "place": { "text": "citation exacte du lieu", "box_2d": [155, 120, 185, 480] },
-    "name": { "text": "nom et prénom du sujet dans l'acte", "box_2d": [210, 80, 240, 520] },
-    "father": { "text": "mention exacte du père", "box_2d": [280, 70, 310, 620] },
-    "mother": { "text": "mention exacte de la mère", "box_2d": [320, 70, 350, 620] },
-    "spouse": { "text": "mention exacte du conjoint", "box_2d": [380, 80, 410, 590] },
-    "spouse_father": { "text": "mention du père du conjoint", "box_2d": [440, 70, 470, 620] },
-    "spouse_mother": { "text": "mention de la mère du conjoint", "box_2d": [480, 70, 510, 620] }
+    "date": { "text": "phrase complète contenant la date avec son contexte" },
+    "place": { "text": "phrase complète mentionnant le lieu ou la paroisse" },
+    "name": { "text": "phrase entière nommant le sujet de l'acte" },
+    "father": { "text": "phrase entière citant le père, sa profession et son statut" },
+    "mother": { "text": "phrase entière citant la mère, sa profession et son statut" },
+    "spouse": { "text": "phrase entière citant le conjoint" },
+    "spouse_father": { "text": "phrase entière citant le père du conjoint" },
+    "spouse_mother": { "text": "phrase entière citant la mère du conjoint" }
   }
 }
 \`\`\``;
