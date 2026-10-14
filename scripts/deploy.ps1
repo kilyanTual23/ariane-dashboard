@@ -7,35 +7,42 @@ param(
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Deploiement automatique Ariane -> VPS" -ForegroundColor Cyan
+Write-Host "🚀 Deploiement automatique Ariane -> VPS" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
-# 1. Verifier si des modifications locales non commitees existent
+# 1. Enregistrer les modifications locales si existantes
 $status = git status --porcelain
 if ($status) {
-    Write-Host "[1/3] Enregistrement des modifications locales..." -ForegroundColor Yellow
+    Write-Host "`n[1/4] 📦 Enregistrement des modifications locales..." -ForegroundColor Yellow
     git add .
     $commitMsg = "chore(deploy): auto-deploy " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
     git commit -m $commitMsg
 } else {
-    Write-Host "[1/3] Aucun nouveau commit requis (arbre propre)" -ForegroundColor Green
+    Write-Host "`n[1/4] ✓ Arbre de travail propre" -ForegroundColor Green
 }
 
 # 2. Pousser vers GitHub
-Write-Host "[2/3] Envoi vers GitHub (git push)..." -ForegroundColor Cyan
-git push origin master
+Write-Host "[2/4] 📤 Synchronisation GitHub (origin master)..." -ForegroundColor Cyan
+try {
+    git push origin master
+} catch {
+    Write-Host "⚠️ Attention : push GitHub ignore ou non bloquant." -ForegroundColor Yellow
+}
 
-# 3. Connexion SSH et execution sur le VPS
+# 3. Pousser le code directement sur le VPS par SSH
+Write-Host "[3/4] 🌐 Envoi direct du code vers le VPS..." -ForegroundColor Cyan
+git push vps master
+
+# 4. Compilation et redemarrage sur le VPS
+Write-Host "[4/4] ⚡ Compilation Next.js et redemarrage PM2 sur le serveur..." -ForegroundColor Cyan
 $target = $User + "@" + $HostName
-Write-Host "[3/3] Execution distante sur le VPS ($target)..." -ForegroundColor Cyan
+$remoteCmd = "set -e; cd " + $RemoteDir + "; npm run build; pm2 restart ariane"
 
-$remoteCommands = "set -e; cd " + $RemoteDir + "; git pull origin master; npm run build; pm2 restart ariane; echo 'DEPLOIEMENT_VPS_OK'"
-
-ssh -o BatchMode=yes $target $remoteCommands
+ssh -o BatchMode=yes $target $remoteCmd
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "`nDeploiement VPS termine avec succes !" -ForegroundColor Green
+    Write-Host "`n🎉 Deploiement VPS termine avec succes ! Ariane est en ligne." -ForegroundColor Green
 } else {
-    Write-Host "`nErreur lors de l'execution sur le VPS." -ForegroundColor Red
+    Write-Host "`n❌ Erreur lors de la compilation ou du redemarrage sur le VPS." -ForegroundColor Red
     exit 1
 }
