@@ -15,7 +15,7 @@
     "db:save": "tsx scripts/checkpoint.ts",
     "migrate:turso": "tsx scripts/migrate-to-turso.ts",
     "actes:download": "tsx scripts/download-all-actes.ts",
-    "deploy": "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1"
+    "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",
