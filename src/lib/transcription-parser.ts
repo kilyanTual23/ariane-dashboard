@@ -63,6 +63,7 @@ export interface ExtractedActData {
   father_given_names?: string;
   father_surname?: string;
   father_occupation?: string;
+  father_age?: string;
   father_is_deceased?: boolean;
   father_death_date_raw?: string;
   father_death_place?: string;
@@ -73,6 +74,7 @@ export interface ExtractedActData {
   mother_given_names?: string;
   mother_surname?: string;
   mother_occupation?: string;
+  mother_age?: string;
   mother_is_deceased?: boolean;
   mother_death_date_raw?: string;
   mother_death_place?: string;
@@ -182,6 +184,45 @@ interface ParsedParent {
   birth_place?: string;
 }
 
+const FRENCH_NUMBER_WORDS: Record<string, number> = {
+  un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9,
+  dix: 10, onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15, seize: 16,
+  "dix-sept": 17, "dix-huit": 18, "dix-neuf": 19,
+  vingt: 20, trente: 30, quarante: 40, cinquante: 50, soixante: 60, "soixante-dix": 70,
+  "quatre-vingt": 80, "quatre-vingts": 80, "quatre-vingt-dix": 90, cent: 100,
+};
+
+export function parseFrenchWordsToNumber(input: string): number | null {
+  const clean = input.toLowerCase().trim().replace(/\s+et\s+/g, "-").replace(/\s+/g, "-");
+  if (FRENCH_NUMBER_WORDS[clean] !== undefined) return FRENCH_NUMBER_WORDS[clean];
+
+  const parts = clean.split("-").filter(Boolean);
+  if (parts.length === 2) {
+    const tens = FRENCH_NUMBER_WORDS[parts[0]];
+    const units = FRENCH_NUMBER_WORDS[parts[1]];
+    if (tens !== undefined && units !== undefined) return tens + units;
+  } else if (parts.length === 3 && parts[0] === "quatre" && parts[1].startsWith("vingt")) {
+    const units = FRENCH_NUMBER_WORDS[parts[2]];
+    if (units !== undefined) return 80 + units;
+  }
+  return null;
+}
+
+export function parseFrenchAge(text: string): number | null {
+  const numMatch = text.match(/(?:âgé[e]?|age)\s+de\s+(\d{1,2})\s+ans/i);
+  if (numMatch) {
+    const val = parseInt(numMatch[1], 10);
+    if (!isNaN(val) && val > 0 && val < 120) return val;
+  }
+
+  const wordMatch = text.match(/(?:âgé[e]?|age)\s+de\s+([a-zéèêë\s-]+?)\s+ans/i);
+  if (wordMatch) {
+    const num = parseFrenchWordsToNumber(wordMatch[1]);
+    if (num && num > 0 && num < 120) return num;
+  }
+  return null;
+}
+
 /**
  * Analyse une mention ou ligne relative à un parent pour en extraire
  * les dates, lieux, professions et filiations même en texte libre.
@@ -230,11 +271,10 @@ function parseParentBlock(
     result.birth_date_raw = birthDateMatch[1].trim();
   }
 
-  // 5. Âge & Naissance calculée (ex: "âgé de 50 ans")
-  const ageMatch = text.match(/(?:âgé[e]?|age)\s+de\s+(\d{1,2})\s+ans/i);
-  if (ageMatch && referenceYear && !result.birth_date_raw) {
-    const age = parseInt(ageMatch[1], 10);
-    if (!isNaN(age) && age > 0) {
+  // 5. Âge & Naissance calculée (ex: "âgé de 34 ans", "âgé de trente-deux ans")
+  if (referenceYear && !result.birth_date_raw) {
+    const age = parseFrenchAge(text);
+    if (age && age > 0) {
       result.birth_date_raw = `vers ${referenceYear - age}`;
     }
   }
@@ -597,6 +637,39 @@ export function parseTranscription(text: string): ExtractedActData {
       if (!data.mother_death_place && parsedM.death_place) data.mother_death_place = parsedM.death_place;
       if (!data.mother_birth_date_raw && parsedM.birth_date_raw) data.mother_birth_date_raw = parsedM.birth_date_raw;
       if (!data.mother_birth_place && parsedM.birth_place) data.mother_birth_place = parsedM.birth_place;
+    }
+  }
+
+  // Déduction de l'année de naissance approximative des parents à partir de leur âge
+  if (refYear) {
+    if (!data.father_birth_date_raw) {
+      if (data.father_age) {
+        const a = parseFrenchAge(`âgé de ${data.father_age}`);
+        if (a) data.father_birth_date_raw = `vers ${refYear - a}`;
+      } else {
+        const fatherAgeMatch =
+          clean.match(/(?:père|déclarant|comparant)[^,.;()]*?âgé\s+de\s+([a-zéèêë\d\s-]+?)\s+ans/i) ||
+          clean.match(/âgé\s+de\s+([a-zéèêë\d\s-]+?)\s+ans[^,.;()]*?(?:père|déclarant|comparant)/i);
+        if (fatherAgeMatch) {
+          const a = parseFrenchAge(`âgé de ${fatherAgeMatch[1]} ans`);
+          if (a) data.father_birth_date_raw = `vers ${refYear - a}`;
+        }
+      }
+    }
+
+    if (!data.mother_birth_date_raw) {
+      if (data.mother_age) {
+        const a = parseFrenchAge(`âgée de ${data.mother_age}`);
+        if (a) data.mother_birth_date_raw = `vers ${refYear - a}`;
+      } else {
+        const motherAgeMatch =
+          clean.match(/(?:mère|épouse|conjointe)[^,.;()]*?âgée\s+de\s+([a-zéèêë\d\s-]+?)\s+ans/i) ||
+          clean.match(/âgée\s+de\s+([a-zéèêë\d\s-]+?)\s+ans[^,.;()]*?(?:mère|épouse|conjointe)/i);
+        if (motherAgeMatch) {
+          const a = parseFrenchAge(`âgée de ${motherAgeMatch[1]} ans`);
+          if (a) data.mother_birth_date_raw = `vers ${refYear - a}`;
+        }
+      }
     }
   }
 

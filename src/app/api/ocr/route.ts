@@ -59,9 +59,15 @@ Réponds rigoureusement selon la structure suivante :
 
 RÈGLE ABSOLUE SUR LES NOMS : En généalogie française, les NOMS DE FAMILLE sont TOUJOURS écrits INTÉGRALEMENT EN MAJUSCULES (ex: DUPONT, MARTIN, LE GALL, DE LA HAYE, etc.) tant dans l'analyse que dans tous les champs du bloc JSON.
 
+RÈGLE SUR LES ÂGES ET ANNÉES DE NAISSANCE ESTIMÉES :
+Dans les actes de naissance, mariage ou décès, l'âge des personnes (père, mère, époux, épouse, défunt) est très souvent indiqué (ex: "âgé de trente-quatre ans", "âgée de 28 ans").
+Dès qu'un âge est mentionné :
+1. Renseigne le champ âge correspondant ("age", "father_age", "mother_age", "spouse_age").
+2. Calcule systématiquement l'année de naissance approximative par rapport à l'année de l'acte sous la forme "vers YYYY" (ex: si l'acte est de 1884 et que le père a 34 ans -> father_birth_date_raw: "vers 1850") et place-la dans "father_birth_date_raw", "mother_birth_date_raw", etc.
+
 RÈGLE OBLIGATOIRE SUR LES SOURCES ET COORDONNÉES DANS L'IMAGE :
-Dans le bloc JSON "sources", pour chaque champ extrait (date, place, name, occupation, father, mother, spouse, spouse_father, spouse_mother), fournis systématiquement :
-1. "text" : la citation textuelle exacte de quelques mots telle qu'elle est écrite dans l'acte original (ex: "le quatorze février mil sept cent", "fils de deffunt pierre dupont").
+Dans le bloc JSON "sources", pour chaque champ extrait (date, place, name, occupation, father, father_birth_date, mother, mother_birth_date, spouse, spouse_father, spouse_mother), fournis systématiquement :
+1. "text" : la citation textuelle exacte de quelques mots telle qu'elle est écrite dans l'acte original (ex: "le quatorze février mil sept cent", "fils de deffunt pierre dupont", "âgé de trente ans").
 2. "box_2d" : les coordonnées de la ligne ou des mots dans l'image sous la forme [ymin, xmin, ymax, xmax] normalisées entre 0 et 1000 (ex: [210, 80, 245, 590]).
 
 ### Données extraites
@@ -74,7 +80,7 @@ Dans le bloc JSON "sources", pour chaque champ extrait (date, place, name, occup
   "given_names": "prénom(s) du sujet (ou époux si mariage)",
   "surname": "nom de famille du sujet (ou époux si mariage)",
   "occupation": "métier",
-  "age": "âge si mentionné",
+  "age": "âge si mentionné (ex: 25 ans)",
   "residence": "paroisse ou lieu de résidence",
   "birth_date_raw": "date de naissance si mentionnée ou calculée (ex: vers 1715)",
   "birth_place": "lieu de naissance si mentionné",
@@ -84,6 +90,9 @@ Dans le bloc JSON "sources", pour chaque champ extrait (date, place, name, occup
   "father_given_names": "prénom du père",
   "father_surname": "nom du père",
   "father_occupation": "métier du père",
+  "father_age": "âge du père si mentionné (ex: 34 ans)",
+  "father_birth_date_raw": "date ou année de naissance calculée du père (ex: vers 1850 si l'acte est de 1884 et père 34 ans)",
+  "father_birth_place": "lieu de naissance ou origine du père si mentionné",
   "father_is_deceased": true | false,
   "father_death_date_raw": "date de décès du père si précisée (ex: décédé le 3 mai 1740)",
   "father_death_place": "lieu de décès du père si précisé",
@@ -91,6 +100,9 @@ Dans le bloc JSON "sources", pour chaque champ extrait (date, place, name, occup
   "mother_given_names": "prénom de la mère",
   "mother_surname": "nom de jeune fille de la mère",
   "mother_occupation": "métier de la mère",
+  "mother_age": "âge de la mère si mentionné (ex: 28 ans)",
+  "mother_birth_date_raw": "date ou année de naissance calculée de la mère (ex: vers 1856 si l'acte est de 1884 et mère 28 ans)",
+  "mother_birth_place": "lieu de naissance ou origine de la mère si mentionné",
   "mother_is_deceased": true | false,
   "mother_death_date_raw": "date de décès de la mère si précisée",
   "mother_death_place": "lieu de décès de la mère si précisé",

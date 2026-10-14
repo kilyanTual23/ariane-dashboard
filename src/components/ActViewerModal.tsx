@@ -398,11 +398,19 @@ export function ActViewerModal({
       case "father_death_date":
       case "father_death_place":
         return s["father"] || s["father_name"] || s["groom_father"];
+      case "father_birth_date":
+        return s["father_birth_date"] || s["father_age"] || s["father"];
+      case "father_birth_place":
+        return s["father_birth_place"] || s["father"];
       case "mother":
       case "mother_status":
       case "mother_death_date":
       case "mother_death_place":
         return s["mother"] || s["mother_name"] || s["groom_mother"];
+      case "mother_birth_date":
+        return s["mother_birth_date"] || s["mother_age"] || s["mother"];
+      case "mother_birth_place":
+        return s["mother_birth_place"] || s["mother"];
       case "spouse":
         return s["spouse"] || s["bride"] || s["bride_name"] || s["marginal_marriage_spouse"];
       case "spouse_father":
@@ -431,14 +439,14 @@ export function ActViewerModal({
       case "father_status": return "État du père (vivant/décédé)";
       case "father_death_date": return "Date de décès du père";
       case "father_death_place": return "Lieu de décès du père";
-      case "father_birth_date": return "Date de naissance du père";
+      case "father_birth_date": return "Date naiss. père (déduite)";
       case "father_birth_place": return "Lieu de naissance du père";
       case "mother": return "Mère";
       case "mother_occupation": return "Profession de la mère";
       case "mother_status": return "État de la mère (vivant/décédée)";
       case "mother_death_date": return "Date de décès de la mère";
       case "mother_death_place": return "Lieu de décès de la mère";
-      case "mother_birth_date": return "Date de naissance de la mère";
+      case "mother_birth_date": return "Date naiss. mère (déduite)";
       case "mother_birth_place": return "Lieu de naissance de la mère";
       case "spouse": return "Conjoint(e) / Époux(se)";
       case "spouse_occupation": return "Profession du conjoint";
@@ -1492,11 +1500,10 @@ export function ActViewerModal({
                 <button
                   type="button"
                   onClick={() => centerOnSource(pinnedSourceKey)}
-                  className="rounded-lg border border-border bg-surface-2 px-2 py-1 text-[11px] font-medium text-fg hover:bg-surface-3 transition-colors flex items-center gap-1"
+                  className="rounded-lg border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-fg hover:bg-surface-3 transition-colors cursor-pointer"
                   title="Recentrer et zoomer sur cette écriture"
                 >
-                  <span>🎯</span>
-                  <span className="hidden sm:inline">Recentrer</span>
+                  Recentrer
                 </button>
                 <button
                   type="button"
@@ -1515,13 +1522,12 @@ export function ActViewerModal({
             <button
               type="button"
               onClick={() => setMode("pan")}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors ${
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors cursor-pointer ${
                 mode === "pan"
                   ? "bg-fg text-accent-fg font-medium shadow-xs"
                   : "text-fg-muted hover:text-fg hover:bg-surface-2"
               }`}
             >
-              <span>🖐️</span>
               <span>Déplacer</span>
             </button>
             <button
@@ -1530,20 +1536,19 @@ export function ActViewerModal({
                 setMode("select");
                 if (!ocrOpen) setOcrOpen(true);
               }}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors ${
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors cursor-pointer ${
                 mode === "select"
                   ? "bg-fg text-accent-fg font-medium shadow-xs"
                   : "text-fg-muted hover:text-fg hover:bg-surface-2"
               }`}
             >
-              <span>🔲</span>
               <span>Sélectionner l’acte</span>
             </button>
             {cropBox && cropBox.width > 0 && (
               <button
                 type="button"
                 onClick={() => setCropBox(null)}
-                className="rounded-full px-2.5 py-1.5 text-xs text-fg-subtle hover:text-fg hover:bg-surface-2"
+                className="rounded-full px-2.5 py-1.5 text-xs text-fg-subtle hover:text-fg hover:bg-surface-2 cursor-pointer"
                 title="Effacer la sélection"
               >
                 ✕ Effacer
@@ -1558,8 +1563,7 @@ export function ActViewerModal({
             {/* En-tête du panneau */}
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="flex items-center gap-2">
-                <span className="text-base">📝</span>
-                <h3 className="font-medium text-sm text-fg">Transcription & OCR</h3>
+                <h3 className="font-medium text-sm text-fg">Transcription & Analyse</h3>
               </div>
               <button
                 type="button"
@@ -1599,9 +1603,9 @@ export function ActViewerModal({
                     <button
                       type="button"
                       onClick={() => setMode("select")}
-                      className="self-start rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors"
+                      className="self-start rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
                     >
-                      🔲 Tracer un rectangle sur l’acte
+                      Tracer un rectangle sur l’acte
                     </button>
                   </div>
                 )}
@@ -1628,7 +1632,7 @@ export function ActViewerModal({
                     className="mt-0.5 accent-fg"
                   />
                   <div>
-                    <div className="font-medium text-fg">✨ IA Paléographe (Gemini 3.8 Flash)</div>
+                    <div className="font-medium text-fg">IA Paléographe (Gemini 3.8 Flash)</div>
                     <div className="text-[11px] text-fg-muted font-normal mt-0.5">
                       Transcription experte de l'écriture manuscrite ancienne (XVIe au XXe siècle).
                     </div>
@@ -1650,7 +1654,7 @@ export function ActViewerModal({
                     className="mt-0.5 accent-fg"
                   />
                   <div>
-                    <div className="font-medium text-fg">⚡ Tesseract (Local 100% hors-ligne)</div>
+                    <div className="font-medium text-fg">Tesseract (Local hors-ligne)</div>
                     <div className="text-[11px] text-fg-muted font-normal mt-0.5">
                       Sans clé requise. Efficace pour les imprimés, tables décennales et formulaires.
                     </div>
@@ -1740,7 +1744,7 @@ export function ActViewerModal({
                         }`}
                         title="Basculer entre l'affichage formaté et l'éditeur de texte brut"
                       >
-                        {editMode ? "✓ Aperçu formaté" : "✎ Modifier texte"}
+                        {editMode ? "Aperçu formaté" : "Modifier texte"}
                       </button>
                     </div>
 
@@ -1748,18 +1752,18 @@ export function ActViewerModal({
                       <button
                         type="button"
                         onClick={handleCopyTranscription}
-                        className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg hover:bg-surface-2 transition-colors"
+                        className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg hover:bg-surface-2 transition-colors cursor-pointer"
                       >
-                        {copySuccess ? "✓ Copié !" : "📋 Copier"}
+                        {copySuccess ? "Copié !" : "Copier"}
                       </button>
                       {slug && (personId || unionId) && (
                         <button
                           type="button"
                           onClick={handleSaveToNotes}
                           disabled={pendingSave}
-                          className="rounded-lg bg-fg text-accent-fg px-2.5 py-1 text-[11px] font-medium hover:opacity-90 transition-opacity"
+                          className="rounded-lg bg-fg text-accent-fg px-2.5 py-1 text-[11px] font-medium hover:opacity-90 transition-opacity cursor-pointer"
                         >
-                          {saveSuccess ? "✓ Enregistré !" : "💾 Enregistrer"}
+                          {saveSuccess ? "Enregistré !" : "Enregistrer dans notes"}
                         </button>
                       )}
                     </div>
@@ -1769,7 +1773,7 @@ export function ActViewerModal({
                   {pinnedSourceKey && getSourceForField(pinnedSourceKey)?.text && (
                     <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-amber-400/10 border border-amber-400/30 text-amber-900 dark:text-amber-200 rounded-lg text-xs animate-in fade-in duration-150">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-semibold shrink-0">🔎 Source ({getFieldLabel(pinnedSourceKey)}) :</span>
+                        <span className="font-semibold shrink-0">Source ({getFieldLabel(pinnedSourceKey)}) :</span>
                         <span className="italic truncate font-serif">« {getSourceForField(pinnedSourceKey)!.text} »</span>
                       </div>
                       <button
@@ -1865,9 +1869,15 @@ export function ActViewerModal({
                           "birth_date",
                           "birth_place",
                           "father",
+                          "father_occupation",
                           "father_status",
+                          "father_birth_date",
+                          "father_birth_place",
                           "mother",
+                          "mother_occupation",
                           "mother_status",
+                          "mother_birth_date",
+                          "mother_birth_place",
                           "spouse",
                           "spouse_occupation",
                           "spouse_birth_date",
@@ -1891,11 +1901,15 @@ export function ActViewerModal({
                           "father_status",
                           "father_death_date",
                           "father_death_place",
+                          "father_birth_date",
+                          "father_birth_place",
                           "mother",
                           "mother_occupation",
                           "mother_status",
                           "mother_death_date",
                           "mother_death_place",
+                          "mother_birth_date",
+                          "mother_birth_place",
                           "spouse",
                           "marriage_date",
                           "marriage_place",
@@ -1907,7 +1921,6 @@ export function ActViewerModal({
                       currentVal: string | null | undefined,
                       proposedVal: string,
                       onChangeProposed: (v: string) => void,
-                      icon?: string,
                       placeholder?: string
                     ) => {
                       const isChecked = selectedFieldKeys.has(key);
@@ -1921,14 +1934,14 @@ export function ActViewerModal({
                           key={key}
                           className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-2 transition-all ${
                             isPinned
-                              ? "border-amber-400/70 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
+                              ? "border-amber-400/80 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
                               : isChecked
                               ? "border-border bg-surface shadow-2xs"
                               : "border-border/40 bg-surface-2/20 opacity-70 hover:opacity-100"
                           }`}
                         >
                           {/* 1. Checkbox & Libellé */}
-                          <div className="flex items-center gap-2 min-w-[145px] shrink-0">
+                          <div className="flex items-center gap-2 min-w-[155px] shrink-0">
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -1936,14 +1949,13 @@ export function ActViewerModal({
                               disabled={isEmptyProposed}
                               className="accent-fg rounded size-3.5 cursor-pointer"
                             />
-                            <span className="font-medium text-fg flex items-center gap-1.5 text-xs truncate">
-                              {icon && <span className="opacity-80 text-[13px]">{icon}</span>}
-                              <span>{label}</span>
+                            <span className="font-medium text-fg text-xs truncate">
+                              {label}
                             </span>
                           </div>
 
                           {/* 2. Actuel (Base de données) */}
-                          <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-2/60 border border-border/50 text-fg-muted font-normal text-xs">
+                          <div className="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2/60 border border-border/50 text-fg-muted font-normal text-xs">
                             <span className="text-[10px] text-fg-subtle shrink-0">Actuel :</span>
                             <span className="truncate" title={currentVal || "Non renseigné"}>
                               {currentVal ? (
@@ -1963,7 +1975,7 @@ export function ActViewerModal({
                               value={proposedVal}
                               onChange={(e) => onChangeProposed(e.target.value)}
                               placeholder={placeholder || "Non détecté"}
-                              className={`field w-full text-xs font-medium py-1 px-2 ${
+                              className={`field w-full text-xs font-medium py-1 px-2.5 ${
                                 isDiff && !isEmptyProposed
                                   ? "border-ok/40 bg-ok/5 text-fg ring-ok/20 font-semibold"
                                   : "text-fg-muted"
@@ -1983,8 +1995,7 @@ export function ActViewerModal({
                               }`}
                               title={src.text ? `Extrait : « ${src.text} » (Cliquer pour cibler)` : "Localiser dans l'acte"}
                             >
-                              <span>🔎</span>
-                              <span className="hidden md:inline">{isPinned ? "Épinglé" : "Source"}</span>
+                              <span>{isPinned ? "Épinglé" : "Source"}</span>
                             </button>
                           )}
                         </div>
@@ -1996,8 +2007,7 @@ export function ActViewerModal({
                       label: string,
                       currentDeceased: boolean | undefined,
                       proposedDeceased: boolean,
-                      onToggleDeceased: (val: boolean) => void,
-                      icon?: string
+                      onToggleDeceased: (val: boolean) => void
                     ) => {
                       const isChecked = selectedFieldKeys.has(key);
                       const src = getSourceForField(key);
@@ -2008,30 +2018,29 @@ export function ActViewerModal({
                           key={key}
                           className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-2 transition-all ${
                             isPinned
-                              ? "border-amber-400/70 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
+                              ? "border-amber-400/80 bg-amber-400/5 ring-2 ring-amber-400/25 shadow-xs"
                               : isChecked
                               ? "border-border bg-surface shadow-2xs"
                               : "border-border/40 bg-surface-2/20 opacity-70 hover:opacity-100"
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-[145px] shrink-0">
+                          <div className="flex items-center gap-2 min-w-[155px] shrink-0">
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => toggleFieldKey(key)}
                               className="accent-fg rounded size-3.5 cursor-pointer"
                             />
-                            <span className="font-medium text-fg flex items-center gap-1.5 text-xs truncate">
-                              {icon && <span className="opacity-80 text-[13px]">{icon}</span>}
-                              <span>{label}</span>
+                            <span className="font-medium text-fg text-xs truncate">
+                              {label}
                             </span>
                           </div>
 
-                          <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-2/60 border border-border/50 text-fg-muted font-normal text-xs">
+                          <div className="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2/60 border border-border/50 text-fg-muted font-normal text-xs">
                             <span className="text-[10px] text-fg-subtle shrink-0">Actuel :</span>
                             <span className="truncate">
                               {currentDeceased ? (
-                                <span className="text-danger font-medium">✝ Défunt(e)</span>
+                                <span className="text-danger font-medium">Décédé(e)</span>
                               ) : (
                                 <span className="text-ok font-medium">Vivant(e) / Non précisé</span>
                               )}
@@ -2049,7 +2058,7 @@ export function ActViewerModal({
                                 className="accent-fg rounded"
                               />
                               <span className={proposedDeceased ? "font-semibold text-danger" : "text-fg-muted"}>
-                                {proposedDeceased ? "✝ Feu / Défunt au moment de l'acte" : "Vivant au moment de l'acte"}
+                                {proposedDeceased ? "Décédé(e) au moment de l'acte" : "Vivant(e) au moment de l'acte"}
                               </span>
                             </label>
                           </div>
@@ -2065,8 +2074,7 @@ export function ActViewerModal({
                               }`}
                               title={src.text ? `Extrait : « ${src.text} » (Cliquer pour cibler)` : "Localiser dans l'acte"}
                             >
-                              <span>🔎</span>
-                              <span className="hidden md:inline">{isPinned ? "Épinglé" : "Source"}</span>
+                              <span>{isPinned ? "Épinglé" : "Source"}</span>
                             </button>
                           )}
                         </div>
@@ -2079,7 +2087,6 @@ export function ActViewerModal({
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 pb-3">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-base">⚖️</span>
                               <h4 className="font-semibold text-fg text-sm">
                                 Comparaison Avant / Après
                               </h4>
@@ -2088,7 +2095,7 @@ export function ActViewerModal({
                               </span>
                             </div>
                             <p className="mt-0.5 text-[11px] text-fg-muted">
-                              Cochez les données à enregistrer. Survolez une ligne pour voir sa source dans l'acte.
+                              Sélectionnez les données à injecter dans la généalogie. Cliquez sur Source pour localiser l'écriture.
                             </p>
                           </div>
 
@@ -2096,24 +2103,24 @@ export function ActViewerModal({
                             <button
                               type="button"
                               onClick={() => selectAllKeys(allAvailableKeys)}
-                              className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
                             >
-                              ✓ Tout cocher
+                              Tout cocher
                             </button>
                             <button
                               type="button"
                               onClick={deselectAllKeys}
-                              className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
                             >
-                              ✕ Décocher
+                              Décocher
                             </button>
                             <button
                               type="button"
                               onClick={handleSyncFromTranscription}
-                              className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
+                              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
                               title="Ré-analyser la transcription"
                             >
-                              🔄 Ré-analyser
+                              Ré-analyser
                             </button>
                           </div>
                         </div>
@@ -2124,33 +2131,29 @@ export function ActViewerModal({
                             <>
                               {/* 1. Mariage (Événement) */}
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
-                                  <span>💍</span>
-                                  <span>Événement du mariage</span>
+                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
+                                  Événement du mariage
                                 </span>
                                 {renderRow(
                                   "marriage_date",
                                   "Date du mariage",
                                   currentContext?.union?.date_raw,
                                   fieldMarriageDate,
-                                  setFieldMarriageDate,
-                                  "📅"
+                                  setFieldMarriageDate
                                 )}
                                 {renderRow(
                                   "marriage_place",
                                   "Lieu du mariage",
                                   currentContext?.union?.place,
                                   fieldMarriagePlace,
-                                  setFieldMarriagePlace,
-                                  "📍"
+                                  setFieldMarriagePlace
                                 )}
                               </div>
 
                               {/* 2. Époux (Partenaire 1) */}
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
-                                  <span>🤵</span>
-                                  <span>Époux (Partenaire 1)</span>
+                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
+                                  Époux (Partenaire 1)
                                 </span>
                                 {renderRow(
                                   "name",
@@ -2161,152 +2164,175 @@ export function ActViewerModal({
                                     const p = splitFullName(val);
                                     setFieldGivenNames(p.given_names);
                                     setFieldSurname(p.surname);
-                                  },
-                                  "👤"
+                                  }
                                 )}
                                 {renderRow(
                                   "occupation",
                                   "Métier époux",
                                   currentContext?.union?.partner1?.occupation || currentContext?.person?.occupation,
                                   fieldOccupation,
-                                  setFieldOccupation,
-                                  "💼"
+                                  setFieldOccupation
                                 )}
                                 {renderRow(
                                   "birth_date",
                                   "Date naiss. époux",
                                   currentContext?.union?.partner1?.birth_date_raw || currentContext?.person?.birth_date_raw,
                                   fieldBirthDate,
-                                  setFieldBirthDate,
-                                  "👶"
+                                  setFieldBirthDate
                                 )}
                                 {renderRow(
                                   "birth_place",
                                   "Lieu naiss. époux",
                                   currentContext?.union?.partner1?.birth_place || currentContext?.person?.birth_place,
                                   fieldBirthPlace,
-                                  setFieldBirthPlace,
-                                  "📍"
+                                  setFieldBirthPlace
                                 )}
                               </div>
 
                               {/* 3. Parents de l'Époux */}
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
-                                  <span>👨‍👩‍👦</span>
-                                  <span>Parents de l'Époux</span>
+                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
+                                  Parents de l'Époux
                                 </span>
                                 {renderRow(
                                   "father",
                                   "Père de l'époux",
                                   currentContext?.union?.partner1Father?.displayName || currentContext?.person?.father?.displayName,
                                   fieldFather,
-                                  setFieldFather,
-                                  "👨"
+                                  setFieldFather
+                                )}
+                                {fieldFatherOccupation && renderRow(
+                                  "father_occupation",
+                                  "Métier père époux",
+                                  null,
+                                  fieldFatherOccupation,
+                                  setFieldFatherOccupation
                                 )}
                                 {renderStatusRow(
                                   "father_status",
                                   "Statut père époux",
                                   currentContext?.union?.partner1Father?.is_living === 0 || currentContext?.person?.father?.is_living === 0,
                                   fatherIsDeceased,
-                                  setFatherIsDeceased,
-                                  "✝"
+                                  setFatherIsDeceased
+                                )}
+                                {fieldFatherBirthDate && renderRow(
+                                  "father_birth_date",
+                                  "Date naiss. père (déduite)",
+                                  currentContext?.union?.partner1Father?.birth_date_raw || currentContext?.person?.father?.birth_date_raw,
+                                  fieldFatherBirthDate,
+                                  setFieldFatherBirthDate
+                                )}
+                                {fieldFatherBirthPlace && renderRow(
+                                  "father_birth_place",
+                                  "Lieu naiss. père époux",
+                                  currentContext?.union?.partner1Father?.birth_place || currentContext?.person?.father?.birth_place,
+                                  fieldFatherBirthPlace,
+                                  setFieldFatherBirthPlace
                                 )}
                                 {renderRow(
                                   "mother",
                                   "Mère de l'époux",
                                   currentContext?.union?.partner1Mother?.displayName || currentContext?.person?.mother?.displayName,
                                   fieldMother,
-                                  setFieldMother,
-                                  "👩"
+                                  setFieldMother
+                                )}
+                                {fieldMotherOccupation && renderRow(
+                                  "mother_occupation",
+                                  "Métier mère époux",
+                                  null,
+                                  fieldMotherOccupation,
+                                  setFieldMotherOccupation
                                 )}
                                 {renderStatusRow(
                                   "mother_status",
                                   "Statut mère époux",
                                   currentContext?.union?.partner1Mother?.is_living === 0 || currentContext?.person?.mother?.is_living === 0,
                                   motherIsDeceased,
-                                  setMotherIsDeceased,
-                                  "✝"
+                                  setMotherIsDeceased
+                                )}
+                                {fieldMotherBirthDate && renderRow(
+                                  "mother_birth_date",
+                                  "Date naiss. mère (déduite)",
+                                  currentContext?.union?.partner1Mother?.birth_date_raw || currentContext?.person?.mother?.birth_date_raw,
+                                  fieldMotherBirthDate,
+                                  setFieldMotherBirthDate
+                                )}
+                                {fieldMotherBirthPlace && renderRow(
+                                  "mother_birth_place",
+                                  "Lieu naiss. mère époux",
+                                  currentContext?.union?.partner1Mother?.birth_place || currentContext?.person?.mother?.birth_place,
+                                  fieldMotherBirthPlace,
+                                  setFieldMotherBirthPlace
                                 )}
                               </div>
 
                               {/* 4. Épouse (Partenaire 2) */}
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
-                                  <span>👰</span>
-                                  <span>Épouse (Partenaire 2)</span>
+                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
+                                  Épouse (Partenaire 2)
                                 </span>
                                 {renderRow(
                                   "spouse",
                                   "Prénom(s) & Nom",
                                   currentContext?.union?.partner2?.displayName,
                                   fieldSpouse,
-                                  setFieldSpouse,
-                                  "👤"
+                                  setFieldSpouse
                                 )}
                                 {renderRow(
                                   "spouse_occupation",
                                   "Métier épouse",
                                   currentContext?.union?.partner2?.occupation,
                                   fieldSpouseOccupation,
-                                  setFieldSpouseOccupation,
-                                  "💼"
+                                  setFieldSpouseOccupation
                                 )}
                                 {renderRow(
                                   "spouse_birth_date",
                                   "Date naiss. épouse",
                                   currentContext?.union?.partner2?.birth_date_raw,
                                   fieldSpouseBirthDate,
-                                  setFieldSpouseBirthDate,
-                                  "👶"
+                                  setFieldSpouseBirthDate
                                 )}
                                 {renderRow(
                                   "spouse_birth_place",
                                   "Lieu naiss. épouse",
                                   currentContext?.union?.partner2?.birth_place,
                                   fieldSpouseBirthPlace,
-                                  setFieldSpouseBirthPlace,
-                                  "📍"
+                                  setFieldSpouseBirthPlace
                                 )}
                               </div>
 
                               {/* 5. Parents de l'Épouse */}
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
-                                  <span>👨‍👩‍👧</span>
-                                  <span>Parents de l'Épouse</span>
+                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
+                                  Parents de l'Épouse
                                 </span>
                                 {renderRow(
                                   "spouse_father",
                                   "Père de l'épouse",
                                   currentContext?.union?.partner2Father?.displayName,
                                   fieldSpouseFather,
-                                  setFieldSpouseFather,
-                                  "👨"
+                                  setFieldSpouseFather
                                 )}
                                 {renderStatusRow(
                                   "spouse_father_status",
                                   "Statut père épouse",
                                   currentContext?.union?.partner2Father?.is_living === 0,
                                   spouseFatherIsDeceased,
-                                  setSpouseFatherIsDeceased,
-                                  "✝"
+                                  setSpouseFatherIsDeceased
                                 )}
                                 {renderRow(
                                   "spouse_mother",
                                   "Mère de l'épouse",
                                   currentContext?.union?.partner2Mother?.displayName,
                                   fieldSpouseMother,
-                                  setFieldSpouseMother,
-                                  "👩"
+                                  setFieldSpouseMother
                                 )}
                                 {renderStatusRow(
                                   "spouse_mother_status",
                                   "Statut mère épouse",
                                   currentContext?.union?.partner2Mother?.is_living === 0,
                                   spouseMotherIsDeceased,
-                                  setSpouseMotherIsDeceased,
-                                  "✝"
+                                  setSpouseMotherIsDeceased
                                 )}
                               </div>
                             </>
@@ -2314,35 +2340,29 @@ export function ActViewerModal({
                             <>
                               {/* 1. Événement / Acte */}
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
-                                  <span>📜</span>
-                                  <span>
-                                    {actKind === "death" ? "Acte de décès" : "Acte de baptême / naissance"}
-                                  </span>
+                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
+                                  {actKind === "death" ? "Acte de décès" : "Acte de baptême / naissance"}
                                 </span>
                                 {renderRow(
                                   "date",
                                   "Date de l'acte",
                                   actKind === "death" ? currentContext?.person?.death_date_raw : currentContext?.person?.birth_date_raw,
                                   fieldDate,
-                                  setFieldDate,
-                                  "📅"
+                                  setFieldDate
                                 )}
                                 {renderRow(
                                   "place",
                                   "Lieu / Paroisse",
                                   actKind === "death" ? currentContext?.person?.death_place : currentContext?.person?.birth_place,
                                   fieldPlace,
-                                  setFieldPlace,
-                                  "📍"
+                                  setFieldPlace
                                 )}
                               </div>
 
                               {/* 2. Individu concerné */}
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
-                                  <span>👤</span>
-                                  <span>Individu concerné</span>
+                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
+                                  Individu concerné
                                 </span>
                                 {renderRow(
                                   "name",
@@ -2353,16 +2373,14 @@ export function ActViewerModal({
                                     const p = splitFullName(val);
                                     setFieldGivenNames(p.given_names);
                                     setFieldSurname(p.surname);
-                                  },
-                                  "👤"
+                                  }
                                 )}
                                 {renderRow(
                                   "occupation",
                                   "Profession / Métier",
                                   currentContext?.person?.occupation,
                                   fieldOccupation,
-                                  setFieldOccupation,
-                                  "💼"
+                                  setFieldOccupation
                                 )}
                                 {(actKind === "death" || fieldBirthDate || fieldBirthPlace) && (
                                   <>
@@ -2371,16 +2389,14 @@ export function ActViewerModal({
                                       "Date naissance déduite",
                                       currentContext?.person?.birth_date_raw,
                                       fieldBirthDate,
-                                      setFieldBirthDate,
-                                      "👶"
+                                      setFieldBirthDate
                                     )}
                                     {renderRow(
                                       "birth_place",
                                       "Lieu de naissance",
                                       currentContext?.person?.birth_place,
                                       fieldBirthPlace,
-                                      setFieldBirthPlace,
-                                      "📍"
+                                      setFieldBirthPlace
                                     )}
                                   </>
                                 )}
@@ -2391,16 +2407,14 @@ export function ActViewerModal({
                                       "Mention décès marginale",
                                       currentContext?.person?.death_date_raw,
                                       fieldDeathDate,
-                                      setFieldDeathDate,
-                                      "✝"
+                                      setFieldDeathDate
                                     )}
                                     {renderRow(
                                       "death_place",
                                       "Lieu de décès marginal",
                                       currentContext?.person?.death_place,
                                       fieldDeathPlace,
-                                      setFieldDeathPlace,
-                                      "📍"
+                                      setFieldDeathPlace
                                     )}
                                   </>
                                 )}
@@ -2408,106 +2422,136 @@ export function ActViewerModal({
 
                               {/* 3. Parents */}
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
-                                  <span>👨‍👩‍👦</span>
-                                  <span>Filiation (Parents)</span>
+                                <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
+                                  Filiation (Parents)
                                 </span>
                                 {renderRow(
                                   "father",
                                   "Père",
                                   currentContext?.person?.father?.displayName,
                                   fieldFather,
-                                  setFieldFather,
-                                  "👨"
+                                  setFieldFather
                                 )}
                                 {fieldFatherOccupation && renderRow(
                                   "father_occupation",
                                   "Métier du père",
                                   null,
                                   fieldFatherOccupation,
-                                  setFieldFatherOccupation,
-                                  "💼"
+                                  setFieldFatherOccupation
                                 )}
                                 {renderStatusRow(
                                   "father_status",
                                   "Statut père",
                                   currentContext?.person?.father?.is_living === 0,
                                   fatherIsDeceased,
-                                  setFatherIsDeceased,
-                                  "✝"
+                                  setFatherIsDeceased
+                                )}
+                                {fieldFatherBirthDate && renderRow(
+                                  "father_birth_date",
+                                  "Date naiss. père (déduite)",
+                                  currentContext?.person?.father?.birth_date_raw,
+                                  fieldFatherBirthDate,
+                                  setFieldFatherBirthDate
+                                )}
+                                {fieldFatherBirthPlace && renderRow(
+                                  "father_birth_place",
+                                  "Lieu naiss. père",
+                                  currentContext?.person?.father?.birth_place,
+                                  fieldFatherBirthPlace,
+                                  setFieldFatherBirthPlace
                                 )}
                                 {fieldFatherDeathDate && renderRow(
                                   "father_death_date",
                                   "Date décès père",
                                   null,
                                   fieldFatherDeathDate,
-                                  setFieldFatherDeathDate,
-                                  "📅"
+                                  setFieldFatherDeathDate
                                 )}
+                                {fieldFatherDeathPlace && renderRow(
+                                  "father_death_place",
+                                  "Lieu décès père",
+                                  null,
+                                  fieldFatherDeathPlace,
+                                  setFieldFatherDeathPlace
+                                )}
+
                                 {renderRow(
                                   "mother",
                                   "Mère",
                                   currentContext?.person?.mother?.displayName,
                                   fieldMother,
-                                  setFieldMother,
-                                  "👩"
+                                  setFieldMother
                                 )}
                                 {fieldMotherOccupation && renderRow(
                                   "mother_occupation",
                                   "Métier de la mère",
                                   null,
                                   fieldMotherOccupation,
-                                  setFieldMotherOccupation,
-                                  "💼"
+                                  setFieldMotherOccupation
                                 )}
                                 {renderStatusRow(
                                   "mother_status",
                                   "Statut mère",
                                   currentContext?.person?.mother?.is_living === 0,
                                   motherIsDeceased,
-                                  setMotherIsDeceased,
-                                  "✝"
+                                  setMotherIsDeceased
+                                )}
+                                {fieldMotherBirthDate && renderRow(
+                                  "mother_birth_date",
+                                  "Date naiss. mère (déduite)",
+                                  currentContext?.person?.mother?.birth_date_raw,
+                                  fieldMotherBirthDate,
+                                  setFieldMotherBirthDate
+                                )}
+                                {fieldMotherBirthPlace && renderRow(
+                                  "mother_birth_place",
+                                  "Lieu naiss. mère",
+                                  currentContext?.person?.mother?.birth_place,
+                                  fieldMotherBirthPlace,
+                                  setFieldMotherBirthPlace
                                 )}
                                 {fieldMotherDeathDate && renderRow(
                                   "mother_death_date",
                                   "Date décès mère",
                                   null,
                                   fieldMotherDeathDate,
-                                  setFieldMotherDeathDate,
-                                  "📅"
+                                  setFieldMotherDeathDate
+                                )}
+                                {fieldMotherDeathPlace && renderRow(
+                                  "mother_death_place",
+                                  "Lieu décès mère",
+                                  null,
+                                  fieldMotherDeathPlace,
+                                  setFieldMotherDeathPlace
                                 )}
                               </div>
 
                               {/* 4. Conjoint / Union éventuelle */}
                               {(fieldSpouse || fieldMarriageDate || fieldMarriagePlace) && (
                                 <div className="flex flex-col gap-1.5">
-                                  <span className="text-[11.5px] font-semibold text-fg flex items-center gap-1.5 px-0.5">
-                                    <span>💍</span>
-                                    <span>Conjoint / Union mentionnée</span>
+                                  <span className="text-[10.5px] font-semibold text-fg-muted uppercase tracking-wider px-0.5">
+                                    Conjoint / Union mentionnée
                                   </span>
                                   {renderRow(
                                     "spouse",
                                     "Conjoint(e)",
                                     currentContext?.union?.partner2?.displayName,
                                     fieldSpouse,
-                                    setFieldSpouse,
-                                    "💍"
+                                    setFieldSpouse
                                   )}
                                   {fieldMarriageDate && renderRow(
                                     "marriage_date",
                                     "Date mariage",
                                     currentContext?.union?.date_raw,
                                     fieldMarriageDate,
-                                    setFieldMarriageDate,
-                                    "📅"
+                                    setFieldMarriageDate
                                   )}
                                   {fieldMarriagePlace && renderRow(
                                     "marriage_place",
                                     "Lieu mariage",
                                     currentContext?.union?.place,
                                     fieldMarriagePlace,
-                                    setFieldMarriagePlace,
-                                    "📍"
+                                    setFieldMarriagePlace
                                   )}
                                 </div>
                               )}

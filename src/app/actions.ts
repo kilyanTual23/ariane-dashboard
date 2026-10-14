@@ -828,8 +828,8 @@ export interface ActViewerContextData {
     birth_place: string | null;
     death_date_raw: string | null;
     death_place: string | null;
-    father?: { id: number; displayName: string; is_living: number } | null;
-    mother?: { id: number; displayName: string; is_living: number } | null;
+    father?: { id: number; displayName: string; is_living: number; birth_date_raw?: string | null; birth_place?: string | null } | null;
+    mother?: { id: number; displayName: string; is_living: number; birth_date_raw?: string | null; birth_place?: string | null } | null;
   } | null;
   union?: {
     id: number;
@@ -837,10 +837,10 @@ export interface ActViewerContextData {
     place: string | null;
     partner1?: { id: number; displayName: string; occupation: string | null; birth_date_raw: string | null; birth_place: string | null } | null;
     partner2?: { id: number; displayName: string; occupation: string | null; birth_date_raw: string | null; birth_place: string | null } | null;
-    partner1Father?: { id: number; displayName: string; is_living: number } | null;
-    partner1Mother?: { id: number; displayName: string; is_living: number } | null;
-    partner2Father?: { id: number; displayName: string; is_living: number } | null;
-    partner2Mother?: { id: number; displayName: string; is_living: number } | null;
+    partner1Father?: { id: number; displayName: string; is_living: number; birth_date_raw?: string | null; birth_place?: string | null } | null;
+    partner1Mother?: { id: number; displayName: string; is_living: number; birth_date_raw?: string | null; birth_place?: string | null } | null;
+    partner2Father?: { id: number; displayName: string; is_living: number; birth_date_raw?: string | null; birth_place?: string | null } | null;
+    partner2Mother?: { id: number; displayName: string; is_living: number; birth_date_raw?: string | null; birth_place?: string | null } | null;
   } | null;
 }
 
@@ -857,8 +857,10 @@ export async function getActViewerContextAction(
     if (profileId) {
       const p = await q.getPerson(profileId, personId);
       if (p) {
-        const father = p.parents.find((parent) => parent.sex === "M");
-        const mother = p.parents.find((parent) => parent.sex === "F");
+        const fatherRef = p.parents.find((parent) => parent.sex === "M");
+        const motherRef = p.parents.find((parent) => parent.sex === "F");
+        const father = fatherRef ? await q.getPerson(profileId, fatherRef.id) : null;
+        const mother = motherRef ? await q.getPerson(profileId, motherRef.id) : null;
         result.person = {
           id: p.id,
           displayName: p.displayName,
@@ -870,8 +872,8 @@ export async function getActViewerContextAction(
           birth_place: p.birth_place,
           death_date_raw: p.death_date_raw,
           death_place: p.death_place,
-          father: father ? { id: father.id, displayName: father.displayName, is_living: 1 } : null,
-          mother: mother ? { id: mother.id, displayName: mother.displayName, is_living: 1 } : null,
+          father: father ? { id: father.id, displayName: father.displayName, is_living: father.is_living, birth_date_raw: father.birth_date_raw, birth_place: father.birth_place } : null,
+          mother: mother ? { id: mother.id, displayName: mother.displayName, is_living: mother.is_living, birth_date_raw: mother.birth_date_raw, birth_place: mother.birth_place } : null,
         };
       }
     }
@@ -886,10 +888,15 @@ export async function getActViewerContextAction(
       const profileId = u.profile_id;
       let p1 = u.partner1_id ? await q.getPerson(profileId, u.partner1_id) : null;
       let p2 = u.partner2_id ? await q.getPerson(profileId, u.partner2_id) : null;
-      const p1Father = p1?.parents.find((parent) => parent.sex === "M");
-      const p1Mother = p1?.parents.find((parent) => parent.sex === "F");
-      const p2Father = p2?.parents.find((parent) => parent.sex === "M");
-      const p2Mother = p2?.parents.find((parent) => parent.sex === "F");
+      const p1FatherRef = p1?.parents.find((parent) => parent.sex === "M");
+      const p1MotherRef = p1?.parents.find((parent) => parent.sex === "F");
+      const p2FatherRef = p2?.parents.find((parent) => parent.sex === "M");
+      const p2MotherRef = p2?.parents.find((parent) => parent.sex === "F");
+
+      const p1Father = p1FatherRef ? await q.getPerson(profileId, p1FatherRef.id) : null;
+      const p1Mother = p1MotherRef ? await q.getPerson(profileId, p1MotherRef.id) : null;
+      const p2Father = p2FatherRef ? await q.getPerson(profileId, p2FatherRef.id) : null;
+      const p2Mother = p2MotherRef ? await q.getPerson(profileId, p2MotherRef.id) : null;
 
       result.union = {
         id: u.id,
@@ -897,10 +904,10 @@ export async function getActViewerContextAction(
         place: u.place,
         partner1: p1 ? { id: p1.id, displayName: p1.displayName, occupation: p1.occupation, birth_date_raw: p1.birth_date_raw, birth_place: p1.birth_place } : null,
         partner2: p2 ? { id: p2.id, displayName: p2.displayName, occupation: p2.occupation, birth_date_raw: p2.birth_date_raw, birth_place: p2.birth_place } : null,
-        partner1Father: p1Father ? { id: p1Father.id, displayName: p1Father.displayName, is_living: 1 } : null,
-        partner1Mother: p1Mother ? { id: p1Mother.id, displayName: p1Mother.displayName, is_living: 1 } : null,
-        partner2Father: p2Father ? { id: p2Father.id, displayName: p2Father.displayName, is_living: 1 } : null,
-        partner2Mother: p2Mother ? { id: p2Mother.id, displayName: p2Mother.displayName, is_living: 1 } : null,
+        partner1Father: p1Father ? { id: p1Father.id, displayName: p1Father.displayName, is_living: p1Father.is_living, birth_date_raw: p1Father.birth_date_raw, birth_place: p1Father.birth_place } : null,
+        partner1Mother: p1Mother ? { id: p1Mother.id, displayName: p1Mother.displayName, is_living: p1Mother.is_living, birth_date_raw: p1Mother.birth_date_raw, birth_place: p1Mother.birth_place } : null,
+        partner2Father: p2Father ? { id: p2Father.id, displayName: p2Father.displayName, is_living: p2Father.is_living, birth_date_raw: p2Father.birth_date_raw, birth_place: p2Father.birth_place } : null,
+        partner2Mother: p2Mother ? { id: p2Mother.id, displayName: p2Mother.displayName, is_living: p2Mother.is_living, birth_date_raw: p2Mother.birth_date_raw, birth_place: p2Mother.birth_place } : null,
       };
     }
   }
@@ -1078,6 +1085,12 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
             fUpdate.death_date_iso = d.iso;
             if (d.year) fUpdate.death_year = d.year;
           }
+          if (fatherBirthDateRaw && !existingFather.birth_year) {
+            const d = parseDateInput(fatherBirthDateRaw);
+            fUpdate.birth_date_raw = d.canonical;
+            fUpdate.birth_date_iso = d.iso;
+            if (d.year) fUpdate.birth_year = d.year;
+          }
           if (fatherDeathPlace) fUpdate.death_place = normalizePlace(fatherDeathPlace);
           if (fatherBirthPlace) fUpdate.birth_place = normalizePlace(fatherBirthPlace);
           if (Object.keys(fUpdate).length > 0) {
@@ -1126,6 +1139,12 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
             mUpdate.death_date_raw = d.canonical;
             mUpdate.death_date_iso = d.iso;
             if (d.year) mUpdate.death_year = d.year;
+          }
+          if (motherBirthDateRaw && !existingMother.birth_year) {
+            const d = parseDateInput(motherBirthDateRaw);
+            mUpdate.birth_date_raw = d.canonical;
+            mUpdate.birth_date_iso = d.iso;
+            if (d.year) mUpdate.birth_year = d.year;
           }
           if (motherDeathPlace) mUpdate.death_place = normalizePlace(motherDeathPlace);
           if (motherBirthPlace) mUpdate.birth_place = normalizePlace(motherBirthPlace);
