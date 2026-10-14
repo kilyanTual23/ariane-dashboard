@@ -1028,60 +1028,91 @@ export function ActViewerModal({
         fd.append("death_place", (fieldDeathPlace || fieldPlace).trim());
       }
 
+      // Contexte IDs parents et conjoints
+      const isMarriage = actKind === "marriage" || Boolean(unionId);
+      const fatherId = isMarriage ? currentContext?.union?.partner1Father?.id : currentContext?.person?.father?.id;
+      const motherId = isMarriage ? currentContext?.union?.partner1Mother?.id : currentContext?.person?.mother?.id;
+      const spouseId = isMarriage ? currentContext?.union?.partner2?.id : undefined;
+      const spouseFatherId = isMarriage ? currentContext?.union?.partner2Father?.id : undefined;
+      const spouseMotherId = isMarriage ? currentContext?.union?.partner2Mother?.id : undefined;
+
+      if (fatherId) fd.append("father_id", String(fatherId));
+      if (motherId) fd.append("mother_id", String(motherId));
+      if (spouseId) fd.append("spouse_id", String(spouseId));
+      if (spouseFatherId) fd.append("spouse_father_id", String(spouseFatherId));
+      if (spouseMotherId) fd.append("spouse_mother_id", String(spouseMotherId));
+
       // Père (du sujet ou époux 1)
-      if (selectedFieldKeys.has("father") && fieldFather.trim()) {
+      if (fieldFather.trim()) {
         const fParts = splitFullName(fieldFather.trim());
-        fd.append("father_given_names", fParts.given_names);
-        fd.append("father_surname", fParts.surname);
-        fd.append("create_father", createFather ? "1" : "0");
+        if (selectedFieldKeys.has("father")) {
+          fd.append("father_given_names", fParts.given_names);
+          fd.append("father_surname", fParts.surname);
+        } else if (!fatherId) {
+          // Si le père n'est pas encore lié mais qu'on a un nom pour une création
+          fd.append("father_given_names", fParts.given_names);
+          fd.append("father_surname", fParts.surname);
+        }
       }
+      if (createFather) fd.append("create_father", "1");
       if (selectedFieldKeys.has("father_occupation") && fieldFatherOccupation.trim()) fd.append("father_occupation", fieldFatherOccupation.trim());
-      if (selectedFieldKeys.has("father_status") && fatherIsDeceased) fd.append("father_is_deceased", "1");
+      if (selectedFieldKeys.has("father_status")) fd.append("father_is_deceased", fatherIsDeceased ? "1" : "0");
       if (selectedFieldKeys.has("father_death_date") && fieldFatherDeathDate.trim()) fd.append("father_death_date_raw", fieldFatherDeathDate.trim());
       if (selectedFieldKeys.has("father_death_place") && fieldFatherDeathPlace.trim()) fd.append("father_death_place", fieldFatherDeathPlace.trim());
       if (selectedFieldKeys.has("father_birth_date") && fieldFatherBirthDate.trim()) fd.append("father_birth_date_raw", fieldFatherBirthDate.trim());
       if (selectedFieldKeys.has("father_birth_place") && fieldFatherBirthPlace.trim()) fd.append("father_birth_place", fieldFatherBirthPlace.trim());
 
       // Mère (du sujet ou époux 1)
-      if (selectedFieldKeys.has("mother") && fieldMother.trim()) {
+      if (fieldMother.trim()) {
         const mParts = splitFullName(fieldMother.trim());
-        fd.append("mother_given_names", mParts.given_names);
-        fd.append("mother_surname", mParts.surname);
-        fd.append("create_mother", createMother ? "1" : "0");
+        if (selectedFieldKeys.has("mother")) {
+          fd.append("mother_given_names", mParts.given_names);
+          fd.append("mother_surname", mParts.surname);
+        } else if (!motherId) {
+          fd.append("mother_given_names", mParts.given_names);
+          fd.append("mother_surname", mParts.surname);
+        }
       }
+      if (createMother) fd.append("create_mother", "1");
       if (selectedFieldKeys.has("mother_occupation") && fieldMotherOccupation.trim()) fd.append("mother_occupation", fieldMotherOccupation.trim());
-      if (selectedFieldKeys.has("mother_status") && motherIsDeceased) fd.append("mother_is_deceased", "1");
+      if (selectedFieldKeys.has("mother_status")) fd.append("mother_is_deceased", motherIsDeceased ? "1" : "0");
       if (selectedFieldKeys.has("mother_death_date") && fieldMotherDeathDate.trim()) fd.append("mother_death_date_raw", fieldMotherDeathDate.trim());
       if (selectedFieldKeys.has("mother_death_place") && fieldMotherDeathPlace.trim()) fd.append("mother_death_place", fieldMotherDeathPlace.trim());
       if (selectedFieldKeys.has("mother_birth_date") && fieldMotherBirthDate.trim()) fd.append("mother_birth_date_raw", fieldMotherBirthDate.trim());
       if (selectedFieldKeys.has("mother_birth_place") && fieldMotherBirthPlace.trim()) fd.append("mother_birth_place", fieldMotherBirthPlace.trim());
 
       // Conjoint & Mariage (Partenaire 2)
-      if (selectedFieldKeys.has("spouse") && fieldSpouse.trim()) {
+      if (fieldSpouse.trim()) {
         const sParts = splitFullName(fieldSpouse.trim());
-        fd.append("spouse_given_names", sParts.given_names);
-        fd.append("spouse_surname", sParts.surname);
+        if (selectedFieldKeys.has("spouse") || !spouseId) {
+          fd.append("spouse_given_names", sParts.given_names);
+          fd.append("spouse_surname", sParts.surname);
+        }
       }
       if (selectedFieldKeys.has("spouse_occupation") && fieldSpouseOccupation.trim()) fd.append("spouse_occupation", fieldSpouseOccupation.trim());
       if (selectedFieldKeys.has("spouse_birth_date") && fieldSpouseBirthDate.trim()) fd.append("spouse_birth_date_raw", fieldSpouseBirthDate.trim());
       if (selectedFieldKeys.has("spouse_birth_place") && fieldSpouseBirthPlace.trim()) fd.append("spouse_birth_place", fieldSpouseBirthPlace.trim());
 
       // Parents de l'épouse / Conjoint (Partenaire 2)
-      if (selectedFieldKeys.has("spouse_father") && fieldSpouseFather.trim()) {
+      if (fieldSpouseFather.trim()) {
         const sfParts = splitFullName(fieldSpouseFather.trim());
-        fd.append("spouse_father_given_names", sfParts.given_names);
-        fd.append("spouse_father_surname", sfParts.surname);
+        if (selectedFieldKeys.has("spouse_father") || !spouseFatherId) {
+          fd.append("spouse_father_given_names", sfParts.given_names);
+          fd.append("spouse_father_surname", sfParts.surname);
+        }
       }
       if (selectedFieldKeys.has("spouse_father_occupation") && fieldSpouseFatherOccupation.trim()) fd.append("spouse_father_occupation", fieldSpouseFatherOccupation.trim());
-      if (selectedFieldKeys.has("spouse_father_status") && spouseFatherIsDeceased) fd.append("spouse_father_is_deceased", "1");
+      if (selectedFieldKeys.has("spouse_father_status")) fd.append("spouse_father_is_deceased", spouseFatherIsDeceased ? "1" : "0");
 
-      if (selectedFieldKeys.has("spouse_mother") && fieldSpouseMother.trim()) {
+      if (fieldSpouseMother.trim()) {
         const smParts = splitFullName(fieldSpouseMother.trim());
-        fd.append("spouse_mother_given_names", smParts.given_names);
-        fd.append("spouse_mother_surname", smParts.surname);
+        if (selectedFieldKeys.has("spouse_mother") || !spouseMotherId) {
+          fd.append("spouse_mother_given_names", smParts.given_names);
+          fd.append("spouse_mother_surname", smParts.surname);
+        }
       }
       if (selectedFieldKeys.has("spouse_mother_occupation") && fieldSpouseMotherOccupation.trim()) fd.append("spouse_mother_occupation", fieldSpouseMotherOccupation.trim());
-      if (selectedFieldKeys.has("spouse_mother_status") && spouseMotherIsDeceased) fd.append("spouse_mother_is_deceased", "1");
+      if (selectedFieldKeys.has("spouse_mother_status")) fd.append("spouse_mother_is_deceased", spouseMotherIsDeceased ? "1" : "0");
 
       if (selectedFieldKeys.has("marriage_date") && fieldMarriageDate.trim()) fd.append("marriage_date_raw", fieldMarriageDate.trim());
       if (selectedFieldKeys.has("marriage_place") && fieldMarriagePlace.trim()) fd.append("marriage_place", fieldMarriagePlace.trim());
@@ -2372,7 +2403,7 @@ export function ActViewerModal({
                             fieldFatherOccupation ? renderFieldCard(
                               "father_occupation",
                               "Métier père époux",
-                              null,
+                              currentContext?.union?.partner1Father?.occupation || currentContext?.person?.father?.occupation,
                               fieldFatherOccupation,
                               setFieldFatherOccupation
                             ) : null,
@@ -2407,7 +2438,7 @@ export function ActViewerModal({
                             fieldMotherOccupation ? renderFieldCard(
                               "mother_occupation",
                               "Métier mère époux",
-                              null,
+                              currentContext?.union?.partner1Mother?.occupation || currentContext?.person?.mother?.occupation,
                               fieldMotherOccupation,
                               setFieldMotherOccupation
                             ) : null,
@@ -2611,7 +2642,7 @@ export function ActViewerModal({
                             fieldFatherOccupation ? renderFieldCard(
                               "father_occupation",
                               "Métier du père",
-                              null,
+                              currentContext?.person?.father?.occupation,
                               fieldFatherOccupation,
                               setFieldFatherOccupation
                             ) : null,
@@ -2639,14 +2670,14 @@ export function ActViewerModal({
                             fieldFatherDeathDate ? renderFieldCard(
                               "father_death_date",
                               "Date décès père",
-                              null,
+                              currentContext?.person?.father?.death_date_raw,
                               fieldFatherDeathDate,
                               setFieldFatherDeathDate
                             ) : null,
                             fieldFatherDeathPlace ? renderFieldCard(
                               "father_death_place",
                               "Lieu décès père",
-                              null,
+                              currentContext?.person?.father?.death_place,
                               fieldFatherDeathPlace,
                               setFieldFatherDeathPlace
                             ) : null,
@@ -2660,7 +2691,7 @@ export function ActViewerModal({
                             fieldMotherOccupation ? renderFieldCard(
                               "mother_occupation",
                               "Métier de la mère",
-                              null,
+                              currentContext?.person?.mother?.occupation,
                               fieldMotherOccupation,
                               setFieldMotherOccupation
                             ) : null,
@@ -2688,14 +2719,14 @@ export function ActViewerModal({
                             fieldMotherDeathDate ? renderFieldCard(
                               "mother_death_date",
                               "Date décès mère",
-                              null,
+                              currentContext?.person?.mother?.death_date_raw,
                               fieldMotherDeathDate,
                               setFieldMotherDeathDate
                             ) : null,
                             fieldMotherDeathPlace ? renderFieldCard(
                               "mother_death_place",
                               "Lieu décès mère",
-                              null,
+                              currentContext?.person?.mother?.death_place,
                               fieldMotherDeathPlace,
                               setFieldMotherDeathPlace
                             ) : null,
