@@ -45,7 +45,7 @@ export function GeneanetSearchModal({
       ? birthYear + 80
       : "";
 
-  // États pour les filtres activables
+  // États pour les filtres activables : de base UNIQUEMENT Nom + Prénoms cochés
   const [useSurname, setUseSurname] = useState(true);
   const [surname, setSurname] = useState(person.surname || "");
 
@@ -58,22 +58,22 @@ export function GeneanetSearchModal({
     person.sex === "M" ? "H" : person.sex === "F" ? "F" : ""
   );
 
-  const [useSpouse, setUseSpouse] = useState(Boolean(firstSpouse));
+  const [useSpouse, setUseSpouse] = useState(false);
   const [spouseSurname, setSpouseSurname] = useState(spouseNames.surname);
   const [spouseGivenNames, setSpouseGivenNames] = useState(spouseNames.given_names);
 
-  const [useFather, setUseFather] = useState(Boolean(fatherRef));
+  const [useFather, setUseFather] = useState(false);
   const [fatherSurname, setFatherSurname] = useState(fatherNames.surname);
   const [fatherGivenNames, setFatherGivenNames] = useState(fatherNames.given_names);
 
-  const [useMother, setUseMother] = useState(Boolean(motherRef));
+  const [useMother, setUseMother] = useState(false);
   const [motherSurname, setMotherSurname] = useState(motherNames.surname);
   const [motherGivenNames, setMotherGivenNames] = useState(motherNames.given_names);
 
-  const [usePlace, setUsePlace] = useState(Boolean(defaultPlace));
+  const [usePlace, setUsePlace] = useState(false);
   const [place, setPlace] = useState(defaultPlace);
 
-  const [usePeriod, setUsePeriod] = useState(Boolean(defaultFrom || defaultTo));
+  const [usePeriod, setUsePeriod] = useState(false);
   const [fromYear, setFromYear] = useState<string | number>(defaultFrom);
   const [toYear, setToYear] = useState<string | number>(defaultTo);
 
@@ -83,18 +83,28 @@ export function GeneanetSearchModal({
   // Réinitialiser les champs quand la personne change
   useEffect(() => {
     if (isOpen) {
+      setUseSurname(true);
       setSurname(person.surname || "");
+      setUseGivenNames(true);
       setGivenNames(person.given_names || "");
+      setPrenomOperateur("or");
+      setUseSex(false);
       setSexe(person.sex === "M" ? "H" : person.sex === "F" ? "F" : "");
+      setUseSpouse(false);
       setSpouseSurname(spouseNames.surname);
       setSpouseGivenNames(spouseNames.given_names);
+      setUseFather(false);
       setFatherSurname(fatherNames.surname);
       setFatherGivenNames(fatherNames.given_names);
+      setUseMother(false);
       setMotherSurname(motherNames.surname);
       setMotherGivenNames(motherNames.given_names);
+      setUsePlace(false);
       setPlace(defaultPlace);
+      setUsePeriod(false);
       setFromYear(defaultFrom);
       setToYear(defaultTo);
+      setUseOccupation(false);
       setOccupation(person.occupation || "");
     }
   }, [isOpen, person.id]);
@@ -168,7 +178,7 @@ export function GeneanetSearchModal({
         {/* En-tête */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-surface-2/40">
           <div className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 font-bold text-sm">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-surface-2 border border-border text-fg font-semibold text-sm">
               G
             </span>
             <div>
@@ -522,10 +532,10 @@ export function GeneanetSearchModal({
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => onClose()}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-medium px-4 py-2 text-xs shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent hover:opacity-90 text-accent-fg font-medium px-4 py-2 text-xs shadow-soft transition-all active:scale-[0.985] cursor-pointer"
             >
-              <span>🔍 Lancer la recherche sur Geneanet</span>
-              <span className="text-white/80">↗</span>
+              <span>Lancer la recherche sur Geneanet</span>
+              <span className="opacity-80">↗</span>
             </a>
           </div>
         </div>
