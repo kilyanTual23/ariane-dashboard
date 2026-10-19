@@ -21,6 +21,7 @@ import { ActSlot } from "@/components/ActSlot";
 import { Disclosure } from "@/components/Disclosure";
 import { Inline, InlineSelect } from "@/components/Inline";
 import { SlotStrip } from "@/components/PersonCard";
+import { GeneanetSearchButton } from "@/components/GeneanetSearchButton";
 import { monogram } from "@/lib/names";
 import { PersonSelect, type PickerPerson } from "@/components/PersonSelect";
 import { PlaceField } from "@/components/PlaceField";
@@ -344,11 +345,14 @@ export default async function PersonPage({
             </div>
           </div>
 
-          <StatusPicker
-            slug={slug}
-            personId={person.id}
-            status={person.status}
-          />
+          <div className="flex items-center gap-2">
+            <GeneanetSearchButton person={person} />
+            <StatusPicker
+              slug={slug}
+              personId={person.id}
+              status={person.status}
+            />
+          </div>
         </header>
 
         {/* Accès direct à la famille proche */}
