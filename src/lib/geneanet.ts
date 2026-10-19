@@ -25,92 +25,79 @@ export function buildGeneanetSearchUrl(params: GeneanetSearchParams): string {
   const sp = url.searchParams;
 
   // Sexe (Geneanet utilise 'H' pour homme, 'F' pour femme)
-  sp.set("sexe", params.sexe || "");
+  if (params.sexe) {
+    sp.set("sexe", params.sexe);
+  }
 
   // Individu principal
-  sp.set("nom", (params.nom || "").trim());
-  sp.set("ignore_each_patronyme", "");
-  sp.set("prenom", (params.prenom || "").trim());
-  sp.set("prenom_operateur", params.prenomOperateur || "or");
-  sp.set("ignore_each_prenom", "");
+  const nom = (params.nom || "").trim();
+  const prenom = (params.prenom || "").trim();
+
+  if (nom) sp.set("nom", nom);
+  if (prenom) {
+    sp.set("prenom", prenom);
+    if (params.prenomOperateur) sp.set("prenom_operateur", params.prenomOperateur);
+  }
 
   // Profession
-  sp.set("profession", (params.profession || "").trim());
-  sp.set("profession_operateur", "and");
-  sp.set("ignore_each_profession", "");
+  const profession = (params.profession || "").trim();
+  if (profession) {
+    sp.set("profession", profession);
+    sp.set("profession_operateur", "and");
+  }
 
   // Conjoint
-  sp.set("nom_conjoint", (params.nomConjoint || "").trim());
-  sp.set("ignore_each_patronyme_conjoint", "");
-  sp.set("prenom_conjoint", (params.prenomConjoint || "").trim());
-  sp.set("prenom_conjoint_operateur", "and");
-  sp.set("ignore_each_prenom_conjoint", "");
+  const nomConjoint = (params.nomConjoint || "").trim();
+  const prenomConjoint = (params.prenomConjoint || "").trim();
+  if (nomConjoint || prenomConjoint) {
+    if (nomConjoint) sp.set("nom_conjoint", nomConjoint);
+    if (prenomConjoint) {
+      sp.set("prenom_conjoint", prenomConjoint);
+      sp.set("prenom_conjoint_operateur", "and");
+    }
+  }
 
-  // Lieux (place__0__)
-  sp.set("place__0__", (params.place || "").trim());
-  sp.set("voisinage", "");
-  sp.set("ignore_each_place", "");
-  sp.set("zonegeo__0__", (params.zonegeo || "").trim());
-  sp.set("country__0__", "");
-  sp.set("region__0__", "");
-  sp.set("subregion__0__", "");
-
-  for (let i = 1; i <= 4; i++) {
-    sp.set(`place__${i}__`, "");
-    sp.set(`zonegeo__${i}__`, "");
-    sp.set(`country__${i}__`, "");
-    sp.set(`region__${i}__`, "");
-    sp.set(`subregion__${i}__`, "");
+  // Lieu : Geneanet attend place__0__
+  const place = (params.place || "").trim();
+  if (place) {
+    sp.set("place__0__", place);
+    if (params.zonegeo?.trim()) {
+      sp.set("zonegeo__0__", params.zonegeo.trim());
+    }
   }
 
   // Période / Années
   if (params.exactYear) {
     sp.set("type_periode", "exact");
-    sp.set("from", "");
-    sp.set("to", "");
-    sp.set("exact_day", "");
-    sp.set("exact_month", "");
     sp.set("exact_year", String(params.exactYear).trim());
   } else if (params.from || params.to) {
     sp.set("type_periode", "between");
-    sp.set("from", params.from ? String(params.from).trim() : "");
-    sp.set("to", params.to ? String(params.to).trim() : "");
-    sp.set("exact_day", "");
-    sp.set("exact_month", "");
-    sp.set("exact_year", "");
-  } else {
-    sp.set("type_periode", "between");
-    sp.set("from", "");
-    sp.set("to", "");
-    sp.set("exact_day", "");
-    sp.set("exact_month", "");
-    sp.set("exact_year", "");
+    if (params.from) sp.set("from", String(params.from).trim());
+    if (params.to) sp.set("to", String(params.to).trim());
   }
 
   // Parents
-  sp.set("nom_pere", (params.nomPere || "").trim());
-  sp.set("ignore_each_patronyme_pere", "");
-  sp.set("prenom_pere", (params.prenomPere || "").trim());
-  sp.set("prenom_pere_operateur", "and");
-  sp.set("ignore_each_prenom_pere", "");
+  const nomPere = (params.nomPere || "").trim();
+  const prenomPere = (params.prenomPere || "").trim();
+  const nomMere = (params.nomMere || "").trim();
+  const prenomMere = (params.prenomMere || "").trim();
 
-  sp.set("nom_mere", (params.nomMere || "").trim());
-  sp.set("ignore_each_patronyme_mere", "");
-  sp.set("prenom_mere", (params.prenomMere || "").trim());
-  sp.set("prenom_mere_operateur", "and");
-  sp.set("ignore_each_prenom_mere", "");
-
-  // with_parents = 1 si père ou mère renseignés, sinon 0
-  const hasParents = Boolean(
-    (params.nomPere || "").trim() ||
-    (params.prenomPere || "").trim() ||
-    (params.nomMere || "").trim() ||
-    (params.prenomMere || "").trim()
-  );
-  sp.set("with_parents", hasParents ? "1" : "0");
+  const hasParents = Boolean(nomPere || prenomPere || nomMere || prenomMere);
+  if (hasParents) {
+    sp.set("with_parents", "1");
+    if (nomPere) sp.set("nom_pere", nomPere);
+    if (prenomPere) {
+      sp.set("prenom_pere", prenomPere);
+      sp.set("prenom_pere_operateur", "and");
+    }
+    if (nomMere) sp.set("nom_mere", nomMere);
+    if (prenomMere) {
+      sp.set("prenom_mere", prenomMere);
+      sp.set("prenom_mere_operateur", "and");
+    }
+  }
 
   sp.set("go", "1");
-  sp.set("size", "20");
 
   return url.toString();
 }
