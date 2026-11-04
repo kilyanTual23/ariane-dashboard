@@ -29,7 +29,18 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="fr" className={`${sans.variable} ${mono.variable} h-full antialiased`}>
+    <html
+      lang="fr"
+      suppressHydrationWarning
+      className={`${sans.variable} ${mono.variable} h-full antialiased`}
+    >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('ariane-theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var el=document.documentElement;el.setAttribute('data-theme',d?'dark':'light');el.setAttribute('data-theme-setting',t);if(d){el.classList.add('dark');el.classList.remove('light');}else{el.classList.add('light');el.classList.remove('dark');}var z=localStorage.getItem('ariane-zoom')||'1.1';el.style.setProperty('--app-zoom',z);}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col bg-bg font-sans text-fg">{children}</body>
     </html>
   );

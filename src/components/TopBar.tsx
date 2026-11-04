@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { useEffect, useState } from "react";
 import { GlobalSearchModal, type GlobalSearchItem } from "@/components/GlobalSearchModal";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Tab = { href: string; label: string; badge?: number };
 
@@ -121,6 +122,8 @@ export function TopBar({
                 </kbd>
               </button>
             )}
+
+            <ThemeToggle />
 
             {secondary.map((tab) => (
               <Link

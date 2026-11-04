@@ -11,6 +11,7 @@ import {
 import { PersonSelect, type PickerPerson } from "@/components/PersonSelect";
 import { buttonClass, Card } from "@/components/ui";
 import { GeneanetExportCard } from "@/components/GeneanetExportCard";
+import { ThemeSelector } from "@/components/ThemeSelector";
 import { getProfileBySlug, listPersons, listResources } from "@/lib/queries";
 import { logoutAction } from "@/app/login/actions";
 
@@ -42,6 +43,13 @@ export default async function SettingsPage({ params }: PageProps<"/p/[slug]/regl
       <header>
         <h1 className="text-[26px] tracking-[-0.03em]">Réglages</h1>
       </header>
+
+      <Card title="Apparence & Thème">
+        <p className="mb-4 text-sm text-fg-muted">
+          Choisissez l’ambiance d’affichage de votre espace de travail. Le mode clair a été méticuleusement conçu pour les longues sessions de recherche généalogique : fond papier reposant, encrage noir net et contrastes conformes aux normes d’accessibilité.
+        </p>
+        <ThemeSelector />
+      </Card>
 
       <Card title="Profil">
         <form action={updateProfileAction} className="grid gap-3">

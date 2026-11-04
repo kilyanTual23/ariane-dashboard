@@ -8,51 +8,57 @@
   l'espace, la finesse des filets et la typographie.
 */
 
-:root {
+:root,
+html[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #f7f8fa;
+  /* Fond principal : reposant, subtilement teinté pierre/papier d'archive sans éblouir */
+  --bg: #f8fafc;
   --surface: #ffffff;
-  --surface-2: #f2f4f7;
-  --surface-3: #e9ecf1;
-  --border: rgb(9 11 20 / 0.07);
-  --border-strong: rgb(9 11 20 / 0.13);
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
 
-  --fg: #0f1012;
-  --fg-muted: #5b6172;
-  --fg-subtle: #9aa0ae;
+  /* Filets et bordures : finesse encrée nette et élégante */
+  --border: rgb(15 23 42 / 0.08);
+  --border-strong: rgb(15 23 42 / 0.16);
 
-  /* « accent » = l'encre : boutons pleins, éléments actifs, liens soulignés. */
-  --accent: #0f1012;
-  --accent-soft: rgb(9 11 20 / 0.06);
+  /* Typographie : encre noire/ardoise profonde à très haute lisibilité */
+  --fg: #0f172a;
+  --fg-muted: #475569;
+  --fg-subtle: #64748b;
+
+  /* « accent » = l'encre noble : boutons pleins, éléments actifs, liens */
+  --accent: #0f172a;
+  --accent-soft: rgb(15 23 42 / 0.06);
   --accent-fg: #ffffff;
 
+  /* États et signalétique : contrastes certifiés lisibles sur fond clair */
   --ok: #0d9488;
-  --ok-soft: #e3f4f1;
-  --info: #4f46e5;
-  --info-soft: #eceafc;
+  --ok-soft: #f0fdf9;
+  --info: #4338ca;
+  --info-soft: #eef2ff;
   --warn: #d97706;
-  --warn-soft: #fbeedd;
+  --warn-soft: #fffbeb;
   --danger: #e11d48;
-  --danger-soft: #fce8ec;
-  --neutral: #94a3b8;
-  --neutral-soft: #eef1f5;
+  --danger-soft: #fff1f2;
+  --neutral: #64748b;
+  --neutral-soft: #f1f5f9;
 
-  /* Échelle d'avancement, du rouge au vert : cinq paliers assez éloignés pour
-     rester distincts, y compris quand on les compare de loin. */
+  /* Échelle de complétion (cinq paliers lisibles et distincts) */
   --grade-0: #e11d48;
   --grade-1: #ea580c;
-  --grade-2: #ca8a04;
-  --grade-3: #65a30d;
+  --grade-2: #d97706;
+  --grade-3: #16a34a;
   --grade-4: #0d9488;
 
-  --shadow-sm: 0 1px 2px rgb(9 11 20 / 0.04);
-  --shadow-md: 0 1px 2px rgb(9 11 20 / 0.04), 0 12px 28px -18px rgb(9 11 20 / 0.28);
-  --shadow-lg: 0 2px 4px rgb(9 11 20 / 0.04), 0 24px 48px -24px rgb(9 11 20 / 0.32);
+  /* Ombres portées délicates donnant une réelle matérialité et du relief aux cartes */
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.05), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.05), 0 2px 4px -2px rgb(15 23 42 / 0.04);
+  --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.04);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
 
     --bg: #0c0d10;
@@ -93,6 +99,46 @@
   }
 }
 
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0c0d10;
+  --surface: #141519;
+  --surface-2: #1a1c21;
+  --surface-3: #23262d;
+  --border: rgb(255 255 255 / 0.08);
+  --border-strong: rgb(255 255 255 / 0.16);
+
+  --fg: #f4f5f7;
+  --fg-muted: #a0a6b4;
+  --fg-subtle: #6f7685;
+
+  --accent: #f4f5f7;
+  --accent-soft: rgb(255 255 255 / 0.09);
+  --accent-fg: #0b0d12;
+
+  --ok: #2dd4bf;
+  --ok-soft: #10302e;
+  --info: #a5b4fc;
+  --info-soft: #1e1e3a;
+  --warn: #fbbf24;
+  --warn-soft: #33260f;
+  --danger: #fb7185;
+  --danger-soft: #3a1620;
+  --neutral: #7c8496;
+  --neutral-soft: #21242a;
+
+  --grade-0: #fb7185;
+  --grade-1: #fb923c;
+  --grade-2: #facc15;
+  --grade-3: #a3e635;
+  --grade-4: #2dd4bf;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 28px -18px rgb(0 0 0 / 0.7);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.5), 0 24px 48px -24px rgb(0 0 0 / 0.8);
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -130,6 +176,17 @@
   --shadow-soft: var(--shadow-sm);
   --shadow-card: var(--shadow-md);
   --shadow-pop: var(--shadow-lg);
+}
+
+/* Échelle de lisibilité globale (par défaut à 110%) */
+html {
+  zoom: var(--app-zoom, 1.1);
+}
+
+@supports not (zoom: 1) {
+  html {
+    font-size: 110%;
+  }
 }
 
 html,
@@ -173,7 +230,7 @@ h3 {
   .field {
     width: 100%;
     border-radius: 0.625rem;
-    border: 1px solid transparent;
+    border: 1px solid var(--border);
     background: var(--surface-2);
     color: var(--fg);
     padding: 0.45rem 0.7rem;
@@ -185,14 +242,14 @@ h3 {
       box-shadow 150ms ease;
   }
   .field:hover {
-    border-color: var(--border);
+    border-color: var(--border-strong);
   }
   .field:focus-visible,
   .field:focus {
     outline: none;
     background: var(--surface);
     border-color: var(--border-strong);
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--fg) 8%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fg) 8%, transparent);
   }
   .field::placeholder {
     color: var(--fg-subtle);
