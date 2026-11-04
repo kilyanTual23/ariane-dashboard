@@ -431,6 +431,23 @@ export async function getUnionRow(unionId: number): Promise<UnionRow | null> {
   return queryOne<UnionRow>(`SELECT * FROM unions WHERE id = ?`, [unionId]);
 }
 
+export const listUnions = cache(async (profileId: number): Promise<UnionRow[]> => {
+  return queryAll<UnionRow>(
+    `SELECT * FROM unions WHERE profile_id = ? ORDER BY COALESCE(year, 9999), id`,
+    [profileId],
+  );
+});
+
+export const listParentChildLinks = cache(
+  async (profileId: number): Promise<{ parent_id: number; child_id: number }[]> => {
+    return queryAll<{ parent_id: number; child_id: number }>(
+      `SELECT pc.parent_id, pc.child_id FROM parent_child pc
+       JOIN persons c ON c.id = pc.child_id WHERE c.profile_id = ?`,
+      [profileId],
+    );
+  },
+);
+
 /* --------------------------------------------------------------------- sosa */
 
 /**

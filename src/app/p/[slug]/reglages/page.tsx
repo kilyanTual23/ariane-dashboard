@@ -10,6 +10,7 @@ import {
 } from "@/app/actions";
 import { PersonSelect, type PickerPerson } from "@/components/PersonSelect";
 import { buttonClass, Card } from "@/components/ui";
+import { GeneanetExportCard } from "@/components/GeneanetExportCard";
 import { getProfileBySlug, listPersons, listResources } from "@/lib/queries";
 import { logoutAction } from "@/app/login/actions";
 
@@ -127,12 +128,16 @@ export default async function SettingsPage({ params }: PageProps<"/p/[slug]/regl
         </form>
       </Card>
 
-      <Card title="Export">
+      <Card title="Export vers Geneanet (GEDCOM)">
+        <GeneanetExportCard slug={slug} />
+      </Card>
+
+      <Card title="Sauvegarde complète (JSON)">
         <p className="mb-3 text-sm text-fg-muted">
-          Sauvegarde complète du profil : personnes, unions, filiations, tâches et sources.
+          Export brut au format JSON de l&apos;intégralité du profil : personnes, unions, filiations, tâches, ressources et sources. Idéal pour une sauvegarde locale technique ou une restauration.
         </p>
         <a href={`/api/profils/${slug}/export`} className={buttonClass()} download>
-          Télécharger le JSON
+          Télécharger le JSON complet
         </a>
       </Card>
 
