@@ -39,6 +39,7 @@ export function ActSlot({
   const [optimisticIgnored, setOptimisticIgnored] = useState(isIgnored);
   const [selectedReason, setSelectedReason] = useState<string>(COMMON_REASONS[0]);
   const [customReason, setCustomReason] = useState("");
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   const localImageUrl =
     personId
@@ -208,18 +209,44 @@ export function ActSlot({
               </span>
             </button>
 
-            {/* Accès discret au lien d'origine et modification */}
+            {/* Accès discret au lien d'origine, copie et modification */}
             <div className="flex shrink-0 items-center gap-0.5">
               {value?.startsWith("http") && (
-                <a
-                  href={value}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex size-5 items-center justify-center rounded text-[11px] text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
-                  title={`Ouvrir le permalien d'origine (${value})`}
-                >
-                  ↗
-                </a>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(value);
+                      setCopiedUrl(true);
+                      setTimeout(() => setCopiedUrl(false), 1500);
+                    }}
+                    className="flex size-5 items-center justify-center rounded text-[11px] text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+                    title={copiedUrl ? "Lien copié !" : "Copier le permalien d'origine"}
+                  >
+                    {copiedUrl ? (
+                      <span className="text-emerald-500 font-bold text-[10px]">✓</span>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        className="size-3"
+                      >
+                        <path fillRule="evenodd" d="M11 2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2ZM5 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H5Z" clipRule="evenodd" />
+                        <path d="M3 5a1 1 0 0 0-1 1v7a2 2 0 0 0 2 2h7a1 1 0 1 0 0-2H4a1 1 0 0 1-1-1V6a1 1 0 0 0-1-1Z" />
+                      </svg>
+                    )}
+                  </button>
+                  <a
+                    href={value}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex size-5 items-center justify-center rounded text-[11px] text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+                    title={`Ouvrir le permalien d'origine (${value})`}
+                  >
+                    ↗
+                  </a>
+                </>
               )}
               <button
                 type="button"
