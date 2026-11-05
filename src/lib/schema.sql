@@ -116,3 +116,10 @@ CREATE TABLE IF NOT EXISTS resources (
   category    TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Carnet de notes du profil (aussi créé à la volée par src/lib/queries.ts).
+CREATE TABLE IF NOT EXISTS notebooks (
+  profile_id INTEGER PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  content    TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

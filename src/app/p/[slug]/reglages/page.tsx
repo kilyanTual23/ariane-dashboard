@@ -1,19 +1,30 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 
-import {
-  createResourceAction,
-  deleteProfileAction,
-  deleteResourceAction,
-  setRootPersonAction,
-  updateProfileAction,
-} from "@/app/actions";
-import { PersonSelect, type PickerPerson } from "@/components/PersonSelect";
-import { buttonClass, Card } from "@/components/ui";
-import { GeneanetExportCard } from "@/components/GeneanetExportCard";
-import { ThemeSelector } from "@/components/ThemeSelector";
-import { getProfileBySlug, listPersons, listResources } from "@/lib/queries";
+import { deleteProfileAction, setRootPersonAction, updateProfileAction } from "@/app/actions";
 import { logoutAction } from "@/app/login/actions";
+import { ActionButton } from "@/components/ActionButton";
+import { ConfirmButton } from "@/components/Dialog";
+import { ActionForm } from "@/components/FormDialog";
+import { GeneanetExportCard } from "@/components/GeneanetExportCard";
+import { IconDownload, IconLogOut, IconTrash } from "@/components/icons";
+import { PersonSelect, type PickerPerson } from "@/components/PersonSelect";
+import { SubmitButton } from "@/components/SubmitButton";
+import { ThemeSelector } from "@/components/ThemeSelector";
+import { Avatar, Badge, buttonClass, PageHeader } from "@/components/ui";
+import { getProfileBySlug, listPersons } from "@/lib/queries";
+
+/** Sommaire : on saute directement à la bonne section. */
+const SECTIONS = [
+  ["profil", "Profil"],
+  ["racine", "Racine Sosa"],
+  ["apparence", "Apparence"],
+  ["export", "Export Geneanet"],
+  ["sauvegarde", "Sauvegarde"],
+  ["session", "Session"],
+  ["danger", "Zone sensible"],
+] as const;
 
 export const dynamic = "force-dynamic";
 
@@ -21,158 +32,194 @@ export const metadata: Metadata = {
   title: "Réglages",
 };
 
+/** Une section de réglages : intitulé et explication à gauche, contrôles à droite. */
+function Section({
+  id,
+  title,
+  description,
+  children,
+  danger = false,
+}: {
+  id?: string;
+  title: string;
+  description: ReactNode;
+  children: ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <section id={id} className="grid scroll-mt-6 grid-cols-[minmax(0,1fr)] gap-4 border-t border-border py-8 first:border-t-0 first:pt-2 md:grid-cols-[16rem_minmax(0,1fr)] md:gap-10">
+      <div>
+        <h2 className={`text-sm font-semibold ${danger ? "text-danger" : ""}`}>{title}</h2>
+        <p className="mt-1 text-ui text-fg-muted">{description}</p>
+      </div>
+      <div
+        className={`min-w-0 rounded-xl border bg-surface p-5 shadow-xs ${danger ? "border-danger-dot/30" : "border-border"}`}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
 export default async function SettingsPage({ params }: PageProps<"/p/[slug]/reglages">) {
   const { slug } = await params;
   const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const [persons, resources] = await Promise.all([
-    listPersons(profile.id),
-    listResources(profile.id),
-  ]);
+  const persons = await listPersons(profile.id);
   const root = persons.find((p) => p.id === profile.root_person_id);
   const pickable: PickerPerson[] = persons.map((p) => ({
     id: p.id,
     name: p.displayName,
     birthYear: p.birth_year,
     deathYear: p.death_year,
+    sosa: p.sosa,
   }));
 
   return (
-    <div className="flex max-w-3xl flex-col gap-5">
-      <header>
-        <h1 className="text-[26px] tracking-[-0.03em]">Réglages</h1>
-      </header>
+    <div className="flex max-w-5xl flex-col gap-4">
+      <PageHeader title="Réglages" description={`Profil « ${profile.name} » et préférences de cet appareil.`} />
 
-      <Card title="Apparence & Thème">
-        <p className="mb-4 text-sm text-fg-muted">
-          Choisissez l’ambiance d’affichage de votre espace de travail. Le mode clair a été méticuleusement conçu pour les longues sessions de recherche généalogique : fond papier reposant, encrage noir net et contrastes conformes aux normes d’accessibilité.
-        </p>
-        <ThemeSelector />
-      </Card>
+      <nav aria-label="Sections des réglages" className="-mx-1 flex flex-wrap gap-1">
+        {SECTIONS.map(([id, label]) => (
+          <a
+            key={id}
+            href={`#${id}`}
+            className={`rounded-md px-2.5 py-1 text-xs transition-colors hover:bg-surface-2 hover:text-fg ${
+              id === "danger" ? "text-danger" : "text-fg-muted"
+            }`}
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
 
-      <Card title="Profil">
-        <form action={updateProfileAction} className="grid gap-3">
-          <input type="hidden" name="slug" value={slug} />
-          <input type="hidden" name="profileId" value={profile.id} />
-          <label className="block">
-            <span className="label">Nom</span>
-            <input className="field" name="name" defaultValue={profile.name} />
-          </label>
-          <label className="block">
-            <span className="label">Description</span>
-            <input className="field" name="description" defaultValue={profile.description ?? ""} />
-          </label>
-          <div>
-            <button type="submit" className={buttonClass("primary")}>
-              Enregistrer
-            </button>
-          </div>
-        </form>
-      </Card>
+      <div>
+        <Section id="profil" title="Profil" description="Le nom apparaît dans la barre latérale et la liste des profils.">
+          <ActionForm
+            action={updateProfileAction}
+            fields={{ slug, profileId: profile.id }}
+            successMessage="Profil enregistré"
+            className="flex flex-col gap-4"
+          >
+            <label className="block">
+              <span className="label">Nom</span>
+              <input className="field" name="name" defaultValue={profile.name} required />
+            </label>
+            <label className="block">
+              <span className="label">Description</span>
+              <input className="field" name="description" defaultValue={profile.description ?? ""} placeholder="Facultatif" />
+            </label>
+            <div className="flex justify-end">
+              <SubmitButton>Enregistrer</SubmitButton>
+            </div>
+          </ActionForm>
+        </Section>
 
-      <Card title="Racine de la numérotation Sosa">
-        <p className="mb-3 text-sm text-fg-muted">
-          Le « de cujus » porte le numéro 1 ; son père 2, sa mère 3, et ainsi de suite. C’est ce qui
-          alimente le suivi par génération du tableau de bord.
-        </p>
-        <p className="mb-3 text-sm">
-          Racine actuelle :{" "}
-          <strong>{root ? root.displayName : "aucune"}</strong>
-        </p>
-        <form action={setRootPersonAction} className="flex flex-wrap items-end gap-2">
-          <input type="hidden" name="slug" value={slug} />
-          <input type="hidden" name="profileId" value={profile.id} />
-          <div className="min-w-64 flex-1">
-            <PersonSelect name="rootPersonId" people={pickable} placeholder="Choisir la personne racine…" />
-          </div>
-          <button type="submit" className={buttonClass("primary")}>
-            Définir
-          </button>
-          <button type="submit" name="rootPersonId" value="" className={buttonClass()}>
-            Retirer
-          </button>
-        </form>
-      </Card>
+        <Section
+          id="racine"
+          title="Racine Sosa"
+          description="Le « de cujus » porte le numéro 1, son père le 2, sa mère le 3… C’est ce qui numérote l’ascendance et alimente le suivi par génération."
+        >
+          {root ? (
+            <div className="mb-4 flex items-center gap-3 rounded-lg border border-border bg-surface-2/50 px-3 py-2.5">
+              <Avatar seed={root.id} given={root.given_names} surname={root.surname} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-ui font-medium">{root.displayName}</p>
+                <p className="num text-xs text-fg-subtle">
+                  {root.birth_year ?? "?"} – {root.is_living ? "vivant" : (root.death_year ?? "?")}
+                </p>
+              </div>
+              <Badge tone="ink">G1</Badge>
+              <ActionButton
+                action={setRootPersonAction}
+                fields={{ slug, profileId: profile.id, rootPersonId: "" }}
+                successMessage="Racine retirée"
+                variant="quiet"
+                size="sm"
+              >
+                Retirer
+              </ActionButton>
+            </div>
+          ) : (
+            <p className="mb-4 text-ui text-fg-muted">Aucune racine : les numéros Sosa et les générations restent vides.</p>
+          )}
+          <ActionForm
+            action={setRootPersonAction}
+            fields={{ slug, profileId: profile.id }}
+            successMessage="Racine Sosa mise à jour"
+            className="flex flex-wrap items-end gap-2"
+          >
+            <label className="min-w-64 flex-1">
+              <span className="label">{root ? "Changer de racine" : "Choisir la racine"}</span>
+              <PersonSelect name="rootPersonId" people={pickable} placeholder="Rechercher une personne…" allowCreate={false} required />
+            </label>
+            <SubmitButton>Définir</SubmitButton>
+          </ActionForm>
+        </Section>
 
-      <Card title="Liens utiles">
-        {resources.length > 0 && (
-          <ul className="mb-4 flex flex-col gap-1.5">
-            {resources.map((r) => (
-              <li key={r.id} className="flex items-center gap-2 text-sm">
-                {r.category && (
-                  <span className="rounded bg-surface-3 px-1.5 py-px text-[11px] text-fg-muted">
-                    {r.category}
-                  </span>
-                )}
-                <a
-                  href={r.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-fg underline underline-offset-4"
-                >
-                  {r.label} ↗
-                </a>
-                <form action={deleteResourceAction} className="ml-auto">
-                  <input type="hidden" name="slug" value={slug} />
-                  <input type="hidden" name="resourceId" value={r.id} />
-                  <button type="submit" className="text-xs text-fg-subtle hover:text-danger">
-                    ✕
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-        <form action={createResourceAction} className="grid gap-2 sm:grid-cols-[1fr_1.5fr_auto_auto]">
-          <input type="hidden" name="slug" value={slug} />
-          <input type="hidden" name="profileId" value={profile.id} />
-          <input className="field" name="label" placeholder="Archives de la Manche" required />
-          <input className="field" name="url" placeholder="https://…" required />
-          <input className="field" name="category" placeholder="Catégorie" />
-          <button type="submit" className={buttonClass()}>
-            Ajouter
-          </button>
-        </form>
-      </Card>
+        <Section
+          id="apparence"
+          title="Apparence"
+          description="Thème, couleur d’accent et taille d’affichage, enregistrés sur cet appareil."
+        >
+          <ThemeSelector />
+        </Section>
 
-      <Card title="Export vers Geneanet (GEDCOM)">
-        <GeneanetExportCard slug={slug} />
-      </Card>
+        <Section
+          id="export"
+          title="Export Geneanet"
+          description="Fichier GEDCOM 5.5.1 prêt à importer : dates normalisées, numéros Sosa, sources et protection des vivants."
+        >
+          <GeneanetExportCard slug={slug} />
+        </Section>
 
-      <Card title="Sauvegarde complète (JSON)">
-        <p className="mb-3 text-sm text-fg-muted">
-          Export brut au format JSON de l&apos;intégralité du profil : personnes, unions, filiations, tâches, ressources et sources. Idéal pour une sauvegarde locale technique ou une restauration.
-        </p>
-        <a href={`/api/profils/${slug}/export`} className={buttonClass()} download>
-          Télécharger le JSON complet
-        </a>
-      </Card>
+        <Section
+          id="sauvegarde"
+          title="Sauvegarde"
+          description="Export brut et complet du profil (fiches, unions, filiations, tâches, sources), à conserver en lieu sûr."
+        >
+          <a href={`/api/profils/${slug}/export`} className={buttonClass("secondary")} download>
+            <IconDownload size={14} />
+            Télécharger la sauvegarde JSON
+          </a>
+        </Section>
 
-      <Card title="Sécurité">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-fg-muted">
-            L&apos;accès à Ariane est protégé par mot de passe.
-          </p>
-          <form action={logoutAction}>
-            <button type="submit" className={buttonClass("ghost")}>
+        <Section id="session" title="Session" description="L’accès à Ariane est protégé par mot de passe.">
+          <form action={logoutAction} className="flex items-center justify-between gap-3">
+            <p className="text-ui text-fg-muted">Fermer la session sur cet appareil.</p>
+            <SubmitButton variant="secondary">
+              <IconLogOut size={14} />
               Se déconnecter
-            </button>
+            </SubmitButton>
           </form>
-        </div>
-      </Card>
+        </Section>
 
-      <Card title="Zone sensible">
-        <form action={deleteProfileAction} className="flex items-center justify-between gap-3">
-          <input type="hidden" name="profileId" value={profile.id} />
-          <p className="text-sm text-fg-muted">
-            Supprimer « {profile.name} » et l’ensemble de ses {persons.length} fiches.
-          </p>
-          <button type="submit" className={buttonClass("danger")}>
-            Supprimer le profil
-          </button>
-        </form>
-      </Card>
+        <Section
+          id="danger"
+          title="Zone sensible"
+          danger
+          description="Action définitive. Pensez à télécharger une sauvegarde avant."
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-ui text-fg-muted">
+              Supprimer « {profile.name} » et ses <span className="num">{persons.length}</span> fiches.
+            </p>
+            <ConfirmButton
+              action={deleteProfileAction}
+              fields={{ profileId: profile.id }}
+              title="Supprimer définitivement ce profil ?"
+              description={`Les ${persons.length} fiches, unions, tâches et sources du profil seront effacées. Cette action est irréversible.`}
+              confirmLabel="Supprimer le profil"
+              confirmText={profile.name}
+              variant="danger"
+            >
+              <IconTrash size={14} />
+              Supprimer le profil
+            </ConfirmButton>
+          </div>
+        </Section>
+      </div>
     </div>
   );
 }

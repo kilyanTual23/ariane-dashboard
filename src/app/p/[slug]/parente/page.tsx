@@ -2,44 +2,43 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { KinshipCalculator } from "@/components/KinshipCalculator";
+import { PageHeader } from "@/components/ui";
 import { getProfileBySlug, listPersons } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Calculateur de parenté",
+  title: "Parenté",
 };
 
-export default async function KinshipPage({
-  params,
-  searchParams,
-}: PageProps<"/p/[slug]/parente">) {
+function idParam(v: string | string[] | undefined): number | null {
+  const n = Number(Array.isArray(v) ? v[0] : v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export default async function KinshipPage({ params, searchParams }: PageProps<"/p/[slug]/parente">) {
   const { slug } = await params;
   const search = await searchParams;
   const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
   const persons = await listPersons(profile.id);
-
-  const initialPersonAId = search.de ? Number(Array.isArray(search.de) ? search.de[0] : search.de) : profile.root_person_id;
-  const initialPersonBId = search.avec ? Number(Array.isArray(search.avec) ? search.avec[0] : search.avec) : null;
+  const known = new Set(persons.map((p) => p.id));
+  const a = idParam(search.de) ?? profile.root_person_id;
+  const b = idParam(search.avec);
 
   return (
     <div className="flex max-w-4xl flex-col gap-6">
-      <header>
-        <h1 className="text-[26px] tracking-[-0.03em]">Calculateur de parenté</h1>
-        <p className="mt-1 text-sm text-fg-muted">
-          Trouvez le plus proche ancêtre commun (MRCA), le degré civil et canonique entre deux personnes de l’arbre.
-        </p>
-      </header>
-
+      <PageHeader
+        title="Parenté"
+        description="Le plus proche ancêtre commun de deux personnes, le lien qui les unit et son degré."
+      />
       <KinshipCalculator
         slug={slug}
         persons={persons}
-        initialPersonAId={initialPersonAId}
-        initialPersonBId={initialPersonBId}
+        initialPersonAId={a && known.has(a) ? a : null}
+        initialPersonBId={b && known.has(b) ? b : null}
       />
     </div>
   );
 }
-

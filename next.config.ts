@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // La racine du projet, sinon Turbopack remonte jusqu'au package-lock.json du profil utilisateur.
   turbopack: { root: __dirname },
+  // En bas à gauche, l'indicateur de dev masquerait le sélecteur de thème de la barre latérale.
+  devIndicators: { position: "bottom-right" },
   // Modules natifs C++/Rust : ils ne doivent jamais être bundlés par Turbopack.
   serverExternalPackages: ["better-sqlite3", "@libsql/client", "libsql", "@napi-rs/canvas", "sharp"],
   // Autoriser l'accès en développement et Server Actions depuis Tailscale

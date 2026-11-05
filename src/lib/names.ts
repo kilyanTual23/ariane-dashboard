@@ -1,3 +1,5 @@
+import { COMPLETION_CRITERIA } from "./completion";
+
 const FEMININE = new Set([
   "marie", "jeanne", "anne", "anna", "perrine", "perrinne", "françoise", "francoise",
   "victoire", "angélique", "angelique", "rosalie", "thérèse", "therese", "madeleine",
@@ -83,9 +85,20 @@ export function inferSex(givenNames: string): "M" | "F" | null {
 }
 
 export function monogram(given?: string | null, surname?: string | null): string {
-  const a = (given ?? "").trim()[0] ?? "";
-  const b = (surname ?? "").trim()[0] ?? "";
-  return (a + b).toUpperCase() || "?";
+  const first = (v?: string | null) => (v ?? "").match(/\p{L}/u)?.[0] ?? "";
+  return (first(given) + first(surname)).toUpperCase() || "?";
+}
+
+/** « Billé, Bretagne, France » → « Billé ». */
+export function shortPlace(place: string | null | undefined) {
+  return place?.split(",")[0]?.trim() || null;
+}
+
+/** Première chose qui manque, en clair : « acte de naissance (+2) ». */
+export function missingHint(missing: string[]) {
+  if (!missing.length) return null;
+  const first = missing[0].toLowerCase();
+  return missing.length > 1 ? `${first} (+${missing.length - 1})` : first;
 }
 
 export function lifeSpan(
@@ -97,7 +110,35 @@ export function lifeSpan(
   },
 ): string {
   const birth = p.birthYear ? `${p.birthYearEstimated ? "~" : ""}${p.birthYear}` : "?";
-  if (p.isLiving) return `${birth} (vivant)`;
-  const death = p.deathYear ? String(p.deathYear) : p.birthYear ? "?" : "?";
-  return `${birth} - ${death}`;
+  if (p.isLiving) return `${birth} – vivant`;
+  const death = p.deathYear ? String(p.deathYear) : "?";
+  return `${birth} – ${death}`;
+}
+
+/** « Acte de naissance » → « Trouver l’acte de naissance » : une tâche se lit comme une action. */
+export function taskTitleFor(criterion: string) {
+  const lower = criterion.charAt(0).toLowerCase() + criterion.slice(1);
+  const article = /^parents/.test(lower)
+    ? "les "
+    : /^[aeiouéèh]/.test(lower)
+      ? "l’"
+      : /^(date|identité)/.test(lower)
+        ? "la "
+        : "le ";
+  return `Trouver ${article}${lower}`;
+}
+
+/**
+ * Titre de tâche tel qu'on l'affiche : sans le nom de la personne (montré juste à
+ * côté), et à l'infinitif quand il ne nomme qu'une case de la fiche
+ * (« Acte de naissance — Jean TUAL » → « Trouver l’acte de naissance »).
+ */
+export function displayTaskTitle(title: string, personName?: string | null) {
+  let t = title.trim();
+  if (personName) {
+    for (const sep of [" — ", " : ", " - "]) {
+      if (t.endsWith(`${sep}${personName}`)) t = t.slice(0, -(sep.length + personName.length)).trim();
+    }
+  }
+  return (COMPLETION_CRITERIA as readonly string[]).includes(t) ? taskTitleFor(t) : t;
 }

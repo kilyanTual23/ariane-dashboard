@@ -35,13 +35,9 @@ export function PlaceField({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Recherche sur l'API des communes françaises
+  const query = open ? (val.split(",")[0]?.trim() ?? "") : "";
   useEffect(() => {
-    if (!open) return;
-    const query = val.split(",")[0]?.trim() ?? "";
-    if (query.length < 2) {
-      setRemote([]);
-      return;
-    }
+    if (query.length < 2) return;
 
     const controller = new AbortController();
     const timer = setTimeout(async () => {
@@ -62,7 +58,7 @@ export function PlaceField({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [val, open]);
+  }, [query]);
 
   // Fermer quand on clique à l'extérieur
   useEffect(() => {
@@ -82,7 +78,9 @@ export function PlaceField({
 
   const suggestions: Suggestion[] = [
     ...localMatches,
-    ...remote.filter((r) => !localMatches.some((l) => l.value.toLowerCase() === r.value.toLowerCase())),
+    ...(query.length >= 2 ? remote : []).filter(
+      (r) => !localMatches.some((l) => l.value.toLowerCase() === r.value.toLowerCase()),
+    ),
   ].slice(0, 8);
 
   const selectValue = (selected: string) => {
@@ -124,7 +122,7 @@ export function PlaceField({
       />
 
       {open && suggestions.length > 0 && (
-        <ul className="absolute left-0 top-full z-50 mt-1 max-h-56 w-full min-w-64 overflow-y-auto rounded-2xl border border-border bg-surface p-1 shadow-pop">
+        <ul className="absolute left-0 top-full z-50 mt-1 max-h-56 w-full min-w-64 animate-pop-in overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-pop">
           {suggestions.map((s, idx) => (
             <li key={`${s.value}-${idx}`}>
               <button
@@ -133,12 +131,12 @@ export function PlaceField({
                   e.preventDefault();
                   selectValue(s.value);
                 }}
-                className={`flex w-full items-baseline justify-between gap-3 rounded-xl px-3 py-1.5 text-left text-xs transition-colors ${
-                  idx === highlight ? "bg-surface-2 font-medium text-fg" : "hover:bg-surface-2 text-fg-muted hover:text-fg"
+                className={`flex w-full items-baseline justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left text-ui transition-colors ${
+                  idx === highlight ? "bg-surface-2 text-fg" : "text-fg hover:bg-surface-2"
                 }`}
               >
                 <span className="truncate">{s.value}</span>
-                {s.hint && <span className="shrink-0 text-[10px] text-fg-subtle">{s.hint}</span>}
+                {s.hint && <span className="shrink-0 text-2xs text-fg-subtle">{s.hint}</span>}
               </button>
             </li>
           ))}

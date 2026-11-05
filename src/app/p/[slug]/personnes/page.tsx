@@ -1,42 +1,44 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { PersonGrid, type GridPerson } from "@/components/PersonGrid";
-import { PersonKanban } from "@/components/PersonKanban";
-import { publicationOf } from "@/lib/publication";
+import { PersonExplorer, type GridPerson } from "@/components/PersonExplorer";
+import { PageHeader } from "@/components/ui";
+import {
+  filtersCookie,
+  filtersFromParams,
+  hasFilterParams,
+  parseStored,
+  parseView,
+  sanitize,
+} from "@/lib/person-filters";
 import { getProfileBySlug, listPersons } from "@/lib/queries";
+import { commune, generationOf } from "@/lib/stats";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-export async function generateMetadata({
-  searchParams,
-}: PageProps<"/p/[slug]/personnes">): Promise<Metadata> {
-  const sp = await searchParams;
-  if (sp.vue === "kanban") {
-    return { title: "Kanban des fiches" };
-  }
-  return { title: "Fiches & Personnes" };
+/** Sosa n ≥ 2 : branche paternelle si le n° tombe dans la première moitié de sa génération. */
+function branchOf(sosa: number | null): "paternelle" | "maternelle" | null {
+  if (!sosa || sosa < 2) return null;
+  const start = 2 ** Math.floor(Math.log2(sosa));
+  return sosa < start + start / 2 ? "paternelle" : "maternelle";
 }
 
-export default async function PersonsPage({
-  params,
-  searchParams,
-}: PageProps<"/p/[slug]/personnes">) {
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Personnes",
+};
+
+export default async function PersonsPage({ params, searchParams }: PageProps<"/p/[slug]/personnes">) {
   const { slug } = await params;
   const sp = await searchParams;
-  const statut = typeof sp.statut === "string" ? sp.statut : undefined;
-  const publication = typeof sp.publication === "string" ? sp.publication : undefined;
-  const vue = typeof sp.vue === "string" ? sp.vue : undefined;
-  const q = typeof sp.q === "string" ? sp.q : undefined;
-  const sosa = sp.sosa === "1" || sp.sosa === "true";
-  const lien = typeof sp.lien === "string" ? sp.lien : undefined;
-  const manquant = typeof sp.manquant === "string" ? sp.manquant : undefined;
-  const tri = typeof sp.tri === "string" ? sp.tri : undefined;
-  const ordre = typeof sp.ordre === "string" ? sp.ordre : undefined;
 
   const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
+
+  // Les filtres viennent de l'URL ; sans paramètre, on reprend là où on s'était arrêté.
+  const stored = parseStored((await cookies()).get(filtersCookie(slug))?.value);
+  const initialFilters = hasFilterParams(sp) ? filtersFromParams(sp) : sanitize(stored.f);
+  const initialView = parseView(sp.vue) ?? (hasFilterParams(sp) ? null : stored.v) ?? "grille";
 
   const rawPersons = await listPersons(profile.id);
   const people: GridPerson[] = rawPersons.map((p) => ({
@@ -58,45 +60,34 @@ export default async function PersonsPage({
     percent: p.completion.percent,
     missing: p.completion.missing,
     ignored: p.completion.ignored,
-    publication: publicationOf(p),
     spouse: p.unions[0]?.spouse?.displayName ?? null,
     marriageYear: p.unions[0]?.year ?? null,
     isLiving: Boolean(p.is_living),
     isUnmarried: Boolean(p.is_unmarried),
+    communes: [
+      ...new Set(
+        [p.birth_place, p.death_place, ...p.unions.map((u) => u.place)]
+          .map((place) => commune(place))
+          .filter((c): c is string => Boolean(c)),
+      ),
+    ],
+    generation: generationOf(p.sosa),
+    branch: branchOf(p.sosa),
   }));
 
-  const complete = people.filter((p) => p.score === p.total).length;
-  const kanban = vue === "kanban";
-
   return (
-    <div className="flex flex-col gap-5">
-      <header>
-        <h1 className="text-[26px] tracking-[-0.03em]">Cartes</h1>
-        <p className="mt-1.5 text-[13px] text-fg-subtle">
-          {people.length} personnes · {complete} cartes complètes.{" "}
-          {kanban
-            ? "Chaque colonne est une étape : la dernière range les cartes reportées sur Geneanet."
-            : "Le bandeau en haut de chaque carte montre les cases déjà remplies."}
-        </p>
-      </header>
-
-      {kanban ? (
-        <PersonKanban slug={slug} people={people} />
-      ) : (
-        <PersonGrid
-          slug={slug}
-          profileId={profile.id}
-          people={people}
-          initialQuery={q}
-          initialStatus={statut}
-          initialSosaOnly={sosa}
-          initialKinship={lien}
-          initialMissing={manquant}
-          initialPublication={publication}
-          initialSort={tri as any}
-          initialDesc={ordre === "desc"}
-        />
-      )}
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Personnes"
+        description="Chaque fiche suit ses cases : naissance, mariage, décès, leurs actes et les parents."
+      />
+      <PersonExplorer
+        slug={slug}
+        profileId={profile.id}
+        people={people}
+        initialFilters={initialFilters}
+        initialView={initialView}
+      />
     </div>
   );
 }

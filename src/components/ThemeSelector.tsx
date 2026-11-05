@@ -1,229 +1,161 @@
 "use client";
 
-import { useTheme, type Theme, type ZoomLevel } from "@/lib/theme";
+import type { ReactNode } from "react";
+
+import { IconCheck, IconMonitor, IconMoon, IconSun } from "@/components/icons";
+import { ACCENTS, SCALES, useTheme, type Accent, type Scale, type Theme } from "@/lib/theme";
+
+const THEMES: { key: Theme; title: string; icon: ReactNode }[] = [
+  { key: "light", title: "Clair", icon: <IconSun size={14} /> },
+  { key: "dark", title: "Sombre", icon: <IconMoon size={14} /> },
+  { key: "system", title: "Système", icon: <IconMonitor size={14} /> },
+];
+
+/** Pastilles du sélecteur : la teinte claire et la teinte sombre de chaque accent. */
+const ACCENT_SWATCH: Record<Accent, { label: string; light: string; dark: string }> = {
+  violet: { label: "Violet", light: "#6e56cf", dark: "#7c66dc" },
+  indigo: { label: "Indigo", light: "#3e63dd", dark: "#4a6ee6" },
+  rose: { label: "Rose", light: "#cf3a8f", dark: "#d84a9c" },
+  cuivre: { label: "Cuivre", light: "#b5542b", dark: "#c96a3f" },
+  graphite: { label: "Graphite", light: "#17171a", dark: "#ededef" },
+};
+
+const SCALE_LABEL: Record<Scale, string> = {
+  "0.9": "Compact",
+  "1": "Standard",
+  "1.1": "Confortable",
+  "1.2": "Grand",
+};
+
+/** Aperçu miniature d'une interface dans un thème donné. */
+function Preview({ dark }: { dark: boolean }) {
+  const c = dark
+    ? { bg: "#0d0d0f", panel: "#17171a", line: "#2a2a2f", ink: "#ededef", soft: "#4a4a52" }
+    : { bg: "#f2f2f3", panel: "#ffffff", line: "#e6e6e9", ink: "#17171a", soft: "#c4c4cc" };
+  return (
+    <div className="flex h-full gap-1.5 p-2" style={{ background: c.bg }}>
+      <div className="flex w-1/4 flex-col gap-1 pt-1">
+        <div className="h-1.5 w-3/4 rounded-full" style={{ background: c.ink }} />
+        <div className="h-1 w-full rounded-full" style={{ background: c.soft }} />
+        <div className="h-1 w-2/3 rounded-full" style={{ background: c.soft }} />
+      </div>
+      <div className="flex flex-1 flex-col gap-1.5 rounded-md p-1.5" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
+        <div className="h-1.5 w-1/2 rounded-full" style={{ background: c.ink }} />
+        <div className="flex gap-1">
+          {["#30a46c", "#3e63dd", "#e5484d"].map((dot) => (
+            <div key={dot} className="h-4 flex-1 rounded" style={{ border: `1px solid ${c.line}` }}>
+              <div className="m-1 size-1 rounded-full" style={{ background: dot }} />
+            </div>
+          ))}
+        </div>
+        <div className="h-1 w-3/4 rounded-full" style={{ background: c.soft }} />
+      </div>
+    </div>
+  );
+}
 
 export function ThemeSelector() {
-  const { theme, resolvedTheme, setTheme, zoom, setZoom, mounted } = useTheme();
-
-  const themeOptions: {
-    key: Theme;
-    title: string;
-    badge: string;
-    desc: string;
-    icon: string;
-  }[] = [
-    {
-      key: "light",
-      title: "Mode clair",
-      badge: "Recommandé de jour",
-      desc: "Fond papier doux, encre haute lisibilité et teintes d'archives étudiées pour ne pas fatiguer les yeux.",
-      icon: "☀️",
-    },
-    {
-      key: "dark",
-      title: "Mode sombre",
-      badge: "Nocturne",
-      desc: "Interface feutrée et contrastes doux, pensée pour les recherches nocturnes prolongées.",
-      icon: "🌙",
-    },
-    {
-      key: "system",
-      title: "Automatique",
-      badge: "Système",
-      desc: "S'adapte dynamiquement aux préférences d'apparence de votre ordinateur ou appareil.",
-      icon: "💻",
-    },
-  ];
-
-  const zoomOptions: {
-    key: ZoomLevel;
-    label: string;
-    sublabel: string;
-    badge?: string;
-  }[] = [
-    {
-      key: "1",
-      label: "100%",
-      sublabel: "Compact",
-    },
-    {
-      key: "1.1",
-      label: "110%",
-      sublabel: "Confortable",
-      badge: "Recommandé",
-    },
-    {
-      key: "1.2",
-      label: "120%",
-      sublabel: "Grand",
-    },
-  ];
+  const { theme, setTheme, scale, setScale, accent, setAccent, resolvedTheme, mounted } = useTheme();
 
   return (
-    <div className="space-y-6">
-      {/* 1. Sélection du thème de couleur */}
+    <div className="flex flex-col gap-6">
       <div>
-        <span className="block text-xs font-semibold text-fg mb-2">Thème de couleur</span>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {themeOptions.map((opt) => {
-            const isSelected = mounted ? theme === opt.key : opt.key === "system";
-
+        <p className="label">Thème</p>
+        <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Thème">
+          {THEMES.map((opt) => {
+            const selected = mounted && theme === opt.key;
             return (
               <button
                 key={opt.key}
                 type="button"
+                role="radio"
+                aria-checked={selected}
                 onClick={() => setTheme(opt.key)}
-                className={`group relative flex flex-col text-left rounded-2xl border p-4 transition-all duration-200 cursor-pointer ${
-                  isSelected
-                    ? "border-accent bg-surface shadow-card ring-2 ring-accent/25"
-                    : "border-border bg-surface hover:border-border-strong hover:bg-surface-2/60 shadow-soft"
-                }`}
+                className="group flex flex-col gap-2 text-left"
               >
-                {/* Entête avec icône et sélection */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg" aria-hidden="true">
-                      {opt.icon}
+                <span
+                  className={`block h-20 overflow-hidden rounded-lg border transition-[border-color,box-shadow] ${
+                    selected ? "border-accent ring-2 ring-ring" : "border-border group-hover:border-border-strong"
+                  }`}
+                >
+                  {opt.key === "system" ? (
+                    <span className="grid h-full grid-cols-2">
+                      <Preview dark={false} />
+                      <Preview dark />
                     </span>
-                    <span className="text-[13px] font-semibold text-fg tracking-tight">
-                      {opt.title}
-                    </span>
-                  </div>
-
-                  <div
-                    className={`flex size-4.5 items-center justify-center rounded-full border transition-colors ${
-                      isSelected
-                        ? "border-accent bg-accent text-accent-fg"
-                        : "border-border bg-surface group-hover:border-fg/40"
-                    }`}
-                  >
-                    {isSelected && (
-                      <svg
-                        className="size-2.5"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="3 8 7 12 13 4" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-
-                {/* Aperçu visuel miniature de l'interface */}
-                <div className="mb-3 overflow-hidden rounded-xl border border-border">
-                  {opt.key === "light" && (
-                    <div className="bg-[#f8fafc] p-2.5 text-[10px] space-y-1.5">
-                      <div className="rounded-lg border border-slate-200/90 bg-white p-2 shadow-xs space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <div className="h-2 w-14 rounded-full bg-slate-900" />
-                          <span className="inline-block rounded bg-teal-50 px-1 py-0.2 text-[8px] font-semibold text-teal-700 border border-teal-200/60">
-                            100%
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-20 rounded-full bg-slate-400/80" />
-                        <div className="h-1.5 w-12 rounded-full bg-slate-300" />
-                      </div>
-                    </div>
+                  ) : (
+                    <Preview dark={opt.key === "dark"} />
                   )}
-
-                  {opt.key === "dark" && (
-                    <div className="bg-[#0c0d10] p-2.5 text-[10px] space-y-1.5">
-                      <div className="rounded-lg border border-white/10 bg-[#141519] p-2 shadow-xs space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <div className="h-2 w-14 rounded-full bg-zinc-100" />
-                          <span className="inline-block rounded bg-teal-950 px-1 py-0.2 text-[8px] font-semibold text-teal-300 border border-teal-800/60">
-                            100%
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-20 rounded-full bg-zinc-500" />
-                        <div className="h-1.5 w-12 rounded-full bg-zinc-700" />
-                      </div>
-                    </div>
-                  )}
-
-                  {opt.key === "system" && (
-                    <div className="grid grid-cols-2 text-[10px]">
-                      {/* Moitié clair */}
-                      <div className="bg-[#f8fafc] p-2.5 border-r border-border space-y-1.5">
-                        <div className="rounded-lg border border-slate-200 bg-white p-1.5 shadow-xs space-y-1">
-                          <div className="h-2 w-7 rounded-full bg-slate-900" />
-                          <div className="h-1.5 w-9 rounded-full bg-slate-400" />
-                        </div>
-                      </div>
-                      {/* Moitié sombre */}
-                      <div className="bg-[#0c0d10] p-2.5 space-y-1.5">
-                        <div className="rounded-lg border border-white/10 bg-[#141519] p-1.5 shadow-xs space-y-1">
-                          <div className="h-2 w-7 rounded-full bg-zinc-100" />
-                          <div className="h-1.5 w-9 rounded-full bg-zinc-500" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Description */}
-                <p className="text-xs text-fg-muted leading-relaxed flex-1">
-                  {opt.desc}
-                </p>
-
-                {/* État courant si système */}
-                {opt.key === "system" && mounted && (
-                  <div className="mt-2.5 pt-2 border-t border-border flex items-center justify-between text-[11px] text-fg-subtle">
-                    <span>Actuellement actif :</span>
-                    <span className="font-medium text-fg">
-                      {resolvedTheme === "light" ? "Mode clair ☀️" : "Mode sombre 🌙"}
-                    </span>
-                  </div>
-                )}
+                </span>
+                <span className="flex items-center gap-1.5 text-ui">
+                  <span className="text-fg-subtle">{opt.icon}</span>
+                  {opt.title}
+                  {selected && <IconCheck size={13} className="ml-auto" />}
+                </span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 2. Taille d'affichage & Lisibilité */}
-      <div className="pt-4 border-t border-border">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3">
-          <div>
-            <span className="text-xs font-semibold text-fg">Taille d’affichage & Lisibilité</span>
-            <p className="text-[11px] text-fg-subtle">
-              Échelle native du texte et de l’interface. Le niveau 110% est activé par défaut pour un confort visuel optimal.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2.5">
-          {zoomOptions.map((z) => {
-            const isSelected = mounted ? zoom === z.key : z.key === "1.1";
-
+      <div>
+        <p className="label">Couleur d’accent</p>
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Couleur d’accent">
+          {ACCENTS.map((a) => {
+            const selected = mounted && accent === a;
+            const swatch = ACCENT_SWATCH[a];
             return (
               <button
-                key={z.key}
+                key={a}
                 type="button"
-                onClick={() => setZoom(z.key)}
-                className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-3 transition-all duration-150 cursor-pointer ${
-                  isSelected
-                    ? "border-accent bg-surface shadow-soft ring-2 ring-accent/25"
-                    : "border-border bg-surface hover:border-border-strong hover:bg-surface-2"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setAccent(a)}
+                className={`flex h-9 items-center gap-2 rounded-lg border pl-2 pr-3 text-ui transition-[border-color,box-shadow] ${
+                  selected ? "border-accent ring-2 ring-ring" : "border-border hover:border-border-strong"
                 }`}
               >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold text-fg tracking-tight">{z.label}</span>
-                  {z.badge && (
-                    <span className="rounded-full bg-teal-500/10 px-1.5 py-px text-[9.5px] font-semibold text-teal-600">
-                      {z.badge}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[11px] text-fg-muted">{z.sublabel}</span>
+                <span
+                  className="flex size-5 items-center justify-center rounded-full"
+                  style={{ background: mounted && resolvedTheme === "dark" ? swatch.dark : swatch.light }}
+                >
+                  {selected && <IconCheck size={11} strokeWidth={3} className="text-accent-fg" />}
+                </span>
+                {swatch.label}
               </button>
             );
           })}
         </div>
+        <p className="mt-2 text-xs text-fg-subtle">
+          Boutons principaux, navigation et éléments sélectionnés. Les couleurs des statuts ne changent pas.
+        </p>
+      </div>
+
+      <div>
+        <p className="label">Taille du texte et de l’interface</p>
+        <div className="flex h-9 rounded-lg border border-border bg-surface-2/70 p-0.5" role="radiogroup" aria-label="Taille">
+          {SCALES.map((s) => {
+            const selected = mounted && scale === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setScale(s)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md text-ui transition-colors ${
+                  selected ? "bg-surface font-medium text-fg shadow-xs" : "text-fg-muted hover:text-fg"
+                }`}
+              >
+                {SCALE_LABEL[s]}
+                <span className="num text-2xs text-fg-subtle">{Math.round(Number(s) * 100)}%</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-fg-subtle">
+          Agrandit le texte et les espacements sans dézoomer les images ni la carte. Réglage propre à cet appareil.
+        </p>
       </div>
     </div>
   );

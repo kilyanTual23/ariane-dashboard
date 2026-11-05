@@ -1,115 +1,95 @@
 "use client";
 
 import { useState } from "react";
+
+import { IconDownload, IconExternalLink } from "@/components/icons";
+import { Toggle } from "@/components/Toggle";
 import { buttonClass } from "@/components/ui";
 
+function Option({
+  title,
+  hint,
+  checked,
+  onChange,
+}: {
+  title: string;
+  hint: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start justify-between gap-4 py-3">
+      <span>
+        <span className="block text-ui font-medium">{title}</span>
+        <span className="block text-xs text-fg-subtle">{hint}</span>
+      </span>
+      <Toggle checked={checked} onChange={onChange} label={title} />
+    </label>
+  );
+}
+
+/**
+ * Export GEDCOM 5.5.1 calibré pour l'import Geneanet : dates en anglais
+ * normalisé (19 NOV 1882, ABT 1810), numéros Sosa, sources et vie privée.
+ */
 export function GeneanetExportCard({ slug }: { slug: string }) {
   const [sosaOnly, setSosaOnly] = useState(false);
   const [includeSources, setIncludeSources] = useState(true);
   const [includeNotes, setIncludeNotes] = useState(true);
-  const [protectLiving, setProtectLiving] = useState(false);
+  const [protectLiving, setProtectLiving] = useState(true);
 
-  const queryParams = new URLSearchParams();
-  if (sosaOnly) queryParams.set("sosa", "1");
-  if (!includeSources) queryParams.set("sources", "0");
-  if (!includeNotes) queryParams.set("notes", "0");
-  if (protectLiving) queryParams.set("protect_living", "1");
-
-  const queryString = queryParams.toString();
-  const exportUrl = `/api/profils/${slug}/export/gedcom${queryString ? `?${queryString}` : ""}`;
+  const query = new URLSearchParams();
+  if (sosaOnly) query.set("sosa", "1");
+  if (!includeSources) query.set("sources", "0");
+  if (!includeNotes) query.set("notes", "0");
+  if (protectLiving) query.set("protect_living", "1");
+  const qs = query.toString();
+  const exportUrl = `/api/profils/${slug}/export/gedcom${qs ? `?${qs}` : ""}`;
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-fg-muted">
-        Générez un fichier <strong>GEDCOM 5.5.1</strong> spécialement calibré pour l&apos;import Geneanet :
-        dates normalisées en anglais standard (<code>19 NOV 1882</code>, <code>ABT 1810</code>), numéros SOSA préservés,
-        sources/permaliens et protection de la vie privée.
-      </p>
-
-      {/* Options de configuration de l'export */}
-      <div className="grid gap-2.5 rounded-lg border border-border bg-surface-2/60 p-3.5 text-xs text-fg sm:grid-cols-2">
-        <label className="flex cursor-pointer items-start gap-2.5">
-          <input
-            type="checkbox"
-            checked={sosaOnly}
-            onChange={(e) => setSosaOnly(e.target.checked)}
-            className="mt-0.5 rounded border-border"
-          />
-          <div>
-            <span className="font-medium">Ascendants directs uniquement (SOSA)</span>
-            <p className="text-[11px] text-fg-subtle">
-              Exclut les collatéraux et les branches sans filiation directe.
-            </p>
-          </div>
-        </label>
-
-        <label className="flex cursor-pointer items-start gap-2.5">
-          <input
-            type="checkbox"
-            checked={includeSources}
-            onChange={(e) => setIncludeSources(e.target.checked)}
-            className="mt-0.5 rounded border-border"
-          />
-          <div>
-            <span className="font-medium">Inclure les sources et permaliens</span>
-            <p className="text-[11px] text-fg-subtle">
-              Transcriptions d&apos;actes et liens d&apos;archives dans les balises SOUR.
-            </p>
-          </div>
-        </label>
-
-        <label className="flex cursor-pointer items-start gap-2.5">
-          <input
-            type="checkbox"
-            checked={includeNotes}
-            onChange={(e) => setIncludeNotes(e.target.checked)}
-            className="mt-0.5 rounded border-border"
-          />
-          <div>
-            <span className="font-medium">Inclure les notes</span>
-            <p className="text-[11px] text-fg-subtle">
-              Notes de recherche et annotations biographiques.
-            </p>
-          </div>
-        </label>
-
-        <label className="flex cursor-pointer items-start gap-2.5">
-          <input
-            type="checkbox"
-            checked={protectLiving}
-            onChange={(e) => setProtectLiving(e.target.checked)}
-            className="mt-0.5 rounded border-border"
-          />
-          <div>
-            <span className="font-medium">Masquer les personnes vivantes (RGPD)</span>
-            <p className="text-[11px] text-fg-subtle">
-              Anonymise les noms et applique le tag <code>RESN privacy</code>.
-            </p>
-          </div>
-        </label>
+    <div>
+      <div className="-mt-3 divide-y divide-border">
+        <Option
+          title="Ancêtres directs uniquement"
+          hint="Exclut les collatéraux et les branches sans filiation Sosa."
+          checked={sosaOnly}
+          onChange={setSosaOnly}
+        />
+        <Option
+          title="Sources et liens d’archives"
+          hint="Permaliens et transcriptions d’actes dans les balises SOUR."
+          checked={includeSources}
+          onChange={setIncludeSources}
+        />
+        <Option
+          title="Notes de recherche"
+          hint="Hypothèses et annotations biographiques."
+          checked={includeNotes}
+          onChange={setIncludeNotes}
+        />
+        <Option
+          title="Masquer les personnes vivantes"
+          hint="Anonymise leurs noms et ajoute la restriction RESN privacy (RGPD)."
+          checked={protectLiving}
+          onChange={setProtectLiving}
+        />
       </div>
-
-      <div className="flex flex-wrap items-center gap-3 pt-1">
-        <a
-          href={exportUrl}
-          className={buttonClass("primary")}
-          download
-        >
-          <span>📥</span>
-          <span>Télécharger le GEDCOM (.ged)</span>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <a href={exportUrl} className={buttonClass("primary")} download>
+          <IconDownload size={14} />
+          Télécharger le GEDCOM
         </a>
-
         <a
           href="https://my.geneanet.org/arbre/"
           target="_blank"
           rel="noreferrer"
-          className={buttonClass("ghost")}
-          title="Ouvrir la page d'import Geneanet dans un nouvel onglet"
+          className={buttonClass("secondary")}
+          title="Ouvrir la page d’import de Geneanet"
         >
-          <span>Ouvrir l&apos;import Geneanet ↗</span>
+          Import Geneanet
+          <IconExternalLink size={13} />
         </a>
       </div>
     </div>
   );
 }
-

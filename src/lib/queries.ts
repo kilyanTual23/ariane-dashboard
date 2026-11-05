@@ -609,3 +609,45 @@ export const listAllSourcesForProfile = cache(async (profileId: number): Promise
   return queryAll<SourceRow>(`SELECT * FROM sources WHERE profile_id = ? ORDER BY id`, [profileId]);
 });
 
+
+/* ------------------------------------------------------------------ carnet */
+
+/**
+ * Carnet de notes du profil : un bloc-notes libre, ouvert depuis n'importe quelle page.
+ * La table se crée d'elle-même au premier usage (aucune migration à lancer).
+ */
+let notebookReady: Promise<void> | null = null;
+function ensureNotebookTable(): Promise<void> {
+  notebookReady ??= execute(
+    `CREATE TABLE IF NOT EXISTS notebooks (
+       profile_id INTEGER PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+       content    TEXT NOT NULL DEFAULT '',
+       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+     )`,
+  )
+    .then(() => undefined)
+    .catch((err) => {
+      notebookReady = null;
+      throw err;
+    });
+  return notebookReady;
+}
+
+export type Notebook = { content: string; updated_at: string | null };
+
+export async function getNotebook(profileId: number): Promise<Notebook> {
+  await ensureNotebookTable();
+  const row = await queryOne<Notebook>(`SELECT content, updated_at FROM notebooks WHERE profile_id = ?`, [profileId]);
+  return row ?? { content: "", updated_at: null };
+}
+
+export async function saveNotebook(profileId: number, content: string): Promise<string> {
+  await ensureNotebookTable();
+  await execute(
+    `INSERT INTO notebooks (profile_id, content, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(profile_id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at`,
+    [profileId, content],
+  );
+  const row = await queryOne<{ updated_at: string }>(`SELECT updated_at FROM notebooks WHERE profile_id = ?`, [profileId]);
+  return row?.updated_at ?? "";
+}

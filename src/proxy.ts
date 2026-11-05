@@ -53,7 +53,7 @@ export const config = {
     /*
      * Intercepter toutes les requêtes sauf les fichiers statiques de Next.js, images et assets
      */
-    "/((?!_next/static|_next/image|favicon.ico|fra.traineddata).*)",
+    "/((?!_next/static|_next/image|favicon.ico|fra.traineddata|manifest.webmanifest|icons/|apple-icon).*)",
   ],
 };
 

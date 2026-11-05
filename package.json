@@ -11,7 +11,6 @@
     "verify": "tsx scripts/verify-import.ts",
     "migrate:status": "tsx scripts/migrate-status.ts",
     "audit": "tsx scripts/audit-import.ts",
-    "geneanet": "tsx scripts/match-geneanet.ts",
     "db:save": "tsx scripts/checkpoint.ts",
     "migrate:turso": "tsx scripts/migrate-to-turso.ts",
     "actes:download": "tsx scripts/download-all-actes.ts",

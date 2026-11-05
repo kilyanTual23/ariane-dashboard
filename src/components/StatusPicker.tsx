@@ -1,101 +1,83 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 
 import { setPersonField } from "@/app/actions";
-import { STATUS_DOT } from "@/components/ui";
+import { IconChevronDown, Spinner } from "@/components/icons";
+import { Menu, MenuItem } from "@/components/Menu";
+import { errorMessage, useToast } from "@/components/Toast";
+import { STATUS_MEANING, StatusDot } from "@/components/ui";
 import { STATUSES, type Status } from "@/lib/types";
 
-/** Ce que veut dire chaque état, en clair, sous le libellé. */
-const MEANING: Record<Status, string> = {
-  "Pas commencé": "personne ne s’en est encore occupé",
-  "En recherche": "en cours, ou des pistes sont ouvertes",
-  Bloqué: "plus rien à tirer pour l’instant",
-  Complet: "rien de plus à trouver (sans lacune)",
-  "Complet (lacunes)": "recherche close malgré des actes ou dates introuvables",
-};
-
+/** Choix du statut de recherche d'une fiche, avec le sens de chaque état. */
 export function StatusPicker({
   slug,
   personId,
   status,
+  className = "",
+  appearance = "field",
 }: {
   slug: string;
   personId: number;
   status: Status;
+  className?: string;
+  /** « plain » : sans cadre, pour une liste de propriétés. */
+  appearance?: "field" | "plain";
 }) {
-  const [open, setOpen] = useState(false);
-  const [optimisticStatus, setOptimisticStatus] = useState<Status>(status);
+  const [optimistic, setOptimistic] = useState<Status>(status);
+  const [lastStatus, setLastStatus] = useState(status);
   const [pending, startTransition] = useTransition();
-  const router = useRouter();
-  const box = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
-  useEffect(() => {
-    setOptimisticStatus(status);
-  }, [status]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  if (status !== lastStatus) {
+    setLastStatus(status);
+    setOptimistic(status);
+  }
 
   const choose = (next: Status) => {
-    setOpen(false);
-    if (next === optimisticStatus) return;
-    setOptimisticStatus(next);
+    if (next === optimistic) return;
+    const previous = optimistic;
+    setOptimistic(next);
     startTransition(async () => {
       try {
         await setPersonField({ slug, personId, field: "status", value: next });
-        router.refresh();
-      } catch {
-        setOptimisticStatus(status);
+      } catch (err) {
+        setOptimistic(previous);
+        toast.error("Statut non modifié", errorMessage(err));
       }
     });
   };
 
   return (
-    <div className="relative inline-block" ref={box}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3.5 py-1.5 text-[13px] shadow-soft transition-all hover:border-border-strong"
-      >
-        <span className={`size-2 rounded-full ${STATUS_DOT[optimisticStatus] ?? "bg-neutral"}`} />
-        {optimisticStatus}
-        <span className="text-[10px] text-fg-subtle">▾</span>
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-surface p-1 shadow-pop">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => choose(s)}
-              className={`flex w-full items-start gap-2.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-surface-2 ${
-                s === optimisticStatus ? "bg-surface-2" : ""
-              }`}
-            >
-              <span className={`mt-1.5 size-2 shrink-0 rounded-full ${STATUS_DOT[s]}`} />
-              <span className="min-w-0">
-                <span className="block text-sm">{s}</span>
-                <span className="block text-[11px] text-fg-subtle">{MEANING[s]}</span>
-              </span>
-              {s === optimisticStatus && <span className="ml-auto text-xs text-fg">✓</span>}
-            </button>
-          ))}
-        </div>
+    <Menu
+      className={className}
+      panelClassName="w-72"
+      trigger={(props) => (
+        <button
+          type="button"
+          {...props}
+          className={
+            appearance === "plain"
+              ? `-mx-2 flex h-8 w-[calc(100%+1rem)] items-center gap-2 rounded-md px-2 text-ui font-medium transition-colors hover:bg-surface-2 ${
+                  props.open ? "bg-surface-2" : ""
+                }`
+              : `flex h-9 w-full items-center gap-2.5 rounded-lg border border-border bg-surface px-3 text-ui font-medium shadow-xs transition-colors hover:border-border-strong ${
+                  props.open ? "border-border-strong" : ""
+                }`
+          }
+        >
+          {pending ? <Spinner size={12} /> : <StatusDot status={optimistic} />}
+          <span className="flex-1 truncate text-left">{optimistic}</span>
+          <IconChevronDown size={14} className="text-fg-subtle" />
+        </button>
       )}
-    </div>
+    >
+      {STATUSES.map((s) => (
+        <MenuItem key={s} icon={<StatusDot status={s} />} checked={s === optimistic} onSelect={() => choose(s)}>
+          <span className="block text-ui text-fg">{s}</span>
+          <span className="block text-2xs text-fg-subtle">{STATUS_MEANING[s]}</span>
+        </MenuItem>
+      ))}
+    </Menu>
   );
 }

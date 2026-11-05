@@ -3,9 +3,11 @@ import Link from "next/link";
 
 import { createProfileAction } from "./actions";
 import { logoutAction } from "./login/actions";
+import { IconArrowRight, IconListChecks, IconLogOut, IconPlus, IconUsers, Logo } from "@/components/icons";
+import { SubmitButton } from "@/components/SubmitButton";
+import { CompletionRing, Kbd, STATUS_DOT } from "@/components/ui";
 import { listPersons, listProfiles } from "@/lib/queries";
-import { buttonClass, completionTone, STATUS_DOT } from "@/components/ui";
-import { STATUSES, type Status } from "@/lib/types";
+import { STATUSES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -26,11 +28,10 @@ export default async function HomePage() {
           status,
           count: persons.filter((x) => x.status === status).length,
         })).filter((c) => c.count > 0);
-
         return {
           ...p,
           complete,
-          // La complétion d'un profil, c'est la part des cases remplies de ses cartes.
+          // La complétion d'un profil, c'est la part des cases remplies de ses fiches.
           percent: slots ? Math.round((filled / slots) * 100) : 0,
           counts,
         };
@@ -41,96 +42,101 @@ export default async function HomePage() {
     .sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name, "fr"));
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-16 sm:py-20">
-      <header className="mb-10 flex items-start justify-between gap-4">
-        <div>
-          <span className="inline-flex items-center gap-2 text-[13px] font-medium tracking-tight">
-            <span className="size-1.5 rounded-full bg-fg" />
-            Ariane
-          </span>
-          <h1 className="mt-6 text-[40px] leading-[1.08] tracking-[-0.035em] sm:text-[52px]">
-            Profils de recherche
-          </h1>
-          <p className="mt-4 max-w-md text-[15px] leading-relaxed text-fg-muted">
-            Chaque profil est un arbre indépendant, classé ici du plus avancé au plus jeune.
-          </p>
-        </div>
-        <form action={logoutAction} className="pt-1">
-          <button
-            type="submit"
-            className="rounded-lg border border-border px-3 py-1.5 text-xs text-fg-muted transition-colors hover:border-fg/20 hover:text-fg"
-            title="Verrouiller la session"
-          >
-            Déconnexion
-          </button>
+    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-5 py-10 sm:py-16">
+      <header className="flex items-center justify-between">
+        <span className="flex items-center gap-2.5 text-sm font-semibold">
+          <Logo size={24} className="text-accent" />
+          Ariane
+        </span>
+        <form action={logoutAction}>
+          <SubmitButton variant="quiet" size="sm">
+            <IconLogOut size={13} />
+            Se déconnecter
+          </SubmitButton>
         </form>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="mt-14">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Profils de recherche</h1>
+        <p className="mt-2 max-w-lg text-sm text-fg-muted">
+          Chaque profil est un arbre indépendant, avec ses fiches, ses tâches et sa racine Sosa.
+        </p>
+      </div>
+
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
         {profiles.map((profile) => (
           <Link
             key={profile.id}
             href={`/p/${profile.slug}`}
-            className="group flex flex-col rounded-2xl border border-border bg-surface p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card"
+            className="group flex flex-col rounded-xl border border-border bg-surface p-5 shadow-xs transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-card"
           >
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-lg font-medium tracking-tight">{profile.name}</h2>
-              <span className="num text-[22px] leading-none tracking-tight">
-                {profile.percent} %
+            <div className="flex items-start gap-4">
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-base font-semibold tracking-tight">{profile.name}</h2>
+                {profile.description && <p className="mt-0.5 line-clamp-2 text-ui text-fg-muted">{profile.description}</p>}
+              </div>
+              <CompletionRing score={profile.percent} total={100} size={46} stroke={4}>
+                <span className="num text-[0.625rem] font-semibold">{profile.percent}%</span>
+              </CompletionRing>
+            </div>
+
+            {profile.personCount > 0 && (
+              <div className="mt-5 flex h-1.5 overflow-hidden rounded-full bg-surface-3">
+                {profile.counts.map(({ status, count }) => (
+                  <span
+                    key={status}
+                    className={`${STATUS_DOT[status]} h-full`}
+                    style={{ width: `${(count / profile.personCount) * 100}%` }}
+                    title={`${status} : ${count}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center gap-4 text-xs text-fg-muted">
+              <span className="flex items-center gap-1.5">
+                <IconUsers size={13} className="text-fg-subtle" />
+                <span className="num">{profile.personCount}</span> fiches ·{" "}
+                <span className="num">{profile.complete}</span> complètes
               </span>
-            </div>
-
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-3">
-              <div
-                className={`h-full rounded-full ${completionTone(profile.percent, 100)}`}
-                style={{ width: `${profile.percent}%` }}
-              />
-            </div>
-
-            <p className="num mt-2.5 text-xs text-fg-subtle">
-              {profile.complete}/{profile.personCount}
-              <span className="font-sans"> cartes complètes</span>
               {profile.openTasks > 0 && (
-                <span className="font-sans">
-                  {" "}
-                  · {profile.openTasks} recherche{profile.openTasks > 1 ? "s" : ""} en attente
+                <span className="flex items-center gap-1.5">
+                  <IconListChecks size={13} className="text-fg-subtle" />
+                  <span className="num">{profile.openTasks}</span> tâche{profile.openTasks > 1 ? "s" : ""}
                 </span>
               )}
-            </p>
-
-            <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-4 text-[11px] text-fg-muted">
-              {profile.counts.map(({ status, count }) => (
-                <span key={status} className="flex items-center gap-1.5">
-                  <span className={`size-1.5 rounded-full ${STATUS_DOT[status as Status]}`} />
-                  {status}
-                  <span className="num text-fg-subtle">{count}</span>
-                </span>
-              ))}
+              <IconArrowRight size={14} className="ml-auto text-fg-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-fg" />
             </div>
           </Link>
         ))}
 
-        {profiles.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-border p-6 text-sm text-fg-muted sm:col-span-2">
-            Aucun profil pour l’instant. Crée le premier ci-dessous, ou importe une base Notion avec
-            <code className="mx-1 rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs">
-              npm run import
-            </code>
-            .
-          </p>
-        )}
+        {/* Créer un profil reste possible, sans peser autant que les profils existants. */}
+        <details
+          open={profiles.length === 0}
+          className="group rounded-xl border border-dashed border-border open:p-5 [&:not([open])]:flex"
+        >
+          <summary className="flex flex-1 cursor-pointer list-none items-center justify-center gap-2 rounded-xl p-5 text-ui text-fg-muted transition-colors hover:bg-surface-2/60 hover:text-fg group-open:p-0 group-open:font-semibold group-open:text-fg group-open:hover:bg-transparent [&::-webkit-details-marker]:hidden">
+            <IconPlus size={14} className="text-fg-subtle" />
+            Nouveau profil
+          </summary>
+          <form action={createProfileAction} className="mt-3 flex flex-col gap-3">
+            <input className="field" name="name" placeholder="Famille Tual" required aria-label="Nom du profil" />
+            <input className="field" name="description" placeholder="Description (facultatif)" aria-label="Description" />
+            <SubmitButton className="self-start">Créer le profil</SubmitButton>
+          </form>
+        </details>
       </div>
 
-      <form action={createProfileAction} className="mt-12 border-t border-border pt-8">
-        <h2 className="text-[13px] font-medium">Nouveau profil</h2>
-        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
-          <input className="field" name="name" placeholder="Famille Tual" required />
-          <input className="field" name="description" placeholder="Description (facultatif)" />
-          <button type="submit" className={buttonClass("primary")}>
-            Créer
-          </button>
-        </div>
-      </form>
+      {profiles.length === 0 && (
+        <p className="mt-6 text-ui text-fg-muted">
+          Vous pouvez aussi importer une base Notion avec{" "}
+          <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs">npm run import</code>.
+        </p>
+      )}
+
+      <p className="mt-auto flex flex-wrap items-center justify-center gap-1.5 pt-16 text-center text-2xs text-fg-subtle">
+        Astuce : <Kbd>Ctrl K</Kbd> pour chercher une personne depuis n’importe quelle page.
+      </p>
     </main>
   );
 }

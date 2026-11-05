@@ -2,79 +2,79 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PersonCard, type CardPerson } from "@/components/PersonCard";
-import { QuickSearch, type SearchPerson } from "@/components/QuickSearch";
-import { completionTone, STATUS_DOT } from "@/components/ui";
-import { publicationOf } from "@/lib/publication";
+import { IconAlert, IconArrowRight, IconChart, IconClock, IconPlus, IconTarget, IconTree } from "@/components/icons";
+import { SlotStrip } from "@/components/PersonCard";
+import { ReminderBoard } from "@/components/PersonReminders";
+import { Avatar, Badge, buttonClass, Card, PageHeader, Stat, STATUS_DOT, StatusDot } from "@/components/ui";
+import { detectAllAnomalies } from "@/lib/anomalies";
+import { lifeSpan, missingHint } from "@/lib/names";
 import { getProfileBySlug, listPersons, listTasks } from "@/lib/queries";
-import { computeLeads, computeStats } from "@/lib/stats";
+import { computeStats, generationOf } from "@/lib/stats";
 import { STATUSES, type Person } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({
-  params,
-}: PageProps<"/p/[slug]">): Promise<Metadata> {
+export async function generateMetadata({ params }: PageProps<"/p/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const profile = await getProfileBySlug(slug);
-  if (!profile) return { title: "Profil introuvable" };
-  return { title: profile.name };
+  return { title: profile?.name ?? "Profil introuvable" };
 }
 
-function toCard(p: Person): CardPerson {
-  return {
-    id: p.id,
-    name: p.displayName,
-    given: p.given_names,
-    surname: p.surname,
-    sosa: p.sosa,
-    status: p.status,
-    kinship: p.kinship,
-    occupation: p.occupation,
+function lifeOf(p: Person) {
+  return lifeSpan({
     birthYear: p.birth_year,
     birthYearEstimated: !!p.birth_year_estimated,
     deathYear: p.death_year,
-    place: p.birth_place ?? p.death_place,
-    score: p.completion.score,
-    total: p.completion.total,
-    percent: p.completion.percent,
-    missing: p.completion.missing,
-    publication: publicationOf(p),
-    isLiving: Boolean(p.is_living),
-    isUnmarried: Boolean(p.is_unmarried),
-  };
+    isLiving: !!p.is_living,
+  });
 }
 
-function Tile({
-  href,
-  label,
-  value,
-  hint,
-  icon,
-}: {
-  href: string;
-  label: string;
-  value: string;
-  hint: string;
-  icon?: string;
-}) {
+/** Ligne de fiche compacte : avatar, nom, années, ce qui manque, jauge. */
+function PersonRow({ slug, person, aside }: { slug: string; person: Person; aside?: React.ReactNode }) {
+  const { score, total, missing, ignored } = person.completion;
   return (
-    <Link
-      href={href}
-      className="group flex flex-col rounded-2xl border border-border bg-surface px-5 py-4 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card"
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wider text-fg-subtle">{label}</span>
-        {icon && (
-          <span className="text-base transition-transform group-hover:scale-110">
-            {icon}
-          </span>
-        )}
+    <li className="group relative flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-2/60">
+      <Avatar seed={person.id} given={person.given_names} surname={person.surname} size="md" />
+      <div className="min-w-0 flex-1">
+        <Link
+          href={`/p/${slug}/personnes/${person.id}`}
+          className="block truncate text-ui font-medium text-fg after:absolute after:inset-0"
+        >
+          {person.displayName}
+        </Link>
+        <p className="truncate text-xs text-fg-subtle">
+          <span className="num">{lifeOf(person)}</span>
+          {missing.length > 0 && (
+            <>
+              {" · "}
+              <span className="text-fg-muted">Manque {missingHint(missing)}</span>
+            </>
+          )}
+        </p>
       </div>
-      <span className="num mt-2 text-[28px] font-semibold leading-none tracking-tight">{value}</span>
-      <span className="mt-2.5 text-xs text-fg-muted">{hint}</span>
-    </Link>
+      {aside ?? (
+        <span className="flex shrink-0 items-center gap-2">
+          <SlotStrip score={score} total={total} missing={missing} ignored={ignored} className="hidden w-24 sm:flex" />
+          <span className="num w-9 text-right text-2xs text-fg-subtle">
+            {score}/{total}
+          </span>
+        </span>
+      )}
+    </li>
   );
+}
+
+/** « 2026-11-05 09:12:00 » (UTC, SQLite) → horodatage. */
+function stampOf(value?: string | null) {
+  if (!value) return 0;
+  const t = Date.parse(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/** Fiches modifiées ces sept derniers jours : la progression, pas seulement l'état. */
+function touchedSince(persons: Person[], days: number) {
+  const since = Date.now() - days * 24 * 3600 * 1000;
+  return persons.filter((p) => stampOf(p.updated_at) >= since);
 }
 
 export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">) {
@@ -82,252 +82,296 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
   const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const [persons, allTasks] = await Promise.all([
-    listPersons(profile.id),
-    listTasks(profile.id),
-  ]);
+  const [persons, allTasks] = await Promise.all([listPersons(profile.id), listTasks(profile.id)]);
   const stats = computeStats(persons);
-  const leads = computeLeads(persons, 4);
-  const openTasks = allTasks.filter(
-    (t) => t.status === "À faire" || t.status === "En cours",
-  );
-  const last = stats.recent[0];
-  const sosaCount = persons.filter((p) => p.sosa).length;
+  const openTasks = allTasks.filter((t) => t.status === "À faire" || t.status === "En cours");
+  // Ce qu'il reste à faire sur des fiches précises : en tête de l'accueil.
+  const reminders = openTasks.filter((t) => t.person_id);
   const sosaRoot = persons.find((p) => p.id === profile.root_person_id) ?? null;
+  const maxGen = stats.generations?.length ?? 0;
+  const anomalies = detectAllAnomalies(persons);
+  const completePercent = stats.total ? Math.round((stats.complete / stats.total) * 100) : 0;
 
-  // Ce qui se termine en une poignée de clics passe devant.
+  const touchedThisWeek = touchedSince(persons, 7);
+  const completedThisWeek = touchedThisWeek.filter((p) => p.completion.percent === 100).length;
+
+  // Une personne n'apparaît qu'une fois sur la page : rappels, puis presque finies, puis récentes.
+  const shown = new Set(reminders.map((t) => t.person_id));
   const almost = persons
-    .filter((p) => p.completion.score < p.completion.total)
+    .filter((p) => p.completion.score < p.completion.total && !shown.has(p.id))
     .sort(
       (a, b) =>
         a.completion.missing.length - b.completion.missing.length ||
+        (a.sosa ?? 9e9) - (b.sosa ?? 9e9) ||
         a.displayName.localeCompare(b.displayName, "fr"),
     )
     .slice(0, 6);
-  const smallestGap = almost.length ? almost[0].completion.missing.length : 0;
-
-  const searchable: SearchPerson[] = persons.map((p) => ({
-    id: p.id,
-    name: p.displayName,
-    givenNames: p.given_names,
-    surname: p.surname,
-    sosa: p.sosa,
-    birthYear: p.birth_year,
-    deathYear: p.death_year,
-    place: p.birth_place ?? p.death_place,
-    birthPlace: p.birth_place,
-    deathPlace: p.death_place,
-    occupation: p.occupation,
-    percent: p.completion.percent,
-  }));
+  for (const p of almost) shown.add(p.id);
+  const recent = stats.recent.filter((p) => !shown.has(p.id)).slice(0, 5);
 
   const counts = STATUSES.map((status) => ({
     status,
     count: persons.filter((p) => p.status === status).length,
-  }));
-  const toPublish = persons.filter((p) => publicationOf(p) === "à mettre sur Geneanet");
-  const archived = persons.filter((p) => publicationOf(p) === "archivée").length;
+  })).filter((c) => c.count > 0);
+
+  const base = `/p/${slug}`;
 
   return (
-    <div className="flex flex-col gap-10">
-      <header>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-[32px] tracking-[-0.03em]">{profile.name}</h1>
-            <p className="mt-2 text-[13px] text-fg-subtle">
-              <span className="num">{stats.complete}</span> cartes complètes sur{" "}
-              <span className="num">{stats.total}</span>
-            </p>
-          </div>
-          {last && (
-            <Link
-              href={`/p/${slug}/personnes/${last.id}`}
-              className="text-[13px] text-fg-muted underline-offset-4 transition-colors hover:text-fg hover:underline"
-            >
-              Reprendre {last.displayName} →
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        title={profile.name}
+        description={
+          persons.length
+            ? profile.description || undefined
+            : "Aucune fiche pour l’instant : commencez par vous-même ou par l’ancêtre le plus proche."
+        }
+        actions={
+          <>
+            <Link href={`${base}/arbre`} className={buttonClass("secondary")}>
+              <IconTree size={14} />
+              Arbre
             </Link>
-          )}
-        </div>
+            <Link href={`${base}/personnes/nouvelle`} className={buttonClass("primary")}>
+              <IconPlus size={15} />
+              Nouvelle fiche
+            </Link>
+          </>
+        }
+      />
 
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-3">
-          <div
-            className={`h-full rounded-full transition-[width] duration-500 ease-out ${completionTone(
-              stats.complete,
-              Math.max(1, stats.total),
-            )}`}
-            style={{ width: `${Math.round((stats.complete / Math.max(1, stats.total)) * 100)}%` }}
-          />
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-surface px-4 py-3 text-[13px] shadow-soft">
-          <span className="num rounded bg-fg px-1.5 py-px text-[10px] leading-4 text-accent-fg">
-            G1
-          </span>
-          {sosaRoot ? (
+      {/* --------------------------------------------------------- chiffres */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+        <Stat
+          href={`${base}/personnes?statut=Complet`}
+          label="Fiches complètes"
+          value={
             <>
-              <span className="text-fg-subtle">racine de la numérotation Sosa :</span>
-              <Link
-                href={`/p/${slug}/personnes/${sosaRoot.id}`}
-                className="font-medium underline-offset-4 hover:underline"
-              >
-                {sosaRoot.displayName}
-              </Link>
-              <Link
-                href={`/p/${slug}/arbre?de=${sosaRoot.id}`}
-                className="text-fg-muted underline-offset-4 transition-colors hover:text-fg hover:underline"
-              >
-                voir son arbre →
-              </Link>
+              {stats.complete}
+              <span className="text-base font-normal text-fg-subtle"> / {stats.total}</span>
             </>
-          ) : (
-            <span className="text-fg-muted">
-              aucune racine définie : les générations et les numéros Sosa restent vides
+          }
+          hint={
+            <span className="flex items-center gap-2">
+              <span className="h-1 flex-1 overflow-hidden rounded-full bg-surface-3">
+                <span className="block h-full rounded-full bg-accent" style={{ width: `${completePercent}%` }} />
+              </span>
+              <span className="num">{completePercent} %</span>
             </span>
-          )}
-          <Link
-            href={`/p/${slug}/reglages`}
-            className="ml-auto text-fg-subtle underline-offset-4 transition-colors hover:text-fg hover:underline"
-          >
-            {sosaRoot ? "changer" : "en définir une"}
-          </Link>
-        </div>
-
-        {toPublish.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-warn/30 bg-warn-soft px-4 py-3 text-[13px]">
-            <span className="size-2 shrink-0 rounded-full bg-warn" />
-            <span>
-              <span className="num">{toPublish.length}</span> carte
-              {toPublish.length > 1 ? "s" : ""} terminée{toPublish.length > 1 ? "s" : ""} à reporter
-              sur Geneanet
-            </span>
-            <Link
-              href={`/p/${slug}/personnes?publication=${encodeURIComponent("à mettre sur Geneanet")}`}
-              className="ml-auto text-fg underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-fg"
-            >
-              les voir →
-            </Link>
-          </div>
-        )}
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {counts.map(({ status, count }) => (
-            <Link
-              key={status}
-              href={`/p/${slug}/personnes?statut=${encodeURIComponent(status)}`}
-              className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] shadow-soft transition-all hover:-translate-y-0.5 hover:border-border-strong"
-            >
-              <span className={`size-2 rounded-full ${STATUS_DOT[status]}`} />
-              {status}
-              <span className="num text-fg-subtle">{count}</span>
-            </Link>
-          ))}
-          {archived > 0 && (
-            <Link
-              href={`/p/${slug}/personnes?publication=${encodeURIComponent("archivée")}`}
-              className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] text-fg-muted shadow-soft transition-all hover:-translate-y-0.5 hover:border-border-strong"
-            >
-              <span className="text-ok">✓</span>
-              Archivées
-              <span className="num text-fg-subtle">{archived}</span>
-            </Link>
-          )}
-        </div>
-      </header>
-
-      <div>
-        <QuickSearch slug={slug} profileId={profile.id} people={searchable} />
-        <p className="mt-2.5 text-xs text-fg-subtle">
-          Entrée ouvre le premier résultat ·{" "}
-          <Link
-            href={`/p/${slug}/personnes/nouvelle`}
-            className="underline-offset-4 transition-colors hover:text-fg hover:underline"
-          >
-            ajouter une personne
-          </Link>
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile
-          href={`/p/${slug}/personnes`}
-          label="Cartes"
-          value={String(stats.total)}
-          hint={`${stats.total - stats.complete} à compléter`}
-          icon="👥"
+          }
         />
-        <Tile
-          href={`/p/${slug}/arbre`}
-          label="Arbre"
-          value={String(sosaCount)}
-          hint="ancêtres numérotés · naviguer de proche en proche"
-          icon="🌳"
+        <Stat
+          href={`${base}/statistiques`}
+          label="Cases remplies"
+          value={`${stats.filledPercent} %`}
+          icon={<IconChart size={15} />}
+          hint={
+            <>
+              <span className="num">{stats.filled}</span> sur <span className="num">{stats.slots}</span> au total
+            </>
+          }
         />
-        <Tile
-          href={`/p/${slug}/taches`}
-          label="Ma liste"
-          value={String(openTasks.length)}
-          hint={openTasks.length ? "recherches en attente" : "rien en attente"}
-          icon="📋"
+        <Stat
+          href={`${base}/arbre`}
+          label="Ancêtres identifiés"
+          value={stats.ancestors}
+          icon={<IconTree size={15} />}
+          hint={maxGen ? `Sur ${maxGen} générations` : "Définissez une racine Sosa"}
         />
-        <Tile
-          href={`/p/${slug}/statistiques`}
-          label="Chiffres"
-          value={`${stats.avgCompletion} %`}
-          hint="générations, actes manquants, communes"
-          icon="📊"
+        <Stat
+          href={`${base}/personnes`}
+          label="Cette semaine"
+          value={touchedThisWeek.length}
+          icon={<IconClock size={15} />}
+          hint={
+            touchedThisWeek.length
+              ? `fiche${touchedThisWeek.length > 1 ? "s" : ""} modifiée${touchedThisWeek.length > 1 ? "s" : ""}${
+                  completedThisWeek ? ` · ${completedThisWeek} complète${completedThisWeek > 1 ? "s" : ""}` : ""
+                }`
+              : "Aucune fiche modifiée depuis 7 jours"
+          }
         />
       </div>
 
-      {almost.length > 0 && (
-        <section>
-          <div className="mb-3 flex items-baseline justify-between gap-3">
-            <h2 className="eyebrow">
-              Presque terminées : {smallestGap === 1 ? "il ne manque qu’une case" : "les plus proches d’être bouclées"}
-            </h2>
-            <Link
-              href={`/p/${slug}/personnes`}
-              className="text-[13px] text-fg-muted underline-offset-4 transition-colors hover:text-fg hover:underline"
-            >
-              toutes les cartes →
-            </Link>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {almost.map((person) => (
-              <PersonCard key={person.id} slug={slug} person={toCard(person)} />
-            ))}
-          </div>
-        </section>
+      {/* ------------------------------------------------------ à traiter */}
+      {(anomalies.length > 0 || !sosaRoot) && (
+        <div className="flex flex-col gap-2">
+          {anomalies.length > 0 && (
+            <Banner tone="danger" icon={<IconAlert size={15} />} href={`${base}/statistiques#coherence`} cta="Vérifier">
+              <strong className="num font-semibold">{anomalies.length}</strong> incohérence
+              {anomalies.length > 1 ? "s" : ""} de dates détectée{anomalies.length > 1 ? "s" : ""}
+            </Banner>
+          )}
+          {!sosaRoot && persons.length > 0 && (
+            <Banner tone="info" icon={<IconTarget size={15} />} href={`${base}/reglages#racine`} cta="Choisir">
+              Aucune racine Sosa : choisissez le « de cujus » pour numéroter les ancêtres et suivre les générations
+            </Banner>
+          )}
+        </div>
       )}
 
-      <section>
-        <div className="mb-1 flex items-baseline justify-between">
-          <h2 className="eyebrow">À chercher ensuite</h2>
-          <Link
-            href={`/p/${slug}/taches`}
-            className="text-[13px] text-fg-muted underline-offset-4 transition-colors hover:text-fg hover:underline"
-          >
-            {openTasks.length > 0 ? `ma liste (${openTasks.length})` : "ma liste"} →
-          </Link>
-        </div>
-        <ul className="flex flex-col">
-          {leads.map((lead) => (
-            <li key={lead.person.id} className="border-t border-border">
-              <Link
-                href={`/p/${slug}/personnes/${lead.person.id}`}
-                className="-mx-3 block rounded-xl px-3 py-3 transition-colors hover:bg-surface"
-              >
-                <span className="text-sm font-medium">{lead.person.displayName}</span>
-                <span className="mt-0.5 block text-xs text-fg-subtle">
-                  {lead.missing.slice(0, 2).join(", ").toLowerCase()} · {lead.why}
-                </span>
-              </Link>
-            </li>
-          ))}
-          {leads.length === 0 && (
-            <li className="text-sm text-fg-muted">Toutes les cartes sont complètes.</li>
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="flex min-w-0 flex-col gap-6">
+          {/* ------------------------------------------ rappels sur fiches */}
+          <ReminderBoard slug={slug} tasks={reminders} />
+
+          {/* --------------------------------------------- presque finies */}
+          {almost.length > 0 && (
+            <Card
+              title="Presque terminées"
+              description="Les fiches qu’il reste le moins de cases à remplir pour boucler."
+              action={
+                <Link href={`${base}/personnes?tri=filled&ordre=desc`} className={buttonClass("quiet", "", "sm")}>
+                  Tout voir
+                  <IconArrowRight size={13} />
+                </Link>
+              }
+              bodyClassName="!px-0 !pb-2"
+            >
+              <ul className="divide-y divide-border border-t border-border">
+                {almost.map((p) => (
+                  <PersonRow key={p.id} slug={slug} person={p} />
+                ))}
+              </ul>
+            </Card>
           )}
-        </ul>
-      </section>
+
+          {recent.length > 0 && (
+            <Card title="Modifiées récemment" description="Pour reprendre là où vous vous êtes arrêté." bodyClassName="!px-0 !pb-2">
+              <ul className="divide-y divide-border border-t border-border">
+                {recent.map((p) => (
+                  <PersonRow
+                    key={p.id}
+                    slug={slug}
+                    person={p}
+                    aside={
+                      p.sosa ? (
+                        <span className="num shrink-0 text-2xs text-fg-subtle">
+                          #{p.sosa}
+                          {generationOf(p.sosa) ? ` · G${generationOf(p.sosa)}` : ""}
+                        </span>
+                      ) : (
+                        <span />
+                      )
+                    }
+                  />
+                ))}
+              </ul>
+            </Card>
+          )}
+        </div>
+
+        {/* ---------------------------------------------------- colonne */}
+        <div className="flex flex-col gap-6">
+          <Card title="Répartition">
+            {persons.length === 0 ? (
+              <p className="text-ui text-fg-muted">Aucune fiche.</p>
+            ) : (
+              <>
+                <div className="flex h-2 overflow-hidden rounded-full bg-surface-3" role="img" aria-label="Répartition des fiches par statut">
+                  {counts.map(({ status, count }) => (
+                    <span
+                      key={status}
+                      className={`${STATUS_DOT[status]} h-full border-r-2 border-surface last:border-0`}
+                      style={{ width: `${(count / persons.length) * 100}%` }}
+                      title={`${status} : ${count}`}
+                    />
+                  ))}
+                </div>
+                <ul className="mt-4 flex flex-col gap-0.5">
+                  {counts.map(({ status, count }) => (
+                    <li key={status}>
+                      <Link
+                        href={`${base}/personnes?statut=${encodeURIComponent(status === "Complet (lacunes)" ? "Complet" : status)}`}
+                        className="-mx-2 flex items-center gap-2.5 rounded-md px-2 py-1 text-ui text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                      >
+                        <StatusDot status={status} />
+                        <span className="flex-1">{status}</span>
+                        <span className="num text-fg">{count}</span>
+                        <span className="num w-9 text-right text-2xs text-fg-subtle">
+                          {Math.round((count / persons.length) * 100)}%
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </Card>
+
+          <Card title="Racine Sosa">
+            {sosaRoot ? (
+              <div className="flex flex-col gap-3">
+                <Link
+                  href={`${base}/personnes/${sosaRoot.id}`}
+                  className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-2"
+                >
+                  <Avatar seed={sosaRoot.id} given={sosaRoot.given_names} surname={sosaRoot.surname} size="lg" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-ui font-medium">{sosaRoot.displayName}</span>
+                    <span className="num block text-xs text-fg-subtle">{lifeOf(sosaRoot)}</span>
+                  </span>
+                  <Badge tone="ink" className="ml-auto">
+                    G1
+                  </Badge>
+                </Link>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link href={`${base}/arbre?de=${sosaRoot.id}`} className={buttonClass("secondary", "justify-center", "sm")}>
+                    <IconTree size={13} />
+                    Son arbre
+                  </Link>
+                  <Link href={`${base}/reglages#racine`} className={buttonClass("secondary", "justify-center", "sm")}>
+                    <IconTarget size={13} />
+                    Changer
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-start gap-3">
+                <p className="text-ui text-fg-muted">
+                  Le « de cujus » porte le numéro 1 : son père le 2, sa mère le 3… C’est ce qui structure l’arbre et
+                  les générations.
+                </p>
+                <Link href={`${base}/reglages#racine`} className={buttonClass("secondary", "", "sm")}>
+                  Choisir la racine
+                </Link>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function Banner({
+  tone,
+  icon,
+  href,
+  cta,
+  children,
+}: {
+  tone: "warn" | "danger" | "info";
+  icon: React.ReactNode;
+  href: string;
+  cta: string;
+  children: React.ReactNode;
+}) {
+  const tones = {
+    warn: "border-warn-dot/30 bg-warn-soft text-warn",
+    danger: "border-danger-dot/25 bg-danger-soft text-danger",
+    info: "border-info-dot/25 bg-info-soft text-info",
+  };
+  return (
+    <Link
+      href={href}
+      className={`group flex items-center gap-3 rounded-xl border px-4 py-2.5 text-ui transition-[filter] hover:brightness-[0.98] ${tones[tone]}`}
+    >
+      {icon}
+      <span className="min-w-0 flex-1 text-fg">{children}</span>
+      <span className="flex shrink-0 items-center gap-1 text-xs font-medium">
+        {cta}
+        <IconArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </Link>
   );
 }

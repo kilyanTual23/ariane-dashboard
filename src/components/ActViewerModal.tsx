@@ -10,11 +10,39 @@ import {
   type ActViewerContextData,
 } from "@/app/actions";
 import {
+  IconAlert,
+  IconArrowUpRight,
+  IconBookOpen,
+  IconCheck,
+  IconCopy,
+  IconDownload,
+  IconExternalLink,
+  IconFileText,
+  IconMaximize,
+  IconMinimize,
+  IconMinus,
+  IconMove,
+  IconPlus,
+  IconRotateCcw,
+  IconRotateCw,
+  IconScan,
+  IconSparkles,
+  IconX,
+  Spinner,
+} from "@/components/icons";
+import { toggleNotebook, useNotebookOpen } from "@/components/Notebook";
+import { buttonClass } from "@/components/ui";
+import {
   parseTranscription,
   splitFullName,
   type ExtractedActData,
   type FieldSource,
 } from "@/lib/transcription-parser";
+
+const TOOL =
+  "flex h-full min-w-7 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-surface hover:text-fg";
+const TOOL_BORDERED =
+  "flex size-8 items-center justify-center rounded-lg border border-border bg-surface text-fg-muted shadow-xs transition-colors hover:bg-surface-2 hover:text-fg";
 
 interface ViewState {
   scale: number;
@@ -26,6 +54,38 @@ interface CropBox {
   y: number;
   width: number;
   height: number;
+}
+
+/** Ouvre ou referme le carnet sans quitter la visionneuse. */
+function NotebookButton({ compact = false }: { compact?: boolean }) {
+  const open = useNotebookOpen();
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={toggleNotebook}
+        aria-pressed={open}
+        aria-label={open ? "Replier le carnet" : "Ouvrir le carnet"}
+        className={`flex size-9 items-center justify-center rounded-lg active:bg-surface-2 ${open ? "text-accent-text" : "text-fg-subtle"}`}
+      >
+        <IconBookOpen size={19} />
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={toggleNotebook}
+      aria-pressed={open}
+      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium shadow-xs transition-colors ${
+        open ? "border-accent/50 bg-accent-soft text-accent-text" : "border-border bg-surface text-fg hover:bg-surface-2"
+      }`}
+      title="Carnet (Ctrl .)"
+    >
+      <IconBookOpen size={14} />
+      Carnet
+    </button>
+  );
 }
 
 export function ActViewerModal({
@@ -779,6 +839,99 @@ export function ActViewerModal({
     return () => container.removeEventListener("wheel", onWheel);
   }, [isOpen]);
 
+  // Écran tactile : un doigt déplace, deux doigts zooment, un double toucher zoome ou revient à l'ensemble.
+  const viewRef = useRef(view);
+  useEffect(() => {
+    viewRef.current = view;
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const rel = (t: Touch) => {
+      const rect = container.getBoundingClientRect();
+      return { x: t.clientX - (rect.left + rect.width / 2), y: t.clientY - (rect.top + rect.height / 2) };
+    };
+    let last: { x: number; y: number } | null = null;
+    let pinch: { dist: number; mid: { x: number; y: number }; scale: number; pan: { x: number; y: number } } | null = null;
+    let lastTap = 0;
+
+    const onStart = (e: TouchEvent) => {
+      if ((e.target as HTMLElement).closest("button, a, input, textarea")) return;
+      e.preventDefault();
+      if (e.touches.length === 2) {
+        const a = rel(e.touches[0]);
+        const b = rel(e.touches[1]);
+        pinch = {
+          dist: Math.hypot(a.x - b.x, a.y - b.y),
+          mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+          scale: viewRef.current.scale,
+          pan: viewRef.current.pan,
+        };
+        last = null;
+        return;
+      }
+      const p = rel(e.touches[0]);
+      last = p;
+      const now = Date.now();
+      if (now - lastTap < 280) {
+        // Double toucher : zoom ×2,5 sous le doigt, ou retour à la vue d'ensemble si déjà zoomé.
+        lastTap = 0;
+        if (viewRef.current.scale > 1.2) {
+          handleFit();
+        } else {
+          setView((prev) => {
+            const scale = Math.min(10, prev.scale * 2.5);
+            const f = scale / prev.scale;
+            return { scale, pan: { x: p.x - (p.x - prev.pan.x) * f, y: p.y - (p.y - prev.pan.y) * f } };
+          });
+        }
+      } else {
+        lastTap = now;
+      }
+    };
+
+    const onMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (pinch && e.touches.length >= 2) {
+        const a = rel(e.touches[0]);
+        const b = rel(e.touches[1]);
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const scale = Math.max(0.04, Math.min(10, (pinch.scale * dist) / Math.max(1, pinch.dist)));
+        const f = scale / pinch.scale;
+        const start = pinch;
+        setView({ scale, pan: { x: mid.x - (start.mid.x - start.pan.x) * f, y: mid.y - (start.mid.y - start.pan.y) * f } });
+        return;
+      }
+      if (last && e.touches.length === 1) {
+        const p = rel(e.touches[0]);
+        const dx = p.x - last.x;
+        const dy = p.y - last.y;
+        last = p;
+        setView((prev) => ({ ...prev, pan: { x: prev.pan.x + dx, y: prev.pan.y + dy } }));
+      }
+    };
+
+    const onEnd = (e: TouchEvent) => {
+      pinch = null;
+      last = e.touches.length === 1 ? rel(e.touches[0]) : null;
+    };
+
+    container.addEventListener("touchstart", onStart, { passive: false });
+    container.addEventListener("touchmove", onMove, { passive: false });
+    container.addEventListener("touchend", onEnd);
+    container.addEventListener("touchcancel", onEnd);
+    return () => {
+      container.removeEventListener("touchstart", onStart);
+      container.removeEventListener("touchmove", onMove);
+      container.removeEventListener("touchend", onEnd);
+      container.removeEventListener("touchcancel", onEnd);
+    };
+  }, [isOpen, handleFit]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
 
@@ -1185,183 +1338,149 @@ export function ActViewerModal({
   return (
     <div
       ref={modalRootRef}
-      className="fixed inset-0 z-50 flex flex-col bg-bg/95 backdrop-blur-md select-none text-fg font-sans"
+      className="fixed inset-0 z-50 flex animate-fade-in select-none flex-col bg-bg font-sans text-fg"
     >
       {/* Barre d'outils supérieure dans la DA sobre d'Ariane */}
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2.5 shrink-0 z-20 shadow-xs">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="text-sm font-medium text-fg truncate max-w-xs sm:max-w-md">
+      <header className="z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2 max-sm:gap-2 max-sm:pt-[calc(0.5rem+env(safe-area-inset-top))]">
+        <div className="flex min-w-0 items-center gap-2.5 max-sm:w-full">
+          <span className="max-w-xs truncate text-sm font-semibold text-fg sm:max-w-md">
             {title}
           </span>
           {naturalSize.width > 0 && (
-            <span className="hidden sm:inline-flex text-[11px] rounded bg-surface-2 px-2 py-0.5 text-fg-muted font-normal">
+            <span className="num hidden rounded-md bg-surface-2 px-1.5 py-0.5 text-2xs text-fg-subtle sm:inline-flex">
               {naturalSize.width} × {naturalSize.height} px
             </span>
           )}
+          <span className="ml-auto sm:hidden">
+            <NotebookButton compact />
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-fg-subtle active:bg-surface-2 sm:hidden"
+            aria-label="Fermer la visionneuse"
+          >
+            <IconX size={19} />
+          </button>
         </div>
 
         {/* Contrôles du Viewer */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex flex-wrap items-center gap-1.5 max-sm:-mx-4 max-sm:w-[calc(100%+2rem)] max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-0.5 [&>*]:shrink-0">
           {/* Zoom */}
-          <div className="flex items-center rounded-lg border border-border bg-surface-2 p-0.5">
-            <button
-              type="button"
-              onClick={() => handleButtonZoom(1 / 1.25)}
-              className="rounded px-2 py-1 text-xs font-semibold text-fg hover:bg-surface-3 transition-colors"
-              title="Dézoomer (-)"
-            >
-              −
+          <div className="flex h-8 items-center rounded-lg border border-border bg-surface-2/70 p-0.5">
+            <button type="button" onClick={() => handleButtonZoom(1 / 1.25)} className={TOOL} title="Dézoomer (−)" aria-label="Dézoomer">
+              <IconMinus size={14} />
             </button>
-            <span className="min-w-14 text-center text-xs font-medium text-fg">
-              {Math.round(view.scale * 100)} %
-            </span>
-            <button
-              type="button"
-              onClick={() => handleButtonZoom(1.25)}
-              className="rounded px-2 py-1 text-xs font-semibold text-fg hover:bg-surface-3 transition-colors"
-              title="Zoomer (+)"
-            >
-              +
+            <span className="num min-w-12 text-center text-xs font-medium text-fg">{Math.round(view.scale * 100)}%</span>
+            <button type="button" onClick={() => handleButtonZoom(1.25)} className={TOOL} title="Zoomer (+)" aria-label="Zoomer">
+              <IconPlus size={14} />
             </button>
-            <button
-              type="button"
-              onClick={handleFit}
-              className="rounded px-2 py-1 text-xs text-fg-muted hover:bg-surface-3 hover:text-fg transition-colors"
-              title="Ajuster à la fenêtre"
-            >
+            <span className="mx-0.5 h-4 w-px bg-border" />
+            <button type="button" onClick={handleFit} className={`${TOOL} px-2 text-xs`} title="Ajuster à la fenêtre">
               Ajuster
             </button>
             <button
               type="button"
               onClick={handleActualSize}
-              className={`rounded px-2 py-1 text-xs transition-colors ${
-                Math.round(view.scale * 100) === 100
-                  ? "bg-fg text-accent-fg font-medium shadow-xs"
-                  : "text-fg-muted hover:bg-surface-3 hover:text-fg"
-              }`}
-              title="Taille réelle 1:1 netteté maximale"
+              className={`${TOOL} px-2 text-xs ${Math.round(view.scale * 100) === 100 ? "bg-surface font-medium text-fg shadow-xs" : ""}`}
+              title="Taille réelle (1:1)"
             >
-              100%
+              1:1
             </button>
           </div>
 
           {/* Rotation */}
-          <div className="flex items-center rounded-lg border border-border bg-surface-2 p-0.5">
-            <button
-              type="button"
-              onClick={handleRotateCCW}
-              className="rounded px-1.5 py-1 text-xs text-fg hover:bg-surface-3 transition-colors"
-              title="Pivoter à gauche"
-            >
-              ↺
+          <div className="flex h-8 items-center rounded-lg border border-border bg-surface-2/70 p-0.5">
+            <button type="button" onClick={handleRotateCCW} className={TOOL} title="Pivoter à gauche" aria-label="Pivoter à gauche">
+              <IconRotateCcw size={14} />
             </button>
-            <button
-              type="button"
-              onClick={handleRotateCW}
-              className="rounded px-2 py-1 text-xs font-medium text-fg hover:bg-surface-3 transition-colors"
-              title="Pivoter à droite"
-            >
-              ↻ {rotation !== 0 ? `${rotation}°` : "90°"}
+            <button type="button" onClick={handleRotateCW} className={TOOL} title="Pivoter à droite" aria-label="Pivoter à droite">
+              <IconRotateCw size={14} />
             </button>
+            {rotation !== 0 && <span className="num px-1.5 text-2xs text-fg-subtle">{rotation}°</span>}
           </div>
 
           {/* Filtres de lisibilité */}
-          <button
-            type="button"
-            onClick={() => setHighContrast((v) => !v)}
-            className={`rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
-              highContrast
-                ? "border-fg bg-fg text-accent-fg font-medium"
-                : "border-border bg-surface text-fg hover:bg-surface-2"
-            }`}
-            title="Contraste renforcé"
-          >
-            ◐ Contraste
-          </button>
+          <div className="flex h-8 items-center rounded-lg border border-border bg-surface-2/70 p-0.5" role="group" aria-label="Filtres de lisibilité">
+            <button
+              type="button"
+              aria-pressed={highContrast}
+              onClick={() => setHighContrast((v) => !v)}
+              className={`${TOOL} px-2 text-xs ${highContrast ? "bg-surface font-medium text-fg shadow-xs" : ""}`}
+              title="Contraste renforcé"
+            >
+              Contraste
+            </button>
+            <button
+              type="button"
+              aria-pressed={invert}
+              onClick={() => setInvert((v) => !v)}
+              className={`${TOOL} px-2 text-xs ${invert ? "bg-surface font-medium text-fg shadow-xs" : ""}`}
+              title="Inverser les couleurs : l’encre pâle ressort"
+            >
+              Négatif
+            </button>
+            <button
+              type="button"
+              aria-pressed={grayscale}
+              onClick={() => setGrayscale((v) => !v)}
+              className={`${TOOL} px-2 text-xs ${grayscale ? "bg-surface font-medium text-fg shadow-xs" : ""}`}
+              title="Niveaux de gris"
+            >
+              N&amp;B
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setInvert((v) => !v)}
-            className={`rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
-              invert
-                ? "border-fg bg-fg text-accent-fg font-medium"
-                : "border-border bg-surface text-fg hover:bg-surface-2"
-            }`}
-            title="Mode Négatif"
-          >
-            ◑ Négatif
-          </button>
+          <span className="mx-0.5 hidden h-5 w-px bg-border sm:inline" />
 
-          <button
-            type="button"
-            onClick={() => setGrayscale((v) => !v)}
-            className={`hidden sm:inline-flex rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
-              grayscale
-                ? "border-fg bg-fg text-accent-fg font-medium"
-                : "border-border bg-surface text-fg hover:bg-surface-2"
-            }`}
-            title="Niveaux de gris"
-          >
-            N&B
-          </button>
+          {/* Carnet : noter en lisant l'acte (sur téléphone, il est dans la ligne du titre) */}
+          <span className="max-sm:hidden">
+            <NotebookButton />
+          </span>
 
-          <span className="hidden sm:inline h-4 w-px bg-border mx-0.5" />
-
-          {/* Bouton OCR / Transcription */}
+          {/* Transcription */}
           <button
             type="button"
             onClick={() => setOcrOpen((v) => !v)}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-              ocrOpen
-                ? "border-fg bg-fg text-accent-fg shadow-xs"
-                : "border-border bg-surface-2 text-fg hover:bg-surface-3"
+            aria-pressed={ocrOpen}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors ${
+              ocrOpen ? "bg-accent text-accent-fg shadow-soft" : "border border-border bg-surface text-fg shadow-xs hover:bg-surface-2"
             }`}
-            title="Ouvrir le panneau de transcription et d'OCR"
+            title="Transcrire l’acte et reporter les informations dans la fiche"
           >
-            📝 Transcription OCR
+            <IconSparkles size={14} />
+            Transcrire
           </button>
 
-          {/* Plein écran */}
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg hover:bg-surface-2"
-            title="Plein écran"
-          >
-            {isFullscreen ? "🗗" : "⛶"}
+          <button type="button" onClick={toggleFullscreen} className={`${TOOL_BORDERED} max-sm:hidden`} title="Plein écran" aria-label="Plein écran">
+            {isFullscreen ? <IconMinimize size={14} /> : <IconMaximize size={14} />}
           </button>
 
-          {/* Permalien d'archives */}
           {originalUrl && (
             <a
               href={originalUrl}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-muted hover:text-fg hover:bg-surface-2"
-              title="Ouvrir le permalien sur le site des archives"
+              className={TOOL_BORDERED}
+              title="Ouvrir sur le site des archives"
+              aria-label="Ouvrir sur le site des archives"
             >
-              Archives ↗
+              <IconExternalLink size={14} />
             </a>
           )}
 
-          {/* Téléchargement */}
-          <a
-            href={imageUrl}
-            download={downloadFilename ?? "acte.jpg"}
-            className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-fg hover:bg-surface-2 shadow-2xs"
-            title="Télécharger l'image JPEG originale"
-          >
-            💾
+          <a href={imageUrl} download={downloadFilename ?? "acte.jpg"} className={TOOL_BORDERED} title="Télécharger l’image" aria-label="Télécharger l’image">
+            <IconDownload size={14} />
           </a>
 
-          {/* Fermer */}
           <button
             type="button"
             onClick={onClose}
-            className="ml-1 rounded-lg p-1.5 text-fg-subtle hover:text-fg hover:bg-surface-2"
-            title="Fermer la visionneuse (Échap)"
+            className="ml-1 flex size-8 items-center justify-center rounded-lg text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg max-sm:hidden"
+            title="Fermer (Échap)"
+            aria-label="Fermer la visionneuse"
           >
-            ✕
+            <IconX size={17} />
           </button>
         </div>
       </header>
@@ -1373,7 +1492,7 @@ export function ActViewerModal({
           ref={containerRef}
           onMouseDown={handleMouseDown}
           onDoubleClick={handleDoubleClick}
-          className={`relative flex-1 overflow-hidden w-full h-full bg-surface-2/70 ${
+          className={`relative h-full w-full flex-1 touch-none overflow-hidden bg-surface-2/70 ${
             mode === "select"
               ? "cursor-crosshair"
               : isDragging
@@ -1382,29 +1501,24 @@ export function ActViewerModal({
           }`}
         >
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-surface/70 backdrop-blur-2xs z-20">
-              <span className="text-sm font-medium text-fg animate-pulse">
-                Chargement de l'acte haute définition…
-              </span>
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-surface-2/80">
+              <Spinner size={20} className="text-fg-muted" />
+              <span className="text-ui text-fg-muted">Chargement de l’acte…</span>
             </div>
           )}
 
           {loadError && !loading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface/95 backdrop-blur-sm z-20 p-6 text-center">
-              <span className="text-3xl mb-3">📄</span>
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-surface p-6 text-center">
+              <IconFileText size={28} className="mb-3 text-fg-subtle" />
               <p className="text-sm font-semibold text-fg">{loadError}</p>
               <p className="mt-1.5 max-w-md text-xs text-fg-muted">
-                Le document n'a pas pu être prévisualisé directement. Assurez-vous que le lien Google Drive est partagé avec « Tous les utilisateurs disposant du lien ».
+                Le document n’a pas pu être affiché ici. S’il est sur Google Drive, vérifiez qu’il est partagé avec
+                « Tous les utilisateurs disposant du lien ».
               </p>
               {originalUrl && (
-                <a
-                  href={originalUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-fg px-3.5 py-2 text-xs font-medium text-accent-fg hover:opacity-90 transition-opacity"
-                >
-                  <span>Ouvrir dans Google Drive</span>
-                  <span>↗</span>
+                <a href={originalUrl} target="_blank" rel="noreferrer" className={buttonClass("primary", "mt-4")}>
+                  Ouvrir l’original
+                  <IconExternalLink size={13} />
                 </a>
               )}
             </div>
@@ -1418,7 +1532,7 @@ export function ActViewerModal({
             className="w-full h-full block"
           />
 
-          {/* Boîte de sélection de zone (Crop box) dans la DA sobre */}
+          {/* Cadre de la zone à transcrire */}
           {screenCrop && (
             <div
               style={{
@@ -1427,27 +1541,28 @@ export function ActViewerModal({
                 width: screenCrop.width,
                 height: screenCrop.height,
               }}
-              className="absolute pointer-events-none border-2 border-fg bg-fg/10 shadow-lg transition-all"
+              className="pointer-events-none absolute rounded-sm border-2 border-info-dot bg-info-dot/10"
             >
-              <span className="absolute -top-6 left-0 rounded bg-fg px-2 py-0.5 text-[10.5px] font-medium text-accent-fg shadow-xs">
-                Zone ({cropBox?.width} × {cropBox?.height} px)
+              <span className="num absolute -top-6 left-0 rounded-md bg-info-dot px-1.5 py-0.5 text-2xs font-medium text-white shadow-xs">
+                {cropBox?.width} × {cropBox?.height} px
               </span>
             </div>
           )}
 
 
-          {/* Barre d'outils flottante de mode (Main vs Sélection) */}
-          <div className="absolute bottom-4 left-6 z-10 flex items-center gap-1.5 rounded-full border border-border bg-surface/90 p-1 backdrop-blur-md shadow-md">
+          {/* Outils de la page : déplacer l'image ou tracer une zone à transcrire */}
+          <div className="absolute bottom-4 left-4 z-10 flex h-9 items-center gap-0.5 rounded-xl border border-border bg-surface/95 p-1 shadow-card backdrop-blur">
             <button
               type="button"
               onClick={() => setMode("pan")}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors cursor-pointer ${
-                mode === "pan"
-                  ? "bg-fg text-accent-fg font-medium shadow-xs"
-                  : "text-fg-muted hover:text-fg hover:bg-surface-2"
+              aria-pressed={mode === "pan"}
+              title="Déplacer l’image en la faisant glisser"
+              className={`flex h-full items-center gap-1.5 rounded-lg px-2.5 text-xs transition-colors ${
+                mode === "pan" ? "bg-surface-2 font-medium text-fg" : "text-fg-muted hover:text-fg"
               }`}
             >
-              <span>Déplacer</span>
+              <IconMove size={13} />
+              Déplacer
             </button>
             <button
               type="button"
@@ -1455,318 +1570,275 @@ export function ActViewerModal({
                 setMode("select");
                 if (!ocrOpen) setOcrOpen(true);
               }}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors cursor-pointer ${
-                mode === "select"
-                  ? "bg-fg text-accent-fg font-medium shadow-xs"
-                  : "text-fg-muted hover:text-fg hover:bg-surface-2"
+              aria-pressed={mode === "select"}
+              title="Tracer un cadre autour de l’acte à transcrire"
+              className={`flex h-full items-center gap-1.5 rounded-lg px-2.5 text-xs transition-colors ${
+                mode === "select" ? "bg-surface-2 font-medium text-fg" : "text-fg-muted hover:text-fg"
               }`}
             >
-              <span>Sélectionner l’acte</span>
+              <IconScan size={13} />
+              Tracer une zone
             </button>
             {cropBox && cropBox.width > 0 && (
               <button
                 type="button"
                 onClick={() => setCropBox(null)}
-                className="rounded-full px-2.5 py-1.5 text-xs text-fg-subtle hover:text-fg hover:bg-surface-2 cursor-pointer"
-                title="Effacer la sélection"
+                className="flex h-full items-center gap-1 rounded-lg px-2 text-xs text-fg-subtle transition-colors hover:text-fg"
+                title="Effacer la zone"
               >
-                ✕ Effacer
+                <IconX size={12} />
+                Effacer
               </button>
             )}
           </div>
         </main>
 
-        {/* Panneau latéral OCR & Transcription parfaitement remodelé et confortable */}
+        {/* Panneau latéral : report dans la fiche, texte transcrit, réglages */}
         {ocrOpen && (
-          <aside className="w-[680px] max-w-[95vw] lg:w-[780px] xl:w-[860px] border-l border-border bg-surface flex flex-col shrink-0 z-20 shadow-2xl animate-in slide-in-from-right duration-200">
-            {/* En-tête du panneau avec navigation par onglets */}
-            <div className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-surface shrink-0">
+          <aside className="z-20 flex w-[min(40rem,94vw)] shrink-0 animate-slide-in-right flex-col border-l border-border bg-surface">
+            <div className="flex shrink-0 items-center gap-1 border-b border-border px-3">
               {transcription ? (
-                <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setSidebarTab("compare")}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                      sidebarTab === "compare"
-                        ? "bg-surface text-fg shadow-2xs font-semibold"
-                        : "text-fg-muted hover:text-fg"
-                    }`}
-                  >
-                    <span>Données & Fiche</span>
-                    {selectedFieldKeys.size > 0 && (
-                      <span className="rounded-full bg-fg text-accent-fg px-1.5 py-0.2 text-[10px] font-semibold">
-                        {selectedFieldKeys.size}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarTab("transcription")}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                      sidebarTab === "transcription"
-                        ? "bg-surface text-fg shadow-2xs font-semibold"
-                        : "text-fg-muted hover:text-fg"
-                    }`}
-                  >
-                    <span>Transcription</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarTab("settings")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                      sidebarTab === "settings"
-                        ? "bg-surface text-fg shadow-2xs font-semibold"
-                        : "text-fg-muted hover:text-fg"
-                    }`}
-                    title="Paramètres de transcription et sélection"
-                  >
-                    <span>Paramètres</span>
-                  </button>
-                </div>
+                <nav className="flex items-center gap-0.5" aria-label="Panneau de transcription">
+                  {(
+                    [
+                      ["compare", "Reporter dans la fiche"],
+                      ["transcription", "Texte"],
+                      ["settings", "Réglages"],
+                    ] as const
+                  ).map(([tab, label]) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setSidebarTab(tab)}
+                      aria-current={sidebarTab === tab ? "page" : undefined}
+                      className={`relative flex h-11 items-center gap-1.5 px-2.5 text-ui transition-colors ${
+                        sidebarTab === tab
+                          ? "font-medium text-fg after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-accent"
+                          : "text-fg-muted hover:text-fg"
+                      }`}
+                    >
+                      {label}
+                      {tab === "compare" && selectedFieldKeys.size > 0 && (
+                        <span className="num rounded-full bg-accent px-1.5 text-[0.625rem] font-semibold leading-4 text-accent-fg">
+                          {selectedFieldKeys.size}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </nav>
               ) : (
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-sm text-fg">Transcription & Analyse</h3>
-                </div>
+                <h3 className="flex h-11 items-center gap-2 px-1.5 text-ui font-semibold">
+                  <IconSparkles size={14} className="text-fg-subtle" />
+                  Transcrire l’acte
+                </h3>
               )}
-
               <button
                 type="button"
                 onClick={() => setOcrOpen(false)}
-                className="rounded-lg p-1.5 text-fg-subtle hover:text-fg hover:bg-surface-2 cursor-pointer transition-colors"
+                className="ml-auto flex size-7 items-center justify-center rounded-md text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
                 title="Fermer le panneau"
+                aria-label="Fermer le panneau"
               >
-                ✕
+                <IconX size={15} />
               </button>
             </div>
 
             {/* Corps du panneau défilant */}
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 text-xs">
-              {/* Statut de chargement OCR */}
+            <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5 text-ui">
               {ocrLoading ? (
-                <div className="flex flex-col items-center justify-center py-14 gap-3.5">
-                  <div className="flex items-center justify-center size-12 rounded-2xl bg-surface-2 border border-border shadow-xs">
-                    <span className="inline-block size-6 rounded-full border-2 border-fg border-t-transparent animate-spin" />
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-semibold text-fg">
-                      {ocrProgress || `Analyse en cours (${ocrElapsed}s)…`}
-                    </div>
-                    <p className="text-xs text-fg-muted mt-1 max-w-xs leading-relaxed">
+                <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                  <Spinner size={22} className="text-fg-muted" />
+                  <div>
+                    <p className="text-sm font-medium text-fg">{ocrProgress || `Analyse en cours… ${ocrElapsed} s`}</p>
+                    <p className="mx-auto mt-1 max-w-xs text-xs text-fg-muted">
                       {ocrEngine === "gemini"
-                        ? "L'IA paléographe déchiffre l'écriture ancienne et extrait les données généalogiques…"
-                        : "Le moteur Tesseract analyse les caractères du document…"}
+                        ? "L’IA paléographe déchiffre l’écriture et repère les informations généalogiques."
+                        : "Tesseract reconnaît les caractères du document."}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCancelOcr}
-                    className="mt-2 rounded-xl border border-border bg-surface px-4 py-2 text-xs font-medium text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                  >
-                    ✕ Annuler l'analyse
+                  <button type="button" onClick={handleCancelOcr} className={buttonClass("secondary", "", "sm")}>
+                    Annuler l’analyse
                   </button>
                 </div>
               ) : sidebarTab === "settings" || !transcription ? (
-                /* Onglet 1 / Mode initial : Paramètres de numérisation & lancement */
-                <div className="flex flex-col gap-4">
-                  {/* Choix de la zone */}
-                  <div className="rounded-2xl border border-border bg-surface-2/40 p-3.5 flex flex-col gap-2">
-                    <span className="font-semibold text-fg text-xs uppercase tracking-wider">
-                      1. Zone à transcrire
-                    </span>
+                <div className="flex flex-col gap-6">
+                  <section>
+                    <h4 className="text-ui font-semibold">Zone à transcrire</h4>
                     {cropBox && cropBox.width > 20 && cropBox.height > 20 ? (
-                      <div className="flex items-center justify-between gap-2 text-ok font-medium">
-                        <span>
-                          ✓ Rectangle sélectionné ({cropBox.width} × {cropBox.height} px)
+                      <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
+                        <span className="flex items-center gap-2 text-fg">
+                          <IconScan size={14} className="text-fg-subtle" />
+                          Zone tracée
+                          <span className="num text-xs text-fg-subtle">
+                            {cropBox.width} × {cropBox.height} px
+                          </span>
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setCropBox(null)}
-                          className="text-fg-muted hover:text-fg underline text-[11px] font-normal cursor-pointer"
-                        >
+                        <button type="button" onClick={() => setCropBox(null)} className={buttonClass("quiet", "", "xs")}>
                           Toute la page
                         </button>
                       </div>
                     ) : (
-                      <div className="text-fg-muted flex flex-col gap-2">
-                        <p className="text-xs leading-relaxed">
-                          Toute la page sera analysée. Pour isoler un acte précis, activez « Sélectionner l'acte » et tracez un rectangle sur le registre.
+                      <div className="mt-1.5 flex flex-col items-start gap-2.5">
+                        <p className="text-xs text-fg-muted">
+                          Toute la page sera lue. Sur un registre à plusieurs actes, tracez un cadre autour de celui qui
+                          vous intéresse : la lecture est plus fiable.
                         </p>
-                        <button
-                          type="button"
-                          onClick={() => setMode("select")}
-                          className="self-start rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                        >
-                          Tracer un rectangle sur l'acte
+                        <button type="button" onClick={() => setMode("select")} className={buttonClass("secondary", "", "sm")}>
+                          <IconScan size={13} />
+                          Tracer une zone
                         </button>
                       </div>
                     )}
-                  </div>
+                  </section>
 
-                  {/* Choix du moteur */}
-                  <div className="rounded-2xl border border-border bg-surface-2/40 p-3.5 flex flex-col gap-2.5">
-                    <span className="font-semibold text-fg text-xs uppercase tracking-wider">
-                      2. Moteur de transcription
-                    </span>
-
-                    <label
-                      className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors ${
-                        ocrEngine === "gemini"
-                          ? "border-fg bg-surface font-medium text-fg shadow-2xs"
-                          : "border-border bg-surface/50 hover:bg-surface text-fg-muted"
-                      }`}
+                  <section>
+                    <h4 className="text-ui font-semibold">Moteur de lecture</h4>
+                    <div
+                      className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border"
+                      role="radiogroup"
+                      aria-label="Moteur de transcription"
                     >
-                      <input
-                        type="radio"
-                        name="ocrEngine"
-                        checked={ocrEngine === "gemini"}
-                        onChange={() => setOcrEngine("gemini")}
-                        className="mt-0.5 accent-fg"
-                      />
-                      <div>
-                        <div className="font-semibold text-fg">IA Paléographe (Gemini 3.8 Flash)</div>
-                        <div className="text-[11px] text-fg-muted font-normal mt-0.5">
-                          Transcription experte de l'écriture manuscrite ancienne (XVIe au XXe siècle).
-                        </div>
-                      </div>
-                    </label>
-
-                    <label
-                      className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors ${
-                        ocrEngine === "tesseract"
-                          ? "border-fg bg-surface font-medium text-fg shadow-2xs"
-                          : "border-border bg-surface/50 hover:bg-surface text-fg-muted"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="ocrEngine"
-                        checked={ocrEngine === "tesseract"}
-                        onChange={() => setOcrEngine("tesseract")}
-                        className="mt-0.5 accent-fg"
-                      />
-                      <div>
-                        <div className="font-semibold text-fg">Tesseract (Local hors-ligne)</div>
-                        <div className="text-[11px] text-fg-muted font-normal mt-0.5">
-                          Sans clé requise. Efficace pour les imprimés, tables décennales et formulaires.
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* Clé API */}
+                      {(
+                        [
+                          ["gemini", "IA paléographe", "Écritures manuscrites anciennes, du XVIe au XXe siècle. Nécessite une clé."],
+                          ["tesseract", "Tesseract, en local", "Sans clé ni connexion. Pour les imprimés, tables décennales et formulaires."],
+                        ] as const
+                      ).map(([engine, title, hint]) => (
+                        <label
+                          key={engine}
+                          className={`flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors ${
+                            ocrEngine === engine ? "bg-surface-2/70" : "hover:bg-surface-2/40"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="ocrEngine"
+                            checked={ocrEngine === engine}
+                            onChange={() => setOcrEngine(engine)}
+                            className="mt-0.5 accent-[var(--fg)]"
+                          />
+                          <span>
+                            <span className="block text-ui font-medium text-fg">{title}</span>
+                            <span className="block text-xs text-fg-muted">{hint}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                     {ocrEngine === "gemini" && (
-                      <div className="mt-2 pt-2.5 border-t border-border flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[11px] text-fg font-medium">
-                            Clé API Vision (Gemini, Groq ou OpenAI) :
-                          </label>
+                      <label className="mt-4 block">
+                        <span className="label flex items-center justify-between gap-2">
+                          Clé d’accès (Gemini, Groq ou OpenAI)
                           {geminiApiKey && (
-                            <span className="text-[10px] text-ok font-medium">✓ Enregistrée</span>
+                            <span className="flex items-center gap-1 font-normal text-ok">
+                              <IconCheck size={12} />
+                              Enregistrée sur cet appareil
+                            </span>
                           )}
-                        </div>
+                        </span>
                         <input
                           type="password"
                           value={geminiApiKey}
                           onChange={(e) => handleSaveGeminiKey(e.target.value)}
-                          placeholder="Collez votre clé Google AI Studio (AIza...), Groq (gsk_...) ou OpenAI (sk-...)…"
-                          className="field w-full text-xs"
+                          placeholder="AIza…, gsk_… ou sk-…"
+                          autoComplete="off"
+                          className="field"
                         />
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] pt-0.5">
+                        <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs">
                           <a
                             href="https://aistudio.google.com/apikey"
                             target="_blank"
                             rel="noreferrer"
-                            className="text-fg underline hover:text-fg-muted font-medium"
+                            className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
                           >
-                            Obtenir une clé Google AI Studio ↗
+                            Obtenir une clé Google AI Studio
+                            <IconArrowUpRight size={11} />
                           </a>
-                          <span className="text-fg-subtle">·</span>
                           <a
                             href="https://console.groq.com/keys"
                             target="_blank"
                             rel="noreferrer"
-                            className="text-fg-muted underline hover:text-fg"
+                            className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
                           >
-                            Alternative gratuite : Groq (1s, sans quota) ↗
+                            Alternative gratuite : Groq
+                            <IconArrowUpRight size={11} />
                           </a>
-                        </div>
-                      </div>
+                        </span>
+                      </label>
                     )}
-                  </div>
+                  </section>
 
-                  {/* Bouton de lancement */}
-                  <button
-                    type="button"
-                    onClick={handleRunOcr}
-                    className="w-full rounded-xl bg-fg py-3 text-xs font-semibold text-accent-fg transition-opacity hover:opacity-90 cursor-pointer shadow-xs"
-                  >
-                    {transcription ? "Relancer l'analyse" : "Lancer la transcription"}
+                  <button type="button" onClick={handleRunOcr} className={buttonClass("primary", "w-full", "lg")}>
+                    <IconSparkles size={15} />
+                    {transcription ? "Relancer l’analyse" : "Lancer la transcription"}
                   </button>
                 </div>
               ) : sidebarTab === "transcription" ? (
-                /* Onglet 2 : Transcription intégrale */
+                /* Onglet 2 : texte transcrit */
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between border-b border-border pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-fg text-sm">Transcription paléographique</span>
-                      <button
-                        type="button"
-                        onClick={() => setEditMode((v) => !v)}
-                        className={`rounded-lg px-2 py-1 text-[11px] transition-colors cursor-pointer ${
-                          editMode
-                            ? "bg-fg text-accent-fg font-medium"
-                            : "text-fg-subtle hover:text-fg hover:bg-surface-2"
-                        }`}
-                      >
-                        {editMode ? "Aperçu formaté" : "Modifier texte"}
-                      </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex h-7 items-center rounded-lg border border-border bg-surface-2/70 p-0.5" role="radiogroup" aria-label="Mode">
+                      {(
+                        [
+                          [false, "Lecture"],
+                          [true, "Correction"],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          role="radio"
+                          aria-checked={editMode === value}
+                          onClick={() => setEditMode(value)}
+                          className={`h-full rounded-md px-2.5 text-xs transition-colors ${
+                            editMode === value ? "bg-surface font-medium text-fg shadow-xs" : "text-fg-muted hover:text-fg"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={handleCopyTranscription}
-                        className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                      >
-                        {copySuccess ? "Copié !" : "Copier"}
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <button type="button" onClick={handleCopyTranscription} className={buttonClass("secondary", "", "sm")}>
+                        {copySuccess ? <IconCheck size={13} /> : <IconCopy size={13} />}
+                        {copySuccess ? "Copié" : "Copier"}
                       </button>
                       {slug && (personId || unionId) && (
                         <button
                           type="button"
                           onClick={handleSaveToNotes}
                           disabled={pendingSave}
-                          className="rounded-lg bg-fg text-accent-fg px-2.5 py-1 text-[11px] font-medium hover:opacity-90 transition-opacity cursor-pointer"
+                          className={buttonClass("secondary", "", "sm")}
                         >
-                          {saveSuccess ? "Enregistré !" : "Enregistrer dans notes"}
+                          {saveSuccess ? <IconCheck size={13} /> : <IconFileText size={13} />}
+                          {saveSuccess ? "Ajouté aux notes" : "Ajouter aux notes"}
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Indicateur de source épinglée */}
                   {pinnedSourceKey && getSourceForField(pinnedSourceKey)?.text && (
-                    <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-400/10 border border-amber-400/30 text-amber-900 dark:text-amber-200 rounded-xl text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-semibold shrink-0">Source ({getFieldLabel(pinnedSourceKey)}) :</span>
-                        <span className="italic truncate font-serif">« {getSourceForField(pinnedSourceKey)!.text} »</span>
-                      </div>
+                    <div className="flex items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-xs">
+                      <span className="shrink-0 font-medium text-warn">{getFieldLabel(pinnedSourceKey)}</span>
+                      <span className="min-w-0 flex-1 italic text-fg">« {getSourceForField(pinnedSourceKey)!.text} »</span>
                       <button
                         type="button"
                         onClick={() => setPinnedSourceKey(null)}
-                        className="text-xs hover:opacity-75 shrink-0 px-1 font-bold cursor-pointer"
-                        title="Désépingler"
+                        className="shrink-0 text-fg-subtle transition-colors hover:text-fg"
+                        title="Retirer le surlignage"
+                        aria-label="Retirer le surlignage"
                       >
-                        ✕
+                        <IconX size={13} />
                       </button>
                     </div>
                   )}
 
                   {editMode ? (
                     <textarea
-                      rows={16}
+                      rows={18}
                       value={transcription}
                       onChange={(e) => setTranscription(e.target.value)}
-                      placeholder="La transcription s'affiche ici…"
-                      className="field w-full rounded-xl p-3 text-xs font-mono leading-relaxed resize-none min-h-[300px]"
+                      placeholder="La transcription s’affiche ici…"
+                      className="field min-h-[22rem] resize-y font-mono text-xs leading-relaxed"
                     />
                   ) : (() => {
                     const activeQuote = pinnedSourceKey ? getSourceForField(pinnedSourceKey)?.text?.trim() : undefined;
@@ -1776,45 +1848,29 @@ export function ActViewerModal({
                       const match = transcription.slice(idx, idx + activeQuote.length);
                       const after = transcription.slice(idx + activeQuote.length);
                       return (
-                        <div className="overflow-y-auto max-h-[460px] p-3.5 bg-surface-2/40 rounded-xl border border-border/60 text-xs text-fg leading-relaxed whitespace-pre-wrap font-sans">
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed text-fg">
                           <span>{before}</span>
-                          <mark className="bg-amber-300 dark:bg-amber-500/40 text-amber-950 dark:text-amber-100 px-1 py-0.5 rounded font-semibold ring-2 ring-amber-400 animate-pulse shadow-xs">
-                            {match}
-                          </mark>
+                          <mark className="rounded bg-warn-soft px-0.5 font-medium text-fg ring-1 ring-warn-dot/60">{match}</mark>
                           <span>{after}</span>
                         </div>
                       );
                     }
                     return (
-                      <div className="overflow-y-auto max-h-[460px] p-3.5 bg-surface-2/40 rounded-xl border border-border/60 text-xs text-fg leading-relaxed">
+                      <div className="text-sm leading-relaxed text-fg">
                         <ReactMarkdown
                           components={{
-                            h1: ({ ...props }) => (
-                              <h4 className="font-semibold text-fg text-sm mt-3 mb-1.5 first:mt-0" {...props} />
-                            ),
-                            h2: ({ ...props }) => (
-                              <h4 className="font-semibold text-fg text-sm mt-3 mb-1.5 first:mt-0" {...props} />
-                            ),
+                            h1: ({ ...props }) => <h4 className="mb-1.5 mt-4 text-sm font-semibold text-fg first:mt-0" {...props} />,
+                            h2: ({ ...props }) => <h4 className="mb-1.5 mt-4 text-sm font-semibold text-fg first:mt-0" {...props} />,
                             h3: ({ ...props }) => (
-                              <h4 className="font-semibold text-fg text-[12.5px] mt-2.5 mb-1 text-fg pb-0.5 border-b border-border/80" {...props} />
+                              <h4 className="mb-1 mt-4 border-b border-border pb-1 text-ui font-semibold text-fg first:mt-0" {...props} />
                             ),
-                            p: ({ ...props }) => (
-                              <p className="my-1.5 text-fg leading-relaxed" {...props} />
-                            ),
-                            ul: ({ ...props }) => (
-                              <ul className="list-disc pl-4 my-1.5 space-y-1 text-fg-muted" {...props} />
-                            ),
-                            ol: ({ ...props }) => (
-                              <ol className="list-decimal pl-4 my-1.5 space-y-1 text-fg-muted" {...props} />
-                            ),
-                            li: ({ ...props }) => (
-                              <li className="leading-relaxed" {...props} />
-                            ),
-                            strong: ({ ...props }) => (
-                              <strong className="font-semibold text-fg" {...props} />
-                            ),
+                            p: ({ ...props }) => <p className="my-2 text-fg" {...props} />,
+                            ul: ({ ...props }) => <ul className="my-2 list-disc space-y-1 pl-5 text-fg-muted" {...props} />,
+                            ol: ({ ...props }) => <ol className="my-2 list-decimal space-y-1 pl-5 text-fg-muted" {...props} />,
+                            li: ({ ...props }) => <li {...props} />,
+                            strong: ({ ...props }) => <strong className="font-semibold text-fg" {...props} />,
                             blockquote: ({ ...props }) => (
-                              <blockquote className="border-l-2 border-border pl-2.5 my-2 text-fg-muted italic" {...props} />
+                              <blockquote className="my-2 border-l-2 border-border-strong pl-3 italic text-fg-muted" {...props} />
                             ),
                           }}
                         >
@@ -1824,10 +1880,10 @@ export function ActViewerModal({
                     );
                   })()}
 
-                  <p className="text-[11px] text-fg-subtle">
+                  <p className="text-xs text-fg-subtle">
                     {editMode
-                      ? "Vous éditez le texte source. Vos corrections se répercutent si vous cliquez sur Ré-analyser."
-                      : "Cliquez sur « Modifier texte » pour ajuster des mots ou corriger la transcription."}
+                      ? "Corrigez le texte, puis « Ré-analyser » dans l’onglet Reporter dans la fiche pour mettre les champs à jour."
+                      : "Un mot mal lu ? Passez en mode Correction."}
                   </p>
                 </div>
               ) : (
@@ -1835,10 +1891,11 @@ export function ActViewerModal({
                 (() => {
                   if (!slug || (!personId && !unionId)) {
                     return (
-                      <div className="rounded-2xl border border-border bg-surface-2/30 p-6 text-center text-fg-muted flex flex-col items-center gap-2">
-                        <span className="font-semibold text-fg text-sm">Visionneuse isolée</span>
-                        <p className="max-w-md text-xs">
-                          Ouvrez la visionneuse depuis une personne ou une union pour comparer les données extraites avec la fiche et les injecter directement.
+                      <div className="flex flex-col items-center gap-1.5 py-12 text-center">
+                        <p className="text-ui font-medium text-fg">Visionneuse isolée</p>
+                        <p className="max-w-sm text-xs text-fg-muted">
+                          Ouvrez l’acte depuis une fiche pour comparer ce qui a été lu avec la fiche et le reporter en un
+                          clic.
                         </p>
                       </div>
                     );
@@ -2008,6 +2065,37 @@ export function ActViewerModal({
                     if (isTextDiff(currentContext?.union?.place, fieldMarriagePlace)) totalChangesCount++;
                   }
 
+                  // Une ligne par champ : case à cocher, intitulé, valeur de la fiche, valeur lue.
+                  const COLS =
+                    "grid grid-cols-[1rem_minmax(6rem,8.5rem)_minmax(0,1fr)_minmax(0,1.2fr)] items-center gap-x-3";
+
+                  const statusTag = (state: "new" | "modified" | "same" | "empty") =>
+                    state === "new" ? (
+                      <span className="shrink-0 text-2xs font-medium text-ok" title="Absent de la fiche">
+                        Nouveau
+                      </span>
+                    ) : state === "modified" ? (
+                      <span className="shrink-0 text-2xs font-medium text-warn" title="Différent de la fiche">
+                        Modifié
+                      </span>
+                    ) : state === "same" ? (
+                      <span className="shrink-0 text-2xs text-fg-subtle">Identique</span>
+                    ) : null;
+
+                  const sourceLine = (key: string, text?: string | null) =>
+                    text ? (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSource(key)}
+                        title="Surligner ce passage dans le texte"
+                        className={`mt-1 block max-w-full truncate pl-7 text-left text-2xs italic transition-colors ${
+                          pinnedSourceKey === key ? "text-warn" : "text-fg-subtle hover:text-fg-muted"
+                        }`}
+                      >
+                        « {text} »
+                      </button>
+                    ) : null;
+
                   const renderFieldCard = (
                     key: string,
                     label: string,
@@ -2021,11 +2109,9 @@ export function ActViewerModal({
                     const isEmpty = !prop;
                     const isNew = Boolean(prop && !cur);
                     const isModified = Boolean(prop && cur && prop !== cur);
-                    const isSame = Boolean(prop && cur && prop === cur);
                     const isDiff = isNew || isModified;
                     const isChecked = selectedFieldKeys.has(key);
                     const src = getSourceForField(key);
-                    const isPinned = pinnedSourceKey === key;
 
                     if (filterMode === "changes" && !isDiff && !isChecked) {
                       return null;
@@ -2034,98 +2120,44 @@ export function ActViewerModal({
                     return (
                       <div
                         key={key}
-                        className={`rounded-xl border p-3 transition-all flex flex-col gap-2.5 ${
-                          isChecked
-                            ? "border-border bg-surface shadow-xs"
-                            : "border-border/40 bg-surface-2/20 opacity-80 hover:opacity-100"
+                        className={`-mx-2 border-b border-border px-2 py-2 transition-colors last:border-b-0 ${
+                          isChecked ? "bg-surface-2/70" : ""
                         }`}
                       >
-                        {/* En-tête de la carte */}
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="flex items-center gap-2 cursor-pointer select-none min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleFieldKey(key)}
-                              disabled={isEmpty}
-                              className="accent-fg rounded size-3.5 cursor-pointer shrink-0"
-                            />
-                            <span className="font-semibold text-xs text-fg truncate">
-                              {label}
-                            </span>
-                          </label>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isNew && (
-                              <span className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                + Nouveau
-                              </span>
-                            )}
-                            {isModified && (
-                              <span className="rounded-md bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                                ✎ Modifié
-                              </span>
-                            )}
-                            {isSame && (
-                              <span className="rounded-md bg-surface-2 border border-border/60 px-2 py-0.5 text-[10px] text-fg-subtle">
-                                Identique
-                              </span>
-                            )}
-                            {isEmpty && (
-                              <span className="rounded-md px-2 py-0.5 text-[10px] text-fg-subtle italic">
-                                Non détecté
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Grille comparative : Actuel vs Détecté */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                          <div className="flex flex-col gap-0.5 rounded-lg bg-surface-2/60 border border-border/50 px-2.5 py-1.5 min-w-0">
-                            <span className="text-[10px] text-fg-subtle uppercase tracking-wider font-medium">Actuel dans la fiche</span>
-                            <span className="truncate text-xs font-normal" title={currentVal || "Non renseigné"}>
-                              {currentVal ? (
-                                <span className="font-medium text-fg">{currentVal}</span>
-                              ) : (
-                                <span className="italic text-fg-subtle text-[11px]">— Non renseigné</span>
-                              )}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            <span className="text-[10px] text-fg-subtle uppercase tracking-wider font-medium">Détecté dans l'acte</span>
+                        <div className={COLS}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleFieldKey(key)}
+                            disabled={isEmpty}
+                            aria-label={`Reporter : ${label}`}
+                            className="size-3.5 accent-[var(--fg)] disabled:opacity-30"
+                          />
+                          <span className="truncate text-xs text-fg-muted" title={label}>
+                            {label}
+                          </span>
+                          <span className="truncate text-xs" title={currentVal || "Non renseigné"}>
+                            {currentVal ? <span className="text-fg">{currentVal}</span> : <span className="text-fg-subtle">—</span>}
+                          </span>
+                          <span className="flex min-w-0 items-center gap-2">
                             <input
                               type="text"
                               value={proposedVal}
                               onChange={(e) => onChangeProposed(e.target.value)}
-                              placeholder={placeholder || "Non détecté"}
-                              className={`field w-full text-xs font-medium py-1 px-2.5 ${
-                                isDiff && !isEmpty
-                                  ? "border-emerald-500/40 bg-emerald-500/5 text-fg ring-emerald-500/20 font-semibold"
-                                  : "text-fg-muted"
+                              placeholder={placeholder || "Non lu"}
+                              aria-label={`${label} lu dans l’acte`}
+                              className={`h-7 w-full min-w-0 rounded-md border border-transparent px-2 text-xs outline-none transition-colors placeholder:text-fg-subtle hover:border-border focus:border-border-strong focus:bg-surface ${
+                                isNew
+                                  ? "bg-ok-soft/70 font-medium text-fg"
+                                  : isModified
+                                    ? "bg-warn-soft/70 font-medium text-fg"
+                                    : "bg-transparent text-fg-muted"
                               }`}
                             />
-                          </div>
+                            {statusTag(isNew ? "new" : isModified ? "modified" : isEmpty ? "empty" : "same")}
+                          </span>
                         </div>
-
-                        {/* Citation textuelle longue dans la transcription */}
-                        {src?.text && (
-                          <div
-                            onClick={() => handleToggleSource(key)}
-                            className="flex items-start gap-2 rounded-lg bg-surface-2/60 hover:bg-surface-2 border border-border/60 px-3 py-2 text-xs transition-colors cursor-pointer group"
-                            title="Cliquer pour afficher dans la transcription intégrale"
-                          >
-                            <span className="font-semibold text-fg-subtle shrink-0 group-hover:text-fg">
-                              Source :
-                            </span>
-                            <span className="italic font-serif leading-relaxed text-fg">
-                              « {src.text} »
-                            </span>
-                            <span className="text-[10px] text-fg-subtle group-hover:text-fg underline shrink-0 ml-auto">
-                              Transcription ↗
-                            </span>
-                          </div>
-                        )}
+                        {sourceLine(key, src?.text)}
                       </div>
                     );
                   };
@@ -2148,85 +2180,44 @@ export function ActViewerModal({
                     return (
                       <div
                         key={key}
-                        className={`rounded-xl border p-3 transition-all flex flex-col gap-2.5 ${
-                          isChecked
-                            ? "border-border bg-surface shadow-xs"
-                            : "border-border/40 bg-surface-2/20 opacity-80 hover:opacity-100"
+                        className={`-mx-2 border-b border-border px-2 py-2 transition-colors last:border-b-0 ${
+                          isChecked ? "bg-surface-2/70" : ""
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="flex items-center gap-2 cursor-pointer select-none min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleFieldKey(key)}
-                              className="accent-fg rounded size-3.5 cursor-pointer shrink-0"
-                            />
-                            <span className="font-semibold text-xs text-fg truncate">
-                              {label}
-                            </span>
-                          </label>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isDiff && (
-                              <span className="rounded-md bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                                ✎ Modifié
-                              </span>
+                        <div className={COLS}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleFieldKey(key)}
+                            aria-label={`Reporter : ${label}`}
+                            className="size-3.5 accent-[var(--fg)]"
+                          />
+                          <span className="truncate text-xs text-fg-muted" title={label}>
+                            {label}
+                          </span>
+                          <span className="truncate text-xs">
+                            {currentDeceased ? (
+                              <span className="text-fg">Décédé(e)</span>
+                            ) : (
+                              <span className="text-fg-subtle">Vivant(e) ou inconnu</span>
                             )}
-                            {!isDiff && (
-                              <span className="rounded-md bg-surface-2 border border-border/60 px-2 py-0.5 text-[10px] text-fg-subtle">
-                                Identique
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                          <div className="flex flex-col gap-0.5 rounded-lg bg-surface-2/60 border border-border/50 px-2.5 py-1.5">
-                            <span className="text-[10px] text-fg-subtle uppercase tracking-wider font-medium">Actuel dans la fiche</span>
-                            <span className="text-xs font-medium">
-                              {currentDeceased ? (
-                                <span className="text-danger">Décédé(e)</span>
-                              ) : (
-                                <span className="text-ok">Vivant(e) / Non précisé</span>
-                              )}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-col gap-0.5 justify-center">
-                            <span className="text-[10px] text-fg-subtle uppercase tracking-wider font-medium">Statut dans l'acte</span>
-                            <label className="flex items-center gap-2 text-xs cursor-pointer select-none py-1">
+                          </span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <label className="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 text-xs">
                               <input
                                 type="checkbox"
                                 checked={proposedDeceased}
                                 onChange={(e) => onToggleDeceased(e.target.checked)}
-                                className="accent-fg rounded"
+                                className="size-3.5 accent-[var(--fg)]"
                               />
-                              <span className={proposedDeceased ? "font-semibold text-danger" : "text-fg-muted"}>
-                                {proposedDeceased ? "Décédé(e) au moment de l'acte" : "Vivant(e) au moment de l'acte"}
+                              <span className={`truncate ${proposedDeceased ? "font-medium text-fg" : "text-fg-muted"}`}>
+                                {proposedDeceased ? "Décédé(e) lors de l’acte" : "Vivant(e) lors de l’acte"}
                               </span>
                             </label>
-                          </div>
+                            {statusTag(isDiff ? "modified" : "same")}
+                          </span>
                         </div>
-
-                        {/* Citation textuelle longue dans la transcription */}
-                        {src?.text && (
-                          <div
-                            onClick={() => handleToggleSource(key)}
-                            className="flex items-start gap-2 rounded-lg bg-surface-2/60 hover:bg-surface-2 border border-border/60 px-3 py-2 text-xs transition-colors cursor-pointer group"
-                            title="Cliquer pour afficher dans la transcription intégrale"
-                          >
-                            <span className="font-semibold text-fg-subtle shrink-0 group-hover:text-fg">
-                              Source :
-                            </span>
-                            <span className="italic font-serif leading-relaxed text-fg">
-                              « {src.text} »
-                            </span>
-                            <span className="text-[10px] text-fg-subtle group-hover:text-fg underline shrink-0 ml-auto">
-                              Transcription ↗
-                            </span>
-                          </div>
-                        )}
+                        {sourceLine(key, src?.text)}
                       </div>
                     );
                   };
@@ -2236,107 +2227,85 @@ export function ActViewerModal({
                     if (validChildren.length === 0) return null;
 
                     return (
-                      <div key={title} className="rounded-2xl border border-border bg-surface-2/30 p-3.5 flex flex-col gap-2.5 shadow-2xs">
-                        <div className="flex items-center justify-between border-b border-border/70 pb-2 px-0.5">
-                          <span className="font-semibold text-fg text-xs uppercase tracking-wider">
-                            {title}
-                          </span>
-                          <span className="text-[10.5px] text-fg-subtle font-medium">
-                            {validChildren.length} champ{validChildren.length > 1 ? "s" : ""}
-                          </span>
-                        </div>
-                        <div className="flex flex-col gap-2.5">
-                          {validChildren}
-                        </div>
-                      </div>
+                      <section key={title} className="pt-5 first:pt-1">
+                        <h5 className="flex items-center justify-between pb-1 text-xs font-semibold text-fg">
+                          {title}
+                          <span className="num font-normal text-fg-subtle">{validChildren.length}</span>
+                        </h5>
+                        <div className="border-t border-border">{validChildren}</div>
+                      </section>
                     );
                   };
 
                   return (
-                    <div className="flex flex-col gap-3.5">
-                      {/* Barre d'outils supérieure de la comparaison */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-border">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-fg text-sm">
-                              Données extraites vs Fiche
-                            </h4>
-                            <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[10.5px] font-medium text-fg border border-border/80">
-                              {totalChangesCount} modification{totalChangesCount > 1 ? "s" : ""}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 text-[11px] text-fg-muted">
-                            Vérifiez les données à gauche (actuel) et à droite (proposé) avant d'enregistrer.
-                          </p>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div
+                          className="flex h-7 items-center rounded-lg border border-border bg-surface-2/70 p-0.5"
+                          role="radiogroup"
+                          aria-label="Champs affichés"
+                        >
+                          {(
+                            [
+                              ["changes", `Différences (${totalChangesCount})`],
+                              ["all", `Tout (${allAvailableKeys.length})`],
+                            ] as const
+                          ).map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              role="radio"
+                              aria-checked={filterMode === value}
+                              onClick={() => setFilterMode(value)}
+                              className={`h-full rounded-md px-2.5 text-xs transition-colors ${
+                                filterMode === value ? "bg-surface font-medium text-fg shadow-xs" : "text-fg-muted hover:text-fg"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
                         </div>
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {/* Filtre Changements vs Tous */}
-                          <div className="flex items-center rounded-xl border border-border bg-surface-2 p-0.5">
-                            <button
-                              type="button"
-                              onClick={() => setFilterMode("changes")}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
-                                filterMode === "changes"
-                                  ? "bg-surface text-fg shadow-2xs font-semibold"
-                                  : "text-fg-muted hover:text-fg"
-                              }`}
-                            >
-                              Changements ({totalChangesCount})
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setFilterMode("all")}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
-                                filterMode === "all"
-                                  ? "bg-surface text-fg shadow-2xs font-semibold"
-                                  : "text-fg-muted hover:text-fg"
-                              }`}
-                            >
-                              Tous ({allAvailableKeys.length})
-                            </button>
-                          </div>
-
-                          {/* Boutons tout cocher / décocher / ré-analyser */}
-                          <button
-                            type="button"
-                            onClick={() => selectAllKeys(allAvailableKeys)}
-                            className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] font-medium text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                          >
+                        <div className="ml-auto flex items-center gap-0.5">
+                          <button type="button" onClick={() => selectAllKeys(allAvailableKeys)} className={buttonClass("quiet", "", "xs")}>
                             Tout cocher
                           </button>
-                          <button
-                            type="button"
-                            onClick={deselectAllKeys}
-                            className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                          >
-                            Décocher
+                          <button type="button" onClick={deselectAllKeys} className={buttonClass("quiet", "", "xs")}>
+                            Aucun
                           </button>
                           <button
                             type="button"
                             onClick={handleSyncFromTranscription}
-                            className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
-                            title="Ré-analyser la transcription"
+                            className={buttonClass("quiet", "", "xs")}
+                            title="Relire le texte transcrit pour remplir les champs"
                           >
+                            <IconRotateCw size={11} />
                             Ré-analyser
                           </button>
                         </div>
                       </div>
+                      <p className="-mt-1 text-xs text-fg-muted">
+                        Cochez ce qui doit être reporté ; les valeurs lues restent modifiables avant l’enregistrement.
+                      </p>
 
-                      {/* Message informatif si aucun changement en mode filtre */}
-                      {filterMode === "changes" && totalChangesCount === 0 && (
-                        <div className="rounded-xl border border-border bg-surface-2/40 p-4 text-center text-fg-muted">
-                          <p className="font-semibold text-fg text-xs">Aucune nouvelle modification détectée</p>
-                          <p className="text-[11px] mt-1">
-                            Les informations de l'acte correspondent déjà à la fiche, ou aucune nouvelle donnée n'a été trouvée.
-                            Basculez sur « Tous » pour visualiser ou forcer des valeurs.
+                      {filterMode === "changes" && totalChangesCount === 0 ? (
+                        <div className="rounded-lg bg-surface-2 px-4 py-6 text-center">
+                          <p className="text-ui font-medium text-fg">Rien de nouveau dans cet acte</p>
+                          <p className="mt-1 text-xs text-fg-muted">
+                            La fiche contient déjà ces informations. Affichez « Tout » pour forcer une valeur.
                           </p>
+                        </div>
+                      ) : (
+                        <div className={`${COLS} -mb-2 pt-1 text-2xs font-medium text-fg-subtle`}>
+                          <span />
+                          <span>Champ</span>
+                          <span>Dans la fiche</span>
+                          <span>Lu dans l’acte</span>
                         </div>
                       )}
 
                       {/* Sections structurées en cartes claires */}
                       {isMarriage ? (
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col">
                           {/* 1. Événement du mariage */}
                           {renderSection("Événement du mariage", [
                             renderFieldCard(
@@ -2530,7 +2499,7 @@ export function ActViewerModal({
                           ])}
                         </div>
                       ) : (
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col">
                           {/* 1. Événement / Acte */}
                           {actKind === "birth" ? (
                             renderSection("Acte de naissance / baptême", [
@@ -2766,47 +2735,49 @@ export function ActViewerModal({
               )}
             </div>
 
-            {/* Pied de panneau fixe (Sticky Footer) pour la validation et l'enregistrement */}
-            {sidebarTab === "compare" && slug && (personId || unionId) && (
-              <div className="border-t border-border bg-surface p-3.5 shrink-0 flex flex-col gap-2.5 shadow-lg z-10">
+            {/* Pied fixe : report des champs cochés dans la fiche */}
+            {sidebarTab === "compare" && transcription && !ocrLoading && slug && (personId || unionId) && (
+              <div className="flex shrink-0 flex-col gap-2.5 border-t border-border bg-surface px-5 py-3.5">
                 {saveSuccessMessage && (
-                  <div className="rounded-xl bg-ok/10 border border-ok/30 p-2.5 text-center text-xs font-semibold text-ok animate-in fade-in">
-                    {saveSuccessMessage}
-                  </div>
+                  <p className="flex items-center gap-2 rounded-lg bg-ok-soft px-3 py-2 text-xs font-medium text-ok">
+                    <IconCheck size={13} />
+                    {saveSuccessMessage.replace(/^✓\s*/, "")}
+                  </p>
                 )}
                 {saveErrorMessage && (
-                  <div className="rounded-xl bg-danger/10 border border-danger/30 p-2.5 text-center text-xs font-semibold text-danger animate-in fade-in">
-                    ⚠️ {saveErrorMessage}
-                  </div>
+                  <p className="flex items-center gap-2 rounded-lg bg-danger-soft px-3 py-2 text-xs font-medium text-danger">
+                    <IconAlert size={13} />
+                    {saveErrorMessage}
+                  </p>
                 )}
-
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-fg select-none">
-                  <input
-                    type="checkbox"
-                    checked={appendToNotes}
-                    onChange={(e) => setAppendToNotes(e.target.checked)}
-                    className="accent-fg rounded size-3.5"
-                  />
-                  <span>Conserver également la transcription intégrale dans les notes</span>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={handleSaveToRecord}
-                  disabled={pendingSave || selectedFieldKeys.size === 0}
-                  className="w-full rounded-xl bg-fg py-2.5 px-3 text-xs font-semibold text-accent-fg hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {pendingSave ? (
-                    <>
-                      <span className="inline-block size-3 rounded-full border-2 border-accent-fg border-t-transparent animate-spin" />
-                      <span>Enregistrement dans la fiche…</span>
-                    </>
-                  ) : (
-                    <span>
-                      Valider et enregistrer {selectedFieldKeys.size > 0 ? `(${selectedFieldKeys.size} champ${selectedFieldKeys.size > 1 ? "s" : ""})` : ""}
-                    </span>
-                  )}
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex cursor-pointer select-none items-center gap-2 text-xs text-fg-muted">
+                    <input
+                      type="checkbox"
+                      checked={appendToNotes}
+                      onChange={(e) => setAppendToNotes(e.target.checked)}
+                      className="size-3.5 accent-[var(--fg)]"
+                    />
+                    Joindre le texte complet aux notes
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSaveToRecord}
+                    disabled={pendingSave || selectedFieldKeys.size === 0}
+                    className={buttonClass("primary", "ml-auto min-w-48")}
+                  >
+                    {pendingSave ? (
+                      <>
+                        <Spinner size={13} />
+                        Enregistrement…
+                      </>
+                    ) : selectedFieldKeys.size > 0 ? (
+                      `Reporter ${selectedFieldKeys.size} champ${selectedFieldKeys.size > 1 ? "s" : ""} dans la fiche`
+                    ) : (
+                      "Cochez des champs à reporter"
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </aside>

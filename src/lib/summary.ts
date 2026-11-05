@@ -8,6 +8,11 @@ function agreed(base: string, sex: "M" | "F" | null) {
   return `${base}(e)`;
 }
 
+/** « le 3 mars 1850 », mais « vers 1850 », « avant 1900 », « en 1850 » sans article. */
+function on(date: string) {
+  return /^(vers|avant|après|apres|entre|en|courant)\b/i.test(date) ? date : `le ${date}`;
+}
+
 /**
  * La fiche en une phrase — ce qu'on veut lire avant tout le reste.
  */
@@ -18,7 +23,7 @@ export function summarize(person: Person): string {
   const birthPlace = commune(person.birth_place);
   if (birthDate || birthPlace || person.birth_year) {
     const when = birthDate
-      ? `le ${birthDate}`
+      ? on(birthDate)
       : person.birth_year
         ? `vers ${person.birth_year}`
         : null;
@@ -35,7 +40,7 @@ export function summarize(person: Person): string {
     parts.push(
       [
         agreed("marié", person.sex),
-        when ? `le ${when}` : null,
+        when ? on(when) : null,
         union.spouse ? `avec ${union.spouse.displayName}` : null,
         commune(union.place) ? `à ${commune(union.place)}` : null,
       ]
@@ -50,7 +55,7 @@ export function summarize(person: Person): string {
     parts.push(
       [
         agreed("décédé", person.sex),
-        deathDate ? `le ${deathDate}` : null,
+        deathDate ? on(deathDate) : null,
         deathPlace ? `à ${deathPlace}` : null,
       ]
         .filter(Boolean)

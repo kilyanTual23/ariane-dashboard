@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AncestorsMap } from "@/components/AncestorsMap";
+import { PageHeader } from "@/components/ui";
 import { getGeocodedPlaces } from "@/lib/geo";
 import { getProfileBySlug, listPersons } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Carte des ancêtres",
+  title: "Carte",
 };
 
 export default async function MapPage({ params }: PageProps<"/p/[slug]/carte">) {
@@ -20,16 +21,12 @@ export default async function MapPage({ params }: PageProps<"/p/[slug]/carte">) 
   const clusters = await getGeocodedPlaces(persons);
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-[26px] tracking-[-0.03em]">Cartographie des ancêtres</h1>
-        <p className="mt-1 text-sm text-fg-muted">
-          Répartition géographique des naissances, mariages et sépultures à travers les communes françaises.
-        </p>
-      </header>
-
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Carte"
+        description="Où sont nés, se sont mariés et sont morts les membres de la famille, commune par commune."
+      />
       <AncestorsMap slug={slug} clusters={clusters} />
     </div>
   );
 }
-

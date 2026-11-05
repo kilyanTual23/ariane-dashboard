@@ -36,6 +36,24 @@ export function hasLocalAct(target: ActTarget): boolean {
   }
 }
 
+/**
+ * Version de la copie locale (date de modification du fichier), ou null s'il n'y en a pas.
+ * Elle entre dans l'adresse de l'image : une nouvelle copie n'est jamais masquée par le cache.
+ */
+export function localActVersion(target: ActTarget): number | null {
+  try {
+    const stat = fs.statSync(getActFilePath(target));
+    return stat.size > 1024 ? Math.round(stat.mtimeMs) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Supprime la copie locale : elle ne correspond plus au lien de l'acte. */
+export function removeLocalAct(target: ActTarget): void {
+  fs.rmSync(getActFilePath(target), { force: true });
+}
+
 export function getLocalActUrl(target: ActTarget): string | null {
   if (!hasLocalAct(target)) return null;
   return `/api/actes/${getActFilename(target)}`;
@@ -174,6 +192,14 @@ export async function downloadAct(
     // Détection et conversion automatique si le document reçu est un PDF
     if (imageBuffer.subarray(0, 5).toString().startsWith("%PDF-")) {
       imageBuffer = await convertPdfToJpeg(imageBuffer);
+    }
+
+    // Une page d'erreur ou de connexion n'est pas un acte : on ne l'enregistre pas.
+    const meta = await sharp(imageBuffer)
+      .metadata()
+      .catch(() => null);
+    if (!meta?.width || !meta.height) {
+      return { ok: false, error: "Le lien ne mène pas à une image d’acte" };
     }
 
     fs.writeFileSync(destPath, imageBuffer);

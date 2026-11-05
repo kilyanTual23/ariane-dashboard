@@ -2,16 +2,24 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { quickCreatePersonAction } from "@/app/actions";
-import { QuickAddParser } from "@/components/QuickAddParser";
-import { buttonClass } from "@/components/ui";
+import { createPersonAction } from "@/app/actions";
+import { IconArrowLeft } from "@/components/icons";
+import { PlaceField } from "@/components/PlaceField";
+import { SubmitButton } from "@/components/SubmitButton";
+import { PageHeader } from "@/components/ui";
 import { getProfileBySlug, listPlaces } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Nouvelle personne",
+  title: "Nouvelle fiche",
 };
+
+const SEXES = [
+  { value: "", label: "Selon le prénom" },
+  { value: "F", label: "Femme" },
+  { value: "M", label: "Homme" },
+];
 
 export default async function NewPersonPage({ params }: PageProps<"/p/[slug]/personnes/nouvelle">) {
   const { slug } = await params;
@@ -21,53 +29,72 @@ export default async function NewPersonPage({ params }: PageProps<"/p/[slug]/per
   const places = await listPlaces(profile.id);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 pt-4">
+    <div className="flex max-w-2xl flex-col gap-6">
       <Link
         href={`/p/${slug}/personnes`}
-        className="inline-flex items-center gap-1.5 text-[13px] text-fg-subtle transition-colors hover:text-fg"
+        className="flex w-fit items-center gap-1.5 text-ui text-fg-muted transition-colors hover:text-fg"
       >
-        <span aria-hidden>←</span> Toutes les personnes
+        <IconArrowLeft size={14} />
+        Personnes
       </Link>
 
-      <header>
-        <h1 className="text-[28px] font-semibold tracking-[-0.03em]">Ajout rapide</h1>
-        <p className="mt-1 text-sm text-fg-muted">
-          Collez ou tapez une phrase en français : Ariane extrait automatiquement la personne, ses dates, communes, son métier, ainsi que son conjoint et ses parents.
-        </p>
-      </header>
+      <PageHeader
+        title="Nouvelle fiche"
+        description="L’identité suffit pour commencer. Le reste (mariage, décès, actes, famille) se complète ensuite sur la fiche."
+      />
 
-      {/* Saisie intelligente */}
-      <QuickAddParser slug={slug} profileId={profile.id} places={places} />
+      <form action={createPersonAction} className="flex flex-col gap-5 rounded-xl border border-border bg-surface p-5 shadow-xs">
+        <input type="hidden" name="slug" value={slug} />
+        <input type="hidden" name="profileId" value={profile.id} />
 
-      {/* Mode classique repliable */}
-      <div className="mt-6 border-t border-border pt-6">
-        <details className="group">
-          <summary className="cursor-pointer text-xs text-fg-subtle transition-colors hover:text-fg">
-            <span>Ou création classique avec nom seul ▼</span>
-          </summary>
-          <form action={quickCreatePersonAction} className="mt-4 flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
-            <input type="hidden" name="slug" value={slug} />
-            <input type="hidden" name="profileId" value={profile.id} />
-            <label className="block">
-              <span className="label">Prénoms puis NOM</span>
-              <input
-                className="field py-2 text-sm"
-                name="fullName"
-                placeholder="Jean Marie TUAL"
-                required
-              />
-              <span className="mt-1 block text-[11px] text-fg-subtle">
-                Le nom de famille est reconnu aux majuscules.
-              </span>
-            </label>
-            <div>
-              <button type="submit" className={buttonClass("ghost", "text-xs")}>
-                Créer la fiche vide
-              </button>
-            </div>
-          </form>
-        </details>
-      </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="label">Prénoms</span>
+            <input className="field" name="given_names" placeholder="Jean-Marie" autoFocus autoComplete="off" />
+          </label>
+          <label className="block">
+            <span className="label">Nom de famille</span>
+            <input className="field uppercase" name="surname" placeholder="DUPONT" autoComplete="off" />
+          </label>
+        </div>
+
+        <fieldset>
+          <legend className="label">Sexe</legend>
+          <div className="flex flex-wrap gap-2">
+            {SEXES.map((s) => (
+              <label
+                key={s.value}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-ui transition-colors hover:bg-surface-2 has-[:checked]:border-accent has-[:checked]:bg-accent-soft"
+              >
+                <input type="radio" name="sex" value={s.value} defaultChecked={s.value === ""} className="accent-[var(--accent)]" />
+                {s.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
+          <label className="block">
+            <span className="label">Naissance</span>
+            <input className="field" name="birth_date" placeholder="3/3/1850, vers 1850…" autoComplete="off" />
+          </label>
+          <label className="block">
+            <span className="label">Lieu de naissance</span>
+            <PlaceField name="birth_place" places={places} placeholder="Commune" />
+          </label>
+        </div>
+
+        <label className="flex items-center gap-2 text-ui">
+          <input type="checkbox" name="is_living" value="1" className="size-4 accent-[var(--accent)]" />
+          Personne vivante
+          <span className="text-xs text-fg-subtle">· aucune information de décès ne sera demandée</span>
+        </label>
+
+        <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+          <p className="text-xs text-fg-subtle">Un prénom ou un nom suffit.</p>
+          <SubmitButton>Créer la fiche</SubmitButton>
+        </div>
+      </form>
     </div>
   );
 }

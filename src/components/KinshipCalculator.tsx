@@ -1,12 +1,65 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { IconArrowUpDown, IconMerge } from "@/components/icons";
 import { PersonSelect, type PickerPerson } from "@/components/PersonSelect";
-import { Card } from "@/components/ui";
+import { Badge, buttonClass, EmptyState, StatusDot } from "@/components/ui";
 import { computeKinship, type KinshipResult } from "@/lib/kinship";
-import type { Person } from "@/lib/types";
+import type { Person, PersonRef } from "@/lib/types";
+
+function PathNode({
+  slug,
+  person,
+  emphasis = "none",
+}: {
+  slug: string;
+  person: PersonRef;
+  emphasis?: "none" | "subject" | "ancestor";
+}) {
+  return (
+    <Link
+      href={`/p/${slug}/personnes/${person.id}`}
+      className={`relative z-10 flex w-full max-w-64 items-center gap-2 rounded-lg border bg-surface px-3 py-2 text-left transition-colors hover:border-border-strong ${
+        emphasis === "ancestor"
+          ? "border-ok-dot/50 ring-2 ring-ok-soft"
+          : emphasis === "subject"
+            ? "border-fg/40"
+            : "border-border"
+      }`}
+    >
+      <StatusDot status={person.status} className="size-1.5" />
+      <span className="min-w-0 flex-1 truncate text-ui font-medium">{person.displayName}</span>
+      {person.birth_year && <span className="num shrink-0 text-2xs text-fg-subtle">{person.birth_year}</span>}
+    </Link>
+  );
+}
+
+/** Une branche, de l'ancêtre commun (exclu) jusqu'à la personne. */
+function Branch({ slug, path, label }: { slug: string; path: PersonRef[]; label: string }) {
+  const down = [...path].reverse().slice(1);
+  if (down.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center pt-4">
+        <span className="text-2xs text-fg-subtle">{label} est l’ancêtre commun</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-1 flex-col items-center gap-0">
+      {down.map((step, i) => (
+        <div key={step.id} className="flex w-full flex-col items-center">
+          <span className="h-4 w-px bg-border-strong" aria-hidden />
+          <PathNode slug={slug} person={step} emphasis={i === down.length - 1 ? "subject" : "none"} />
+        </div>
+      ))}
+      <span className="mt-2 text-2xs text-fg-subtle">
+        {label} · <span className="num">{down.length}</span> génération{down.length > 1 ? "s" : ""}
+      </span>
+    </div>
+  );
+}
 
 export function KinshipCalculator({
   slug,
@@ -29,6 +82,7 @@ export function KinshipCalculator({
         name: p.displayName,
         birthYear: p.birth_year,
         deathYear: p.death_year,
+        sosa: p.sosa,
       })),
     [persons],
   );
@@ -38,155 +92,104 @@ export function KinshipCalculator({
     return computeKinship(personAId, personBId, persons);
   }, [personAId, personBId, persons]);
 
+  // L'URL garde la paire choisie : on peut la partager ou y revenir.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (personAId) params.set("de", String(personAId));
+    if (personBId) params.set("avec", String(personBId));
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+  }, [personAId, personBId]);
+
+  const ancestor = result?.commonAncestors[0] ?? null;
+  const hasPaths = Boolean(result && ancestor && result.pathA.length > 0 && result.pathB.length > 0);
+
   return (
-    <div className="flex flex-col gap-6">
-      <Card title="Sélectionnez deux personnes">
-        <div className="grid gap-4 sm:grid-cols-[1fr_auto_1fr] items-center">
-          <div>
-            <label className="label mb-1.5 block">Première personne (Sujet A)</label>
-            <PersonSelect
-              name="personA"
-              people={pickable}
-              value={personAId}
-              onChange={(val) => setPersonAId(val)}
-              placeholder="Choisir une personne…"
-            />
-          </div>
+    <div className="flex flex-col gap-5">
+      <div className="grid items-end gap-3 rounded-xl border border-border bg-surface p-4 shadow-xs sm:grid-cols-[1fr_auto_1fr]">
+        <label className="block">
+          <span className="label">Première personne</span>
+          <PersonSelect
+            name="personA"
+            people={pickable}
+            value={personAId}
+            onChange={(id) => setPersonAId(id)}
+            placeholder="Rechercher…"
+            allowCreate={false}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            setPersonAId(personBId);
+            setPersonBId(personAId);
+          }}
+          title="Intervertir"
+          aria-label="Intervertir les deux personnes"
+          className={buttonClass("secondary", "justify-self-center sm:rotate-90", "icon")}
+        >
+          <IconArrowUpDown size={15} />
+        </button>
+        <label className="block">
+          <span className="label">Seconde personne</span>
+          <PersonSelect
+            name="personB"
+            people={pickable}
+            value={personBId}
+            onChange={(id) => setPersonBId(id)}
+            placeholder="Rechercher…"
+            allowCreate={false}
+          />
+        </label>
+      </div>
 
-          <div className="flex justify-center pt-5">
-            <button
-              type="button"
-              onClick={() => {
-                const temp = personAId;
-                setPersonAId(personBId);
-                setPersonBId(temp);
-              }}
-              title="Intervertir les deux personnes"
-              className="rounded-full border border-border bg-surface p-2 text-xs text-fg-muted shadow-soft transition-colors hover:bg-surface-2 hover:text-fg"
-            >
-              ⇄
-            </button>
-          </div>
-
-          <div>
-            <label className="label mb-1.5 block">Deuxième personne (Sujet B)</label>
-            <PersonSelect
-              name="personB"
-              people={pickable}
-              value={personBId}
-              onChange={(val) => setPersonBId(val)}
-              placeholder="Choisir une personne…"
-            />
-          </div>
-        </div>
-      </Card>
-
-      {result && (
-        <div className="flex flex-col gap-6">
-          <Card
-            title={result.relationName}
-            action={
-              result.civilDegree ? (
-                <span className="num text-xs text-fg-subtle">
-                  {result.civilDegree}e degré civil {result.canonicalDegree ? `· ${result.canonicalDegree} canonique` : ""}
-                </span>
-              ) : undefined
-            }
-          >
-            <p className="text-base text-fg leading-relaxed">{result.details}</p>
-
-            {result.commonAncestors.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <span className="text-xs text-fg-subtle block mb-2">
-                  Plus proche(s) ancêtre(s) commun(s) (MRCA) :
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {result.commonAncestors.map((c) => (
-                    <Link
-                      key={c.id}
-                      href={`/p/${slug}/personnes/${c.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-fg hover:bg-surface-3 transition-colors"
-                    >
-                      <span>🌳</span>
-                      <span>{c.displayName}</span>
-                      {c.birth_year && <span className="num text-fg-subtle">({c.birth_year})</span>}
-                    </Link>
-                  ))}
-                </div>
+      {!result ? (
+        <EmptyState icon={<IconMerge size={18} />} title="Choisissez deux personnes">
+          Le calculateur cherche leur plus proche ancêtre commun et en déduit le lien de parenté, avec les degrés
+          civil et canonique.
+        </EmptyState>
+      ) : (
+        <>
+          <section className="rounded-xl border border-border bg-surface p-6 shadow-xs">
+            {result.type !== "none" && result.type !== "same" && (
+              <p className="text-ui text-fg-muted">
+                <strong className="font-medium text-fg">{result.personB.displayName}</strong> est, pour{" "}
+                <strong className="font-medium text-fg">{result.personA.displayName}</strong> :
+              </p>
+            )}
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight first-letter:uppercase">{result.relationName}</h2>
+            {(result.civilDegree || result.canonicalDegree) && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {result.civilDegree ? <Badge>{result.civilDegree}e degré civil</Badge> : null}
+                {result.canonicalDegree ? <Badge>{result.canonicalDegree} (canonique)</Badge> : null}
               </div>
             )}
-          </Card>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-fg-muted">{result.details}</p>
+          </section>
 
-          {result.pathA.length > 1 && result.pathB.length > 1 && (
-            <Card title="Chemin généalogique">
-              <p className="text-xs text-fg-muted mb-4">
-                Remontée générationnelle depuis les deux personnes jusqu’à leur ancêtre commun :
+          {hasPaths && ancestor && (
+            <section className="rounded-xl border border-border bg-surface p-6 shadow-xs">
+              <h2 className="text-sm font-semibold">Chemin de parenté</h2>
+              <p className="mt-0.5 text-ui text-fg-muted">
+                De l’ancêtre commun{result.commonAncestors.length > 1 ? " (et de son conjoint)" : ""} jusqu’aux deux
+                personnes.
               </p>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Branche A */}
-                <div className="rounded-2xl border border-border bg-surface-2/40 p-4">
-                  <span className="text-xs font-medium text-fg block mb-3">
-                    Branche de {result.personA.displayName} :
-                  </span>
-                  <ol className="relative border-l border-border ml-3 flex flex-col gap-3">
-                    {result.pathA.map((step, idx) => (
-                      <li key={step.id} className="ml-4 text-xs">
-                        <span className="absolute -left-1.5 mt-1 size-3 rounded-full border-2 border-surface bg-fg" />
-                        <Link
-                          href={`/p/${slug}/personnes/${step.id}`}
-                          className={`font-medium hover:underline ${
-                            idx === 0
-                              ? "text-fg font-semibold"
-                              : idx === result.pathA.length - 1
-                                ? "text-ok font-semibold"
-                                : "text-fg-muted"
-                          }`}
-                        >
-                          {step.displayName}
-                        </Link>
-                        {idx === 0 && <span className="text-fg-subtle ml-1.5">(départ)</span>}
-                        {idx === result.pathA.length - 1 && (
-                          <span className="text-ok ml-1.5">(ancêtre commun)</span>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
+              <div className="mt-6 flex flex-col items-center">
+                <div className="flex flex-wrap justify-center gap-2">
+                  {result.commonAncestors.map((c) => (
+                    <PathNode key={c.id} slug={slug} person={c} emphasis="ancestor" />
+                  ))}
                 </div>
-
-                {/* Branche B */}
-                <div className="rounded-2xl border border-border bg-surface-2/40 p-4">
-                  <span className="text-xs font-medium text-fg block mb-3">
-                    Branche de {result.personB.displayName} :
-                  </span>
-                  <ol className="relative border-l border-border ml-3 flex flex-col gap-3">
-                    {result.pathB.map((step, idx) => (
-                      <li key={step.id} className="ml-4 text-xs">
-                        <span className="absolute -left-1.5 mt-1 size-3 rounded-full border-2 border-surface bg-fg" />
-                        <Link
-                          href={`/p/${slug}/personnes/${step.id}`}
-                          className={`font-medium hover:underline ${
-                            idx === 0
-                              ? "text-fg font-semibold"
-                              : idx === result.pathB.length - 1
-                                ? "text-ok font-semibold"
-                                : "text-fg-muted"
-                          }`}
-                        >
-                          {step.displayName}
-                        </Link>
-                        {idx === 0 && <span className="text-fg-subtle ml-1.5">(départ)</span>}
-                        {idx === result.pathB.length - 1 && (
-                          <span className="text-ok ml-1.5">(ancêtre commun)</span>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
+                <span className="text-2xs font-medium text-ok">Ancêtre{result.commonAncestors.length > 1 ? "s" : ""} commun{result.commonAncestors.length > 1 ? "s" : ""}</span>
+                <div className="relative mt-1 grid w-full max-w-2xl grid-cols-2 gap-6">
+                  <span className="absolute left-1/4 right-1/4 top-0 h-px bg-border-strong" aria-hidden />
+                  <Branch slug={slug} path={result.pathA} label={result.personA.displayName} />
+                  <Branch slug={slug} path={result.pathB} label={result.personB.displayName} />
                 </div>
               </div>
-            </Card>
+            </section>
           )}
-        </div>
+        </>
       )}
     </div>
   );

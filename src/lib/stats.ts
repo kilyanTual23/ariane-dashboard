@@ -76,7 +76,12 @@ export function computeStats(persons: Person[]) {
     count: persons.filter((p) => p.status === status).length,
   })).filter((s) => s.count > 0);
 
-  const sosa = persons.filter((p) => p.kinship === "SOSA");
+  // Ancêtres directs : les fiches numérotées Sosa, hors racine (le n° 1 est le de cujus).
+  const ancestors = persons.filter((p) => (p.sosa ?? 0) >= 2).length;
+  // Cases remplies sur cases attendues, tous profils confondus : le même chiffre partout.
+  const filled = persons.reduce((s, p) => s + p.completion.score, 0);
+  const slots = persons.reduce((s, p) => s + p.completion.total, 0);
+  const filledPercent = slots ? Math.round((filled / slots) * 100) : 0;
 
   const missingActs = [
     {
@@ -150,7 +155,10 @@ export function computeStats(persons: Person[]) {
     avgCompletion,
     complete: persons.filter((p) => p.completion.percent === 100).length,
     byStatus,
-    sosaCount: sosa.length,
+    ancestors,
+    filled,
+    slots,
+    filledPercent,
     blocked: persons.filter((p) => p.status === "Bloqué"),
     missingActs,
     generations,

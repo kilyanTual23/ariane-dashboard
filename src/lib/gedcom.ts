@@ -280,8 +280,8 @@ export function generateGedcom(
         // Couple non déclaré dans unions, on crée une famille
         const p1 = exportPersons.find((p) => p.id === parentIds[0]);
         const p2 = exportPersons.find((p) => p.id === parentIds[1]);
-        let husbandId = p1?.sex === "M" ? p1.id : p2?.sex === "M" ? p2.id : p1?.id;
-        let wifeId = p1?.sex === "F" ? p1.id : p2?.sex === "F" ? p2.id : p2?.id;
+        const husbandId = p1?.sex === "M" ? p1.id : p2?.sex === "M" ? p2.id : p1?.id;
+        const wifeId = p1?.sex === "F" ? p1.id : p2?.sex === "F" ? p2.id : p2?.id;
         fam = {
           id: `F${famCounter++}`,
           husbandId,

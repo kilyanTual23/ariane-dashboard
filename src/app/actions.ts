@@ -7,7 +7,7 @@ import { checkpointDb } from "@/lib/db";
 import { normalizePlace, parseDateInput } from "@/lib/dates";
 import { inferSex } from "@/lib/names";
 import * as q from "@/lib/queries";
-import { downloadAct } from "@/lib/act-downloader";
+import { downloadAct, removeLocalAct } from "@/lib/act-downloader";
 import { STATUSES, type Person, type Priority, type Status, type TaskStatus } from "@/lib/types";
 
 /* ------------------------------------------------------------------ helpers */
@@ -149,22 +149,15 @@ export async function setPersonField(input: {
     }
     case "birth_source": {
       patch.birth_source = value || null;
-      if (value && (value.startsWith("http") || value.startsWith("www"))) {
-        patch.birth_source_ignored = 0;
-        void downloadAct(value, { kind: "person", personId, actKind: "birth" }).then((r) => {
-          if (r.ok) refreshProfile(slug);
-        });
-      }
+      // Le lien a changé : l'ancienne image ne correspond plus. La fiche relance le téléchargement.
+      removeLocalAct({ kind: "person", personId, actKind: "birth" });
+      if (value && (value.startsWith("http") || value.startsWith("www"))) patch.birth_source_ignored = 0;
       break;
     }
     case "death_source": {
       patch.death_source = value || null;
-      if (value && (value.startsWith("http") || value.startsWith("www"))) {
-        patch.death_source_ignored = 0;
-        void downloadAct(value, { kind: "person", personId, actKind: "death" }).then((r) => {
-          if (r.ok) refreshProfile(slug);
-        });
-      }
+      removeLocalAct({ kind: "person", personId, actKind: "death" });
+      if (value && (value.startsWith("http") || value.startsWith("www"))) patch.death_source_ignored = 0;
       break;
     }
     case "birth_source_ignored": {
@@ -221,12 +214,8 @@ export async function setUnionField(input: {
     await q.updateUnion(input.unionId, { source_ignored: value === "1" || value === "true" ? 1 : 0 });
   } else {
     const patch: q.UnionInput = { source: value || null };
-    if (value && (value.startsWith("http") || value.startsWith("www"))) {
-      patch.source_ignored = 0;
-      void downloadAct(value, { kind: "union", unionId: input.unionId }).then((r) => {
-        if (r.ok) refreshProfile(input.slug);
-      });
-    }
+    removeLocalAct({ kind: "union", unionId: input.unionId });
+    if (value && (value.startsWith("http") || value.startsWith("www"))) patch.source_ignored = 0;
     await q.updateUnion(input.unionId, patch);
   }
   const union = await q.getUnionRow(input.unionId);
@@ -237,24 +226,26 @@ export async function setUnionField(input: {
   await refreshProfile(input.slug);
 }
 
-export async function downloadActAction(fd: FormData) {
+export async function downloadActAction(fd: FormData): Promise<{ ok: boolean; error?: string }> {
   const url = str(fd, "url");
   const slug = str(fd, "slug");
   const personId = num(fd, "personId");
   const unionId = num(fd, "unionId");
   const actKind = str(fd, "actKind") as "birth" | "death" | "marriage";
 
-  if (!url) return;
+  if (!url) return { ok: false, error: "Aucun lien d’acte" };
 
+  let result: { ok: boolean; error?: string } = { ok: false, error: "Acte introuvable" };
   if (personId && (actKind === "birth" || actKind === "death")) {
-    await downloadAct(url, { kind: "person", personId, actKind });
+    result = await downloadAct(url, { kind: "person", personId, actKind });
   } else if (unionId) {
-    await downloadAct(url, { kind: "union", unionId });
+    result = await downloadAct(url, { kind: "union", unionId });
   }
 
   if (slug) {
     await refreshProfile(slug, personId ?? undefined);
   }
+  return { ok: result.ok, error: result.error };
 }
 
 /** Création express : un nom suffit, le reste se remplit dans la fiche. */
@@ -277,113 +268,33 @@ export async function quickCreatePersonAction(fd: FormData) {
 }
 
 /**
- * Création intelligente depuis une phrase en langage naturel :
- * Extrait la personne principale, ses dates, lieux, son métier, ainsi que
- * son conjoint, son mariage et ses parents s'ils sont mentionnés.
+ * Création depuis le formulaire « Nouvelle fiche » : l'identité et, si on les a
+ * sous la main, la naissance et le statut de vie. Le reste se complète sur la fiche.
  */
-export async function smartCreatePersonAction(fd: FormData) {
+export async function createPersonAction(fd: FormData) {
   const slug = str(fd, "slug");
   const profileId = num(fd, "profileId");
-  const text = str(fd, "text");
-  if (!slug || !profileId || !text) return;
+  const given = str(fd, "given_names") ?? "";
+  const surname = (str(fd, "surname") ?? "").toUpperCase();
+  if (!slug || !profileId || (!given && !surname)) return;
 
-  const { parseGenealogyText } = await import("@/lib/nlp-genealogy");
-  const parsed = parseGenealogyText(text);
-
-  const bDate = parseDateInput(parsed.primary.birthDateRaw);
-  const dDate = parseDateInput(parsed.primary.deathDateRaw);
-
-  const primaryBirthPlace = normalizePlace(str(fd, "primary_birth_place") ?? parsed.primary.birthPlace);
-  const primaryDeathPlace = normalizePlace(str(fd, "primary_death_place") ?? parsed.primary.deathPlace);
-
-  const isLivingInput = num(fd, "primary_is_living");
-  const isLiving = isLivingInput !== null
-    ? isLivingInput
-    : (parsed.primary.deathDateRaw || parsed.primary.deathPlace ? 0 : (bDate.year && bDate.year >= 1925 ? 1 : 0));
-
-  const isUnmarriedInput = num(fd, "primary_is_unmarried");
-  const isUnmarried = isUnmarriedInput !== null
-    ? isUnmarriedInput
-    : (parsed.spouse || parsed.marriage ? 0 : 0);
-
-  const primaryId = await q.createPerson(profileId, {
-    given_names: parsed.primary.givenNames || parsed.primary.fullName,
-    surname: parsed.primary.surname || "",
-    sex: parsed.primary.sex,
+  const sexInput = str(fd, "sex");
+  const sex = sexInput === "M" || sexInput === "F" ? sexInput : inferSex(given);
+  const birth = parseDateInput(str(fd, "birth_date") ?? "");
+  const id = await q.createPerson(profileId, {
+    given_names: given,
+    surname,
+    sex,
     status: "En recherche",
-    occupation: parsed.primary.occupation,
-    is_living: isLiving,
-    is_unmarried: isUnmarried,
-    birth_date_raw: bDate.canonical ?? parsed.primary.birthDateRaw,
-    birth_date_iso: bDate.iso,
-    birth_year: bDate.year ?? parsed.primary.birthYear,
-    birth_place: primaryBirthPlace,
-    death_date_raw: dDate.canonical ?? parsed.primary.deathDateRaw,
-    death_date_iso: dDate.iso,
-    death_year: dDate.year ?? parsed.primary.deathYear,
-    death_place: primaryDeathPlace,
+    is_living: str(fd, "is_living") === "1" ? 1 : 0,
+    birth_date_raw: birth.canonical,
+    birth_date_iso: birth.iso,
+    birth_year: birth.year,
+    birth_place: normalizePlace(str(fd, "birth_place")),
   });
-
-  // 2. Conjoint et Union si présents
-  if (parsed.spouse && (parsed.spouse.givenNames || parsed.spouse.surname)) {
-    const sBDate = parseDateInput(parsed.spouse.birthDateRaw);
-    const spouseBirthPlace = normalizePlace(str(fd, "spouse_birth_place") ?? parsed.spouse.birthPlace);
-    const sIsLivingInput = num(fd, "spouse_is_living");
-    const sIsLiving = sIsLivingInput !== null
-      ? sIsLivingInput
-      : (sBDate.year && sBDate.year >= 1925 ? 1 : 0);
-
-    const spouseId = await q.createPerson(profileId, {
-      given_names: parsed.spouse.givenNames || parsed.spouse.fullName,
-      surname: parsed.spouse.surname || "",
-      sex: parsed.spouse.sex,
-      status: "En recherche",
-      is_living: sIsLiving,
-      is_unmarried: 0,
-      birth_date_raw: sBDate.canonical ?? parsed.spouse.birthDateRaw,
-      birth_date_iso: sBDate.iso,
-      birth_year: sBDate.year ?? parsed.spouse.birthYear,
-      birth_place: spouseBirthPlace,
-    });
-
-    const mDate = parseDateInput(parsed.marriage?.dateRaw);
-    const marriagePlace = normalizePlace(str(fd, "marriage_place") ?? parsed.marriage?.place);
-
-    await q.createUnion(profileId, {
-      partner1_id: primaryId,
-      partner2_id: spouseId,
-      date_raw: mDate.canonical ?? parsed.marriage?.dateRaw ?? null,
-      date_iso: mDate.iso,
-      year: mDate.year ?? parsed.marriage?.year ?? null,
-      place: marriagePlace,
-    });
-  }
-
-  // 3. Parents si mentionnés
-  if (parsed.parents?.father && (parsed.parents.father.givenNames || parsed.parents.father.surname)) {
-    const fatherId = await q.createPerson(profileId, {
-      given_names: parsed.parents.father.givenNames || parsed.parents.father.fullName,
-      surname: parsed.parents.father.surname || "",
-      sex: "M",
-      status: "En recherche",
-    });
-    await q.addParent(fatherId, primaryId);
-  }
-
-  if (parsed.parents?.mother && (parsed.parents.mother.givenNames || parsed.parents.mother.surname)) {
-    const motherId = await q.createPerson(profileId, {
-      given_names: parsed.parents.mother.givenNames || parsed.parents.mother.fullName,
-      surname: parsed.parents.mother.surname || "",
-      sex: "F",
-      status: "En recherche",
-    });
-    await q.addParent(motherId, primaryId);
-  }
-
-  await q.recomputeSosa(profileId);
-  await q.checkAndUpdatePersonCompletion(primaryId);
-  await refreshProfile(slug, primaryId);
-  redirect(`/p/${slug}/personnes/${primaryId}`);
+  await q.checkAndUpdatePersonCompletion(id);
+  await refreshProfile(slug, id);
+  redirect(`/p/${slug}/personnes/${id}`);
 }
 
 export async function toggleLivingAction(fd: FormData) {
@@ -511,25 +422,7 @@ export async function bulkSetStatusAction(input: {
   }
 }
 
-/**
- * Report sur Geneanet : on coche quand c'est fait, la carte est archivée.
- * Le bouton inverse rouvre la carte si on s'est trompé.
- */
-export async function markGeneanetAction(fd: FormData) {
-  const slug = str(fd, "slug");
-  const personId = num(fd, "personId");
-  if (!slug || !personId) return;
-  const done = str(fd, "done") === "1";
-  await q.updatePerson(personId, {
-    geneanet_at: done ? new Date().toISOString().slice(0, 19).replace("T", " ") : null,
-  });
-  await refreshProfile(slug, personId);
-}
-
-/**
- * Déplacement d'une carte sur le tableau : la colonne dit tout.
- * Sortir de « Classées » rouvre la carte ; y entrer la considère terminée.
- */
+/** Déplacement d'une carte sur le tableau : la colonne donne le statut. */
 export async function movePersonAction(input: {
   slug: string;
   personId: number;
@@ -537,20 +430,8 @@ export async function movePersonAction(input: {
 }) {
   const { slug, personId, column } = input;
 
-  if (column === "Classées") {
-    const current = await q.getPersonRow(personId);
-    await q.updatePerson(personId, {
-      geneanet_at: new Date().toISOString().slice(0, 19).replace("T", " "),
-      status:
-        current && (current.status === "Complet" || current.status === "Complet (lacunes)" || current.status === "Bloqué")
-          ? current.status
-          : "Complet",
-    });
-  } else if ((STATUSES as readonly string[]).includes(column)) {
-    await q.updatePerson(personId, { status: column as Status, geneanet_at: null });
-  } else {
-    return;
-  }
+  if (!(STATUSES as readonly string[]).includes(column)) return;
+  await q.updatePerson(personId, { status: column as Status });
 
   await refreshProfile(slug);
 }
@@ -1732,3 +1613,21 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
   }
 }
 
+
+/**
+ * Carnet : enregistrement silencieux pendant la frappe. Aucune revalidation de page,
+ * pour ne jamais recharger l'écran sous les doigts de l'utilisateur.
+ */
+export async function saveNotebookAction(input: {
+  profileId: number;
+  content: string;
+}): Promise<{ ok: boolean; updatedAt?: string; error?: string }> {
+  if (!input.profileId || typeof input.content !== "string") return { ok: false, error: "Carnet introuvable" };
+  if (input.content.length > 200_000) return { ok: false, error: "Le carnet est trop long (200 000 caractères au plus)" };
+  try {
+    const updatedAt = await q.saveNotebook(input.profileId, input.content);
+    return { ok: true, updatedAt };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

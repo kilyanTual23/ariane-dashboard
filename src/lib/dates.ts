@@ -165,13 +165,28 @@ export function displayDate(raw?: string | null, iso?: string | null): string | 
 }
 
 /** Un « acte » peut être une URL, une cote, ou « >1925 » (non communicable). */
+/** Les dépôts d'archives qu'on croise le plus, nommés comme on les cite. */
+const ARCHIVE_NAMES: [RegExp, string][] = [
+  [/ille-et-vilaine\.fr$/, "AD Ille-et-Vilaine"],
+  [/lamayenne\.fr$/, "AD Mayenne"],
+  [/correze\.fr$/, "AD Corrèze"],
+  [/archivesdepartementales76\.net$/, "AD Seine-Maritime"],
+  [/archives-manche\.fr$/, "AD Manche"],
+  [/gironde\.fr$/, "AD Gironde"],
+  [/archinoe/, "Archinoë"],
+  [/geneanet\.org$/, "Geneanet"],
+  [/filae\.com$/, "Filae"],
+  [/(drive|docs)\.google\.com$/, "Google Drive"],
+];
+
 export function sourceLabel(source?: string | null): string | null {
   const s = (source ?? "").trim();
   if (!s) return null;
   if (/^>\s*\d{4}$/.test(s)) return `Non communicable (${s})`;
   if (/^https?:\/\//.test(s)) {
     try {
-      return new URL(s).hostname.replace(/^www\./, "");
+      const host = new URL(s).hostname.replace(/^www\./, "");
+      return ARCHIVE_NAMES.find(([re]) => re.test(host))?.[1] ?? host;
     } catch {
       return s;
     }

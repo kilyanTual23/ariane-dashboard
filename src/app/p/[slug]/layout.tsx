@@ -1,8 +1,9 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { TopBar } from "@/components/TopBar";
-import { type GlobalSearchItem } from "@/components/GlobalSearchModal";
-import { getProfileBySlug, listPersons, listProfiles, listTasks } from "@/lib/queries";
+import { AppShell } from "@/components/AppShell";
+import type { GlobalSearchItem } from "@/components/CommandPalette";
+import { getNotebook, getProfileBySlug, listPersons, listProfiles, listTasks } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +12,14 @@ export default async function ProfileLayout({ children, params }: LayoutProps<"/
   const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const [profiles, allTasks, persons] = await Promise.all([
+  const [profiles, allTasks, persons, cookieStore, notebook] = await Promise.all([
     listProfiles(),
     listTasks(profile.id),
     listPersons(profile.id),
+    cookies(),
+    getNotebook(profile.id),
   ]);
-  const openTasks = allTasks.filter(
-    (t) => t.status === "À faire" || t.status === "En cours",
-  );
+  const openTasks = allTasks.filter((t) => t.status === "À faire" || t.status === "En cours").length;
 
   const searchItems: GlobalSearchItem[] = persons.map((p) => ({
     id: p.id,
@@ -37,26 +38,18 @@ export default async function ProfileLayout({ children, params }: LayoutProps<"/
   }));
 
   return (
-    <>
-      <TopBar
-        profiles={profiles.map((p) => ({ slug: p.slug, name: p.name }))}
-        current={profile.slug}
-        profileId={profile.id}
-        searchItems={searchItems}
-        tabs={[
-          { href: `/p/${slug}`, label: "Accueil" },
-          { href: `/p/${slug}/personnes`, label: "Cartes" },
-          { href: `/p/${slug}/arbre`, label: "Arbre" },
-          { href: `/p/${slug}/carte`, label: "Carte" },
-          { href: `/p/${slug}/taches`, label: "Ma liste", badge: openTasks.length },
-        ]}
-        secondary={[
-          { href: `/p/${slug}/parente`, label: "Parenté" },
-          { href: `/p/${slug}/statistiques`, label: "Chiffres" },
-          { href: `/p/${slug}/reglages`, label: "Réglages" },
-        ]}
-      />
-      <main className="mx-auto w-full max-w-[1750px] px-4 py-6 sm:px-8 sm:py-8">{children}</main>
-    </>
+    <AppShell
+      slug={slug}
+      profileId={profile.id}
+      profileName={profile.name}
+      profiles={profiles.map((p) => ({ slug: p.slug, name: p.name }))}
+      searchItems={searchItems}
+      personCount={persons.length}
+      openTasks={openTasks}
+      initialCollapsed={cookieStore.get("ariane-sidebar")?.value === "collapsed"}
+      notebook={notebook}
+    >
+      {children}
+    </AppShell>
   );
 }
