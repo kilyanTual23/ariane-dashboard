@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { getActStorageDir, convertPdfToJpeg } from "@/lib/act-downloader";
+import { canReadActFile } from "@/lib/access";
 
 export async function GET(
   _request: NextRequest,
@@ -12,6 +13,11 @@ export async function GET(
   // Sécurité : n'autoriser que les noms de fichiers sains (ex: person_1_birth.jpg)
   if (!filename || !/^[a-zA-Z0-9_\-]+\.jpg$/.test(filename)) {
     return new NextResponse("Nom de fichier invalide", { status: 400 });
+  }
+
+  // L'acte doit appartenir à une fiche (ou une union) d'un profil du compte connecté.
+  if (!(await canReadActFile(filename))) {
+    return new NextResponse("Image non trouvée", { status: 404 });
   }
 
   const storageDir = getActStorageDir();
@@ -40,7 +46,7 @@ export async function GET(
     headers: {
       "Content-Type": "image/jpeg",
       "Content-Length": fileBuffer.length.toString(),
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": "private, max-age=31536000, immutable",
     },
   });
 }

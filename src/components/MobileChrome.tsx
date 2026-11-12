@@ -24,6 +24,7 @@ import {
   IconSettings,
   IconSun,
   IconTree,
+  IconUser,
   IconUsers,
   Logo,
 } from "@/components/icons";
@@ -325,6 +326,14 @@ export function MobileTabBar({
             </ul>
           </div>
 
+          <Link
+            href="/compte"
+            onClick={() => setMoreOpen(false)}
+            className={buttonClass("secondary", "h-11 w-full justify-center")}
+          >
+            <IconUser size={15} />
+            Mon compte
+          </Link>
           <form action={logoutAction}>
             <button type="submit" className={buttonClass("secondary", "h-11 w-full justify-center")}>
               <IconLogOut size={15} />

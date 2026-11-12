@@ -1,5 +1,7 @@
 import { cache } from "react";
 import { queryAll, queryOne, execute, batch } from "./db";
+import { requireAccount } from "./access";
+import { ensureAuthSchema } from "./auth";
 import { computeCompletion } from "./completion";
 import type {
   Person,
@@ -40,17 +42,22 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
 
 export type ProfileSummary = Profile & { personCount: number; openTasks: number };
 
+/** Les profils du compte connecté (jamais ceux des autres comptes). */
 export const listProfiles = cache(async (): Promise<ProfileSummary[]> => {
+  const account = await requireAccount();
   return queryAll<ProfileSummary>(
     `SELECT p.*,
             (SELECT COUNT(*) FROM persons WHERE profile_id = p.id) AS personCount,
             (SELECT COUNT(*) FROM tasks   WHERE profile_id = p.id AND status IN ('À faire','En cours')) AS openTasks
-     FROM profiles p ORDER BY p.name`,
+     FROM profiles p WHERE p.account_id = ? ORDER BY p.name`,
+    [account.id],
   );
 });
 
+/** Le profil, s'il appartient au compte connecté ; sinon null (la page répond « introuvable »). */
 export const getProfileBySlug = cache(async (slug: string): Promise<Profile | null> => {
-  return queryOne<Profile>(`SELECT * FROM profiles WHERE slug = ?`, [slug]);
+  const account = await requireAccount();
+  return queryOne<Profile>(`SELECT * FROM profiles WHERE slug = ? AND account_id = ?`, [slug, account.id]);
 });
 
 export async function slugify(name: string): Promise<string> {
@@ -70,11 +77,24 @@ export async function slugify(name: string): Promise<string> {
   return slug;
 }
 
-export async function createProfile(name: string, description?: string | null): Promise<Profile> {
+/**
+ * Crée un profil. Sans compte (scripts d'import), il reste sans propriétaire :
+ * il sera rattaché au premier compte administrateur créé.
+ */
+export async function createProfile(
+  name: string,
+  description?: string | null,
+  accountId?: number | null,
+): Promise<Profile> {
   const slug = await slugify(name);
+  if (accountId) await ensureAuthSchema();
   const info = await execute(
-    `INSERT INTO profiles (slug, name, description) VALUES (?, ?, ?)`,
-    [slug, name.trim(), description?.trim() || null],
+    accountId
+      ? `INSERT INTO profiles (slug, name, description, account_id) VALUES (?, ?, ?, ?)`
+      : `INSERT INTO profiles (slug, name, description) VALUES (?, ?, ?)`,
+    accountId
+      ? [slug, name.trim(), description?.trim() || null, accountId]
+      : [slug, name.trim(), description?.trim() || null],
   );
   return (await queryOne<Profile>(`SELECT * FROM profiles WHERE id = ?`, [info.lastInsertRowid]))!;
 }
@@ -99,7 +119,24 @@ export async function updateProfile(
   }
 }
 
+/**
+ * Supprime un profil et toutes ses données. Les suppressions sont explicites :
+ * on ne compte pas sur ON DELETE CASCADE, qui dépend de la connexion.
+ */
 export async function deleteProfile(id: number): Promise<void> {
+  const personsOf = `SELECT id FROM persons WHERE profile_id = ?`;
+  const statements: InStatement[] = [
+    { sql: `DELETE FROM parent_child WHERE parent_id IN (${personsOf}) OR child_id IN (${personsOf})`, args: [id, id] },
+    { sql: `DELETE FROM sources WHERE profile_id = ?`, args: [id] },
+    { sql: `DELETE FROM tasks WHERE profile_id = ?`, args: [id] },
+    { sql: `DELETE FROM resources WHERE profile_id = ?`, args: [id] },
+    { sql: `DELETE FROM unions WHERE profile_id = ?`, args: [id] },
+    { sql: `UPDATE profiles SET root_person_id = NULL WHERE id = ?`, args: [id] },
+    { sql: `DELETE FROM persons WHERE profile_id = ?`, args: [id] },
+  ];
+  await batch(statements);
+  await ensureNotebookTable();
+  await execute(`DELETE FROM notebooks WHERE profile_id = ?`, [id]);
   await execute(`DELETE FROM profiles WHERE id = ?`, [id]);
 }
 

@@ -33,6 +33,7 @@ import {
   IconSettings,
   IconSun,
   IconTree,
+  IconUser,
   IconUsers,
   Logo,
 } from "@/components/icons";
@@ -397,6 +398,9 @@ function ProfileSwitcher({
         Réglages du profil
       </MenuLink>
       <MenuSeparator />
+      <MenuLink href="/compte" icon={<IconUser size={14} />}>
+        Mon compte
+      </MenuLink>
       <form action={logoutAction}>
         <button
           type="submit"

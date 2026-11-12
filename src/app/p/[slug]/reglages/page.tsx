@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 
@@ -8,7 +9,7 @@ import { ActionButton } from "@/components/ActionButton";
 import { ConfirmButton } from "@/components/Dialog";
 import { ActionForm } from "@/components/FormDialog";
 import { GeneanetExportCard } from "@/components/GeneanetExportCard";
-import { IconDownload, IconLogOut, IconTrash } from "@/components/icons";
+import { IconDownload, IconLogOut, IconTrash, IconUser } from "@/components/icons";
 import { PersonSelect, type PickerPerson } from "@/components/PersonSelect";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSelector } from "@/components/ThemeSelector";
@@ -22,7 +23,7 @@ const SECTIONS = [
   ["apparence", "Apparence"],
   ["export", "Export Geneanet"],
   ["sauvegarde", "Sauvegarde"],
-  ["session", "Session"],
+  ["session", "Compte"],
   ["danger", "Zone sensible"],
 ] as const;
 
@@ -185,14 +186,19 @@ export default async function SettingsPage({ params }: PageProps<"/p/[slug]/regl
           </a>
         </Section>
 
-        <Section id="session" title="Session" description="L’accès à Ariane est protégé par mot de passe.">
-          <form action={logoutAction} className="flex items-center justify-between gap-3">
-            <p className="text-ui text-fg-muted">Fermer la session sur cet appareil.</p>
-            <SubmitButton variant="secondary">
-              <IconLogOut size={14} />
-              Se déconnecter
-            </SubmitButton>
-          </form>
+        <Section id="session" title="Compte" description="Ce profil n’est visible que depuis votre compte.">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link href="/compte" className={buttonClass("secondary")}>
+              <IconUser size={14} />
+              Mon compte
+            </Link>
+            <form action={logoutAction}>
+              <SubmitButton variant="quiet">
+                <IconLogOut size={14} />
+                Se déconnecter
+              </SubmitButton>
+            </form>
+          </div>
         </Section>
 
         <Section

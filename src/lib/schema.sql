@@ -1,12 +1,32 @@
 PRAGMA foreign_keys = ON;
 
--- Un profil = un projet de recherche indépendant (un arbre)
+-- Comptes : chacun a ses propres profils (aussi créé à la volée par src/lib/auth.ts).
+CREATE TABLE IF NOT EXISTS accounts (
+  id            INTEGER PRIMARY KEY,
+  username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  display_name  TEXT,
+  password_hash TEXT NOT NULL,          -- scrypt$sel$empreinte
+  is_admin      INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash  TEXT PRIMARY KEY,         -- SHA-256 du jeton posé en cookie
+  account_id  INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_account ON sessions(account_id);
+
+-- Un profil = un projet de recherche indépendant (un arbre), propriété d'un compte
 CREATE TABLE IF NOT EXISTS profiles (
   id            INTEGER PRIMARY KEY,
   slug          TEXT NOT NULL UNIQUE,
   name          TEXT NOT NULL,
   description   TEXT,
   root_person_id INTEGER,
+  account_id    INTEGER REFERENCES accounts(id),
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -46,6 +66,7 @@ CREATE TABLE IF NOT EXISTS persons (
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_profiles_account ON profiles(account_id);
 CREATE INDEX IF NOT EXISTS idx_persons_profile ON persons(profile_id);
 CREATE INDEX IF NOT EXISTS idx_persons_surname ON persons(profile_id, surname);
 

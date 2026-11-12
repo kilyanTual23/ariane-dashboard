@@ -1,13 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 
 import { checkpointDb } from "@/lib/db";
 import { normalizePlace, parseDateInput } from "@/lib/dates";
 import { inferSex } from "@/lib/names";
 import * as q from "@/lib/queries";
 import { downloadAct, removeLocalAct } from "@/lib/act-downloader";
+import {
+  ownedPerson,
+  ownedPersons,
+  ownedProfile,
+  ownedResource,
+  ownedSource,
+  ownedTask,
+  ownedUnion,
+  requireAccount,
+} from "@/lib/access";
 import { STATUSES, type Person, type Priority, type Status, type TaskStatus } from "@/lib/types";
 
 /* ------------------------------------------------------------------ helpers */
@@ -43,9 +53,10 @@ async function refreshProfile(slug: string, personId?: number, otherPersonIds: n
 /* ----------------------------------------------------------------- profils */
 
 export async function createProfileAction(fd: FormData) {
+  const account = await requireAccount();
   const name = str(fd, "name");
   if (!name) return;
-  const profile = await q.createProfile(name, str(fd, "description"));
+  const profile = await q.createProfile(name, str(fd, "description"), account.id);
   revalidatePath("/");
   redirect(`/p/${profile.slug}`);
 }
@@ -54,6 +65,7 @@ export async function updateProfileAction(fd: FormData) {
   const id = num(fd, "profileId");
   const slug = str(fd, "slug");
   if (!id || !slug) return;
+  await ownedProfile(id);
   await q.updateProfile(id, {
     name: str(fd, "name") ?? undefined,
     description: str(fd, "description"),
@@ -66,13 +78,16 @@ export async function setRootPersonAction(fd: FormData) {
   const id = num(fd, "profileId");
   const slug = str(fd, "slug");
   if (!id || !slug) return;
-  await q.updateProfile(id, { root_person_id: num(fd, "rootPersonId") });
+  const rootPersonId = num(fd, "rootPersonId");
+  await ownedPersons(id, [rootPersonId]);
+  await q.updateProfile(id, { root_person_id: rootPersonId });
   await refreshProfile(slug);
 }
 
 export async function deleteProfileAction(fd: FormData) {
   const id = num(fd, "profileId");
   if (!id) return;
+  await ownedProfile(id);
   await q.deleteProfile(id);
   revalidatePath("/");
   redirect("/");
@@ -91,6 +106,7 @@ export async function setPersonField(input: {
   value: string;
 }) {
   const { slug, personId, field } = input;
+  await ownedPerson(personId);
   const value = input.value.trim();
   const patch: q.PersonInput = {};
 
@@ -204,6 +220,7 @@ export async function setUnionField(input: {
   field: "date_raw" | "place" | "source" | "source_ignored";
   value: string;
 }) {
+  await ownedUnion(input.unionId);
   const value = input.value.trim();
   if (input.field === "date_raw") {
     const d = parseDateInput(value);
@@ -234,6 +251,8 @@ export async function downloadActAction(fd: FormData): Promise<{ ok: boolean; er
   const actKind = str(fd, "actKind") as "birth" | "death" | "marriage";
 
   if (!url) return { ok: false, error: "Aucun lien d’acte" };
+  if (personId) await ownedPerson(personId);
+  else if (unionId) await ownedUnion(unionId);
 
   let result: { ok: boolean; error?: string } = { ok: false, error: "Acte introuvable" };
   if (personId && (actKind === "birth" || actKind === "death")) {
@@ -254,6 +273,7 @@ export async function quickCreatePersonAction(fd: FormData) {
   const profileId = num(fd, "profileId");
   const fullName = str(fd, "fullName");
   if (!slug || !profileId || !fullName) return;
+  await ownedProfile(profileId);
 
   const { splitName } = await import("@/lib/names");
   const { given_names, surname } = splitName(fullName);
@@ -277,6 +297,7 @@ export async function createPersonAction(fd: FormData) {
   const given = str(fd, "given_names") ?? "";
   const surname = (str(fd, "surname") ?? "").toUpperCase();
   if (!slug || !profileId || (!given && !surname)) return;
+  await ownedProfile(profileId);
 
   const sexInput = str(fd, "sex");
   const sex = sexInput === "M" || sexInput === "F" ? sexInput : inferSex(given);
@@ -302,6 +323,7 @@ export async function toggleLivingAction(fd: FormData) {
   const personId = num(fd, "personId");
   const isLiving = num(fd, "isLiving") ?? 0;
   if (!slug || !personId) return;
+  await ownedPerson(personId);
   await q.updatePerson(personId, { is_living: isLiving });
   await q.checkAndUpdatePersonCompletion(personId);
   await refreshProfile(slug, personId);
@@ -312,6 +334,7 @@ export async function toggleUnmarriedAction(fd: FormData) {
   const personId = num(fd, "personId");
   const isUnmarried = num(fd, "isUnmarried") ?? 0;
   if (!slug || !personId) return;
+  await ownedPerson(personId);
   await q.updatePerson(personId, { is_unmarried: isUnmarried });
   await q.checkAndUpdatePersonCompletion(personId);
   await refreshProfile(slug, personId);
@@ -331,6 +354,8 @@ export async function toggleActIgnoredAction(fd: FormData) {
   const reason = str(fd, "reason");
 
   if (!slug) return;
+  if ((actKind === "birth" || actKind === "death") && personId) await ownedPerson(personId);
+  if (actKind === "marriage" && unionId) await ownedUnion(unionId);
 
   if (actKind === "birth" && personId) {
     const patch: q.PersonInput = { birth_source_ignored: ignored };
@@ -371,6 +396,7 @@ export async function deletePersonAction(fd: FormData) {
   const personId = num(fd, "personId");
   const profileId = num(fd, "profileId");
   if (!slug || !personId || !profileId) return;
+  await ownedPersons(profileId, [personId]);
   await q.deletePerson(personId);
   await q.recomputeSosa(profileId);
   await checkpointDb();
@@ -389,11 +415,13 @@ export async function bulkDeletePersonsAction(input: {
     if (!slug || !profileId || !personIds || personIds.length === 0) {
       return { ok: false, error: "Paramètres manquants" };
     }
+    await ownedPersons(profileId, personIds);
     await q.deletePersons(personIds);
     await q.recomputeSosa(profileId);
     await refreshProfile(slug);
     return { ok: true, count: personIds.length };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: msg };
   }
@@ -410,6 +438,7 @@ export async function bulkSetStatusAction(input: {
     if (!slug || !profileId || !personIds || personIds.length === 0 || !status) {
       return { ok: false, error: "Paramètres manquants" };
     }
+    await ownedPersons(profileId, personIds);
     await q.bulkUpdateStatus(personIds, status);
     for (const id of personIds) {
       await q.checkAndUpdatePersonCompletion(id);
@@ -417,6 +446,7 @@ export async function bulkSetStatusAction(input: {
     await refreshProfile(slug);
     return { ok: true, count: personIds.length };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: msg };
   }
@@ -431,6 +461,7 @@ export async function movePersonAction(input: {
   const { slug, personId, column } = input;
 
   if (!(STATUSES as readonly string[]).includes(column)) return;
+  await ownedPerson(personId);
   await q.updatePerson(personId, { status: column as Status });
 
   await refreshProfile(slug);
@@ -441,6 +472,7 @@ export async function quickStatusAction(fd: FormData) {
   const personId = num(fd, "personId");
   const status = str(fd, "status") as Status | null;
   if (!slug || !personId || !status) return;
+  await ownedPerson(personId);
   await q.updatePerson(personId, { status });
   await refreshProfile(slug, personId);
 }
@@ -476,6 +508,7 @@ export async function addParentAction(fd: FormData) {
   const profileId = num(fd, "profileId");
   const childId = num(fd, "childId");
   if (!slug || !profileId || !childId) return;
+  await ownedPersons(profileId, [childId, num(fd, "parentId")]);
 
   const child = await q.getPerson(profileId, childId);
   const existingFather = child?.parents.find((p) => p.sex === "M");
@@ -501,6 +534,7 @@ export async function addChildAction(fd: FormData) {
   const profileId = num(fd, "profileId");
   const parentId = num(fd, "parentId");
   if (!slug || !profileId || !parentId) return;
+  await ownedPersons(profileId, [parentId, num(fd, "childId")]);
   const childId = await resolveOrCreatePerson(
     profileId,
     num(fd, "childId"),
@@ -519,6 +553,7 @@ export async function removeParentAction(fd: FormData) {
   const childId = num(fd, "childId");
   const parentId = num(fd, "parentId");
   if (!slug || !profileId || !childId || !parentId) return;
+  await ownedPersons(profileId, [childId, parentId]);
   await q.removeParent(parentId, childId);
   await q.recomputeSosa(profileId);
   await refreshProfile(slug, childId);
@@ -540,7 +575,9 @@ export async function saveUnionAction(fd: FormData) {
   };
 
   const unionId = num(fd, "unionId");
+  await ownedProfile(profileId);
   if (unionId) {
+    if ((await ownedUnion(unionId)) !== profileId) return;
     await q.updateUnion(unionId, input);
     const u = await q.getUnionRow(unionId);
     if (u?.partner1_id) await q.checkAndUpdatePersonCompletion(u.partner1_id);
@@ -548,6 +585,7 @@ export async function saveUnionAction(fd: FormData) {
   } else {
     const personId = num(fd, "personId");
     if (!personId) return;
+    await ownedPersons(profileId, [personId, num(fd, "spouseId")]);
     const spouseId = await resolveOrCreatePerson(
       profileId,
       num(fd, "spouseId"),
@@ -564,6 +602,7 @@ export async function deleteUnionAction(fd: FormData) {
   const slug = str(fd, "slug");
   const unionId = num(fd, "unionId");
   if (!slug || !unionId) return;
+  await ownedUnion(unionId);
   await q.deleteUnion(unionId);
   await refreshProfile(slug);
 }
@@ -575,6 +614,7 @@ export async function createTaskAction(fd: FormData) {
   const profileId = num(fd, "profileId");
   const title = str(fd, "title");
   if (!slug || !profileId || !title) return;
+  await ownedPersons(profileId, [num(fd, "person_id")]);
   await q.createTask(profileId, {
     title,
     person_id: num(fd, "person_id"),
@@ -592,6 +632,7 @@ export async function updateTaskAction(fd: FormData) {
   const slug = str(fd, "slug");
   const taskId = num(fd, "taskId");
   if (!slug || !taskId) return;
+  await ownedTask(taskId);
   const patch: q.TaskInput = {};
   const status = str(fd, "status") as TaskStatus | null;
   const priority = str(fd, "priority") as Priority | null;
@@ -607,6 +648,7 @@ export async function deleteTaskAction(fd: FormData) {
   const slug = str(fd, "slug");
   const taskId = num(fd, "taskId");
   if (!slug || !taskId) return;
+  await ownedTask(taskId);
   await q.deleteTask(taskId);
   await refreshProfile(slug);
 }
@@ -619,6 +661,7 @@ export async function createResourceAction(fd: FormData) {
   const label = str(fd, "label");
   const url = str(fd, "url");
   if (!slug || !profileId || !label || !url) return;
+  await ownedProfile(profileId);
   await q.createResource(profileId, label, url, str(fd, "category"));
   await refreshProfile(slug);
 }
@@ -627,6 +670,7 @@ export async function deleteResourceAction(fd: FormData) {
   const slug = str(fd, "slug");
   const id = num(fd, "resourceId");
   if (!slug || !id) return;
+  await ownedResource(id);
   await q.deleteResource(id);
   await refreshProfile(slug);
 }
@@ -638,6 +682,7 @@ export async function createSourceAction(fd: FormData) {
   const profileId = num(fd, "profileId");
   const personId = num(fd, "personId");
   if (!slug || !profileId || !personId) return;
+  await ownedPersons(profileId, [personId]);
   await q.createSource(profileId, {
     person_id: personId,
     kind: str(fd, "kind") ?? "Autre",
@@ -654,6 +699,7 @@ export async function deleteSourceAction(fd: FormData) {
   const slug = str(fd, "slug");
   const id = num(fd, "sourceId");
   if (!slug || !id) return;
+  await ownedSource(id);
   await q.deleteSource(id);
   await refreshProfile(slug);
 }
@@ -668,6 +714,8 @@ export async function appendTranscriptionToNotesAction(fd: FormData): Promise<{ 
   if (!slug || !text) return { ok: false, error: "Données manquantes" };
 
   try {
+    if (personId) await ownedPerson(personId);
+    else if (unionId) await ownedUnion(unionId);
     if (personId) {
       const profileId = await q.profileIdOfPerson(personId);
       if (!profileId) return { ok: false, error: "Profil introuvable" };
@@ -697,6 +745,7 @@ export async function appendTranscriptionToNotesAction(fd: FormData): Promise<{ 
     }
     return { ok: false, error: "Cible introuvable" };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: msg };
   }
@@ -748,6 +797,8 @@ export async function getActViewerContextAction(
 ): Promise<ActViewerContextData> {
   const result: ActViewerContextData = {};
   if (!slug) return result;
+  if (personId) await ownedPerson(personId);
+  if (unionId) await ownedUnion(unionId);
 
   const toParentContext = (p: Person): ActViewerParentContext => ({
     id: p.id,
@@ -914,6 +965,17 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
   if (!slug) return { ok: false, error: "Profil non spécifié" };
 
   try {
+    // Toutes les fiches citées (sujet, parents, conjoint…) doivent appartenir au même profil du compte.
+    const scopeProfileId = personId ? await ownedPerson(personId) : unionId ? await ownedUnion(unionId) : null;
+    if (!scopeProfileId) return { ok: false, error: "Cible introuvable" };
+    await ownedPersons(scopeProfileId, [
+      fatherIdParam,
+      motherIdParam,
+      spouseIdParam,
+      spouseFatherIdParam,
+      spouseMotherIdParam,
+    ]);
+
     const updatedFields: string[] = [];
     const touchedPersonIds = new Set<number>();
 
@@ -1608,6 +1670,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
 
     return { ok: false, error: "Aucune cible (personne ou union) spécifiée" };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: msg };
   }
@@ -1625,9 +1688,11 @@ export async function saveNotebookAction(input: {
   if (!input.profileId || typeof input.content !== "string") return { ok: false, error: "Carnet introuvable" };
   if (input.content.length > 200_000) return { ok: false, error: "Le carnet est trop long (200 000 caractères au plus)" };
   try {
+    await ownedProfile(input.profileId);
     const updatedAt = await q.saveNotebook(input.profileId, input.content);
     return { ok: true, updatedAt };
   } catch (err) {
+    unstable_rethrow(err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

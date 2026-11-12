@@ -5,6 +5,7 @@ import sharp from "sharp";
 import Tesseract from "tesseract.js";
 import { GoogleGenAI } from "@google/genai";
 import { getActStorageDir } from "@/lib/act-downloader";
+import { canReadActFile } from "@/lib/access";
 import { parseTranscription, cleanTranscriptionText } from "@/lib/transcription-parser";
 
 /**
@@ -249,6 +250,9 @@ export async function POST(req: NextRequest) {
 
     if (imageUrl.startsWith("/api/actes/")) {
       const filename = imageUrl.replace("/api/actes/", "").split("?")[0];
+      if (!/^[a-zA-Z0-9_\-]+\.jpg$/.test(filename) || !(await canReadActFile(filename))) {
+        return NextResponse.json({ error: "Fichier d'acte introuvable sur le serveur" }, { status: 404 });
+      }
       const filePath = path.join(getActStorageDir(), filename);
       if (!fs.existsSync(filePath)) {
         return NextResponse.json(

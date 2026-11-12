@@ -1,6 +1,7 @@
 # Ariane — dashboard de recherches généalogiques
 
 Application web pour recenser, visualiser et accélérer ses recherches généalogiques :
+- **Comptes personnels** : chaque compte a ses propres profils, invisibles depuis les autres comptes.
 - **Profils indépendants** : un arbre et un espace de travail dédiés par profil.
 - **Fiches personnes réactives** : onze cases éditables sur place, calcul de complétion dynamique, rappels et liste de contrôle de l'avancement.
 - **Visionneuse haute résolution d'actes d'archives** : téléchargement automatique depuis les portails d'archives, zoom fluide, filtres de lisibilité, gestes tactiles.
@@ -22,7 +23,7 @@ npm install     # Installation des dépendances (une seule fois)
 Crée un fichier `.env.local` (voir `.env.example`) :
 
 ```env
-# Mot de passe d'accès au site (obligatoire)
+# Mot de passe du propriétaire : demandé une seule fois, pour créer le premier compte
 ARIANE_PASSWORD=un_mot_de_passe
 
 # Base de données Turso Cloud
@@ -50,11 +51,18 @@ Pour la version de production :
 npm run build && npm start
 ```
 
-Toutes les pages sont protégées par le mot de passe `ARIANE_PASSWORD` (page `/login`, vérification dans `src/proxy.ts`).
+Au premier lancement, la page `/login` propose de créer le compte administrateur ; `ARIANE_PASSWORD` y est demandé pour prouver qu'on est le propriétaire. Ensuite, chacun se connecte avec son identifiant et son mot de passe (voir [Comptes](#comptes)).
 
 ---
 
 ## Fonctionnalités
+
+### Comptes
+- **Chacun ses profils** : un compte ne voit que ses propres profils. Pages, exports, images d'actes, transcriptions et modifications vérifient côté serveur que le profil appartient au compte connecté ; un profil d'un autre compte répond « introuvable ».
+- **Premier compte** : créé au premier lancement (avec `ARIANE_PASSWORD`), il devient administrateur et récupère tous les profils existants.
+- **Ajouter un proche** : l'administrateur crée son compte dans **Mon compte** (`/compte`) avec un identifiant et un mot de passe provisoire. Il peut aussi lui redéfinir un mot de passe ou supprimer son compte (avec tous ses profils). L'administrateur ne voit pas les profils des autres comptes.
+- **Mon compte** : nom affiché et changement de mot de passe (les autres appareils sont alors déconnectés).
+- **Sécurité** : mots de passe hachés avec scrypt, sessions de 30 jours stockées en base (cookie `httpOnly`), délai après un mot de passe erroné.
 
 ### 1. La fiche personne
 **Une personne est une carte à remplir.** Onze cases principales — identité, naissance (date / lieu / acte), mariage (date / lieu / acte), décès (date / lieu / acte), parents — auxquelles s'ajoutent les conjoints et les enfants rattachés.
@@ -126,6 +134,8 @@ Sous 1024 px de large, Ariane bascule dans une interface pensée pour le télép
 
 | Page | Rôle |
 |---|---|
+| `/` | Les profils du compte connecté |
+| `/compte` | Mon compte : nom, mot de passe ; gestion des comptes pour l'administrateur |
 | `/p/<profil>` | Tableau de bord : chiffres clés, « À faire sur vos fiches », alertes (incohérences, racine Sosa), fiches presque terminées, répartition par statut, modifications récentes |
 | `/p/<profil>/personnes` | Toutes les fiches en grille, en liste triée par nom avec index alphabétique, ou en tableau par statut ; filtres (statut, commune, siècle, génération, branche) et vues enregistrées |
 | `/p/<profil>/personnes/<id>` | La fiche : état civil, actes et visionneuse, transcription IA, famille, notes, sources, rappels, avancement |
@@ -219,7 +229,8 @@ src/
 │   │   ├── communes/         # Recherche et autocomplétion des lieux
 │   │   ├── ocr/              # Analyse IA et transcription paléographique
 │   │   └── profils/          # Exports (JSON, GEDCOM)
-│   ├── login/                # Page de connexion
+│   ├── compte/               # Mon compte et gestion des comptes
+│   ├── login/                # Connexion et création du premier compte
 │   ├── manifest.ts           # Manifeste de l'application installable
 │   └── p/[slug]/             # Routes du profil (accueil, personnes, arbre, carte, parenté, tâches, stats, réglages)
 ├── components/
@@ -236,7 +247,9 @@ src/
 │   ├── ui.tsx                # Primitives d'interface (boutons, badges, cartes, jauges)
 │   └── icons.tsx             # Jeu d'icônes au trait
 ├── lib/
+│   ├── access.ts             # Contrôle d'accès : chaque donnée appartient-elle au compte connecté ?
 │   ├── act-downloader.ts     # Téléchargement d'actes par portail d'archives (Puppeteer si besoin)
+│   ├── auth.ts               # Comptes, mots de passe et sessions
 │   ├── transcription-parser.ts # Structuration des retours de transcription
 │   ├── completion.ts         # Calcul de complétion et dispenses
 │   ├── db.ts                 # Connexion Turso / libSQL ou SQLite local
@@ -244,7 +257,7 @@ src/
 │   ├── theme.ts              # Thème, couleur d'accent et taille de l'interface
 │   ├── use-media.ts          # Détection mobile, clavier virtuel et défilement
 │   └── types.ts              # Types TypeScript
-└── proxy.ts                  # Protection par mot de passe
+└── proxy.ts                  # Renvoi vers la connexion sans cookie de session
 data/
 ├── ariane.db                 # Base SQLite locale (sans Turso)
 └── actes/                    # Cache des images d'actes

@@ -3,9 +3,11 @@ import Link from "next/link";
 
 import { createProfileAction } from "./actions";
 import { logoutAction } from "./login/actions";
-import { IconArrowRight, IconListChecks, IconLogOut, IconPlus, IconUsers, Logo } from "@/components/icons";
+import { IconArrowRight, IconListChecks, IconLogOut, IconPlus, IconUser, IconUsers, Logo } from "@/components/icons";
 import { SubmitButton } from "@/components/SubmitButton";
 import { CompletionRing, Kbd, STATUS_DOT } from "@/components/ui";
+import { requireAccount } from "@/lib/access";
+import { accountLabel } from "@/lib/auth";
 import { listPersons, listProfiles } from "@/lib/queries";
 import { STATUSES } from "@/lib/types";
 
@@ -16,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
+  const account = await requireAccount();
   const rawProfiles = await listProfiles();
   const profiles = (
     await Promise.all(
@@ -48,18 +51,28 @@ export default async function HomePage() {
           <Logo size={24} className="text-accent" />
           Ariane
         </span>
-        <form action={logoutAction}>
-          <SubmitButton variant="quiet" size="sm">
-            <IconLogOut size={13} />
-            Se déconnecter
-          </SubmitButton>
-        </form>
+        <div className="flex items-center gap-1">
+          <Link
+            href="/compte"
+            className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-ui text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            title="Mon compte"
+          >
+            <IconUser size={14} />
+            <span className="max-w-40 truncate">{accountLabel(account)}</span>
+          </Link>
+          <form action={logoutAction}>
+            <SubmitButton variant="quiet" size="sm">
+              <IconLogOut size={13} />
+              <span className="max-sm:hidden">Se déconnecter</span>
+            </SubmitButton>
+          </form>
+        </div>
       </header>
 
       <div className="mt-14">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Profils de recherche</h1>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Mes profils de recherche</h1>
         <p className="mt-2 max-w-lg text-sm text-fg-muted">
-          Chaque profil est un arbre indépendant, avec ses fiches, ses tâches et sa racine Sosa.
+          Chaque profil est un arbre indépendant, avec ses fiches, ses tâches et sa racine Sosa. Ils ne sont visibles que depuis votre compte.
         </p>
       </div>
 
