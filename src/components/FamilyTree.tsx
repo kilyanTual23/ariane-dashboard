@@ -1,5 +1,6 @@
 "use client";
 
+import { orderParents } from "@/lib/parents";
 import Link from "next/link";
 import {
   useCallback,
@@ -69,7 +70,7 @@ function rowY(level: number): number {
   return y;
 }
 
-type Role = "father" | "mother" | "parents";
+type Role = "parent" | "parents";
 
 type NodeBox =
   | {
@@ -140,12 +141,11 @@ function elbow(x1: number, y1: number, x2: number, y2: number) {
   return `M ${x1} ${y1} H ${x2 - sx * r} Q ${x2} ${y1} ${x2} ${y1 + sy * r} V ${y2}`;
 }
 
+/** Les deux parents, à gauche puis à droite (voir orderParents : deux mères ou deux pères sont tous deux affichés). */
 function parentsOf(byId: Map<number, TreePerson>, id: number): [number | null, number | null] {
   const refs = (byId.get(id)?.parents ?? []).map((pid) => byId.get(pid)).filter((p): p is TreePerson => !!p);
-  const father = refs.find((p) => p.sex === "M") ?? refs.find((p) => p.sex !== "F") ?? null;
-  const mother =
-    refs.find((p) => p.sex === "F" && p.id !== father?.id) ?? refs.find((p) => p.id !== father?.id) ?? null;
-  return [father?.id ?? null, mother?.id ?? null];
+  const { first, second } = orderParents(refs);
+  return [first?.id ?? null, second?.id ?? null];
 }
 
 function byBirth(byId: Map<number, TreePerson>) {
@@ -204,8 +204,8 @@ function computeLayout(
       !f && !m
         ? [empty("parents", id, depth + 1)]
         : [
-            f ? buildUp(f, depth + 1) : empty("father", id, depth + 1),
-            m ? buildUp(m, depth + 1) : empty("mother", id, depth + 1),
+            f ? buildUp(f, depth + 1) : empty("parent", id, depth + 1),
+            m ? buildUp(m, depth + 1) : empty("parent", id, depth + 1),
           ];
     const gap = sizeOf(-(depth + 1)).gap;
     const width = Math.max(own, slots.reduce((s, t) => s + t.width, 0) + gap * (slots.length - 1));
@@ -443,8 +443,7 @@ const LEVEL_LABEL: Record<string, string> = {
 };
 
 const ROLE_LABEL: Record<Role, string> = {
-  father: "Père",
-  mother: "Mère",
+  parent: "Parent",
   parents: "Parents",
 };
 

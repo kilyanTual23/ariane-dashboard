@@ -510,18 +510,9 @@ export async function addParentAction(fd: FormData) {
   if (!slug || !profileId || !childId) return;
   await ownedPersons(profileId, [childId, num(fd, "parentId")]);
 
-  const child = await q.getPerson(profileId, childId);
-  const existingFather = child?.parents.find((p) => p.sex === "M");
-  const existingMother = child?.parents.find((p) => p.sex === "F");
-  const fallbackSex =
-    existingFather && !existingMother ? "F" : existingMother && !existingFather ? "M" : null;
-
-  const parentId = await resolveOrCreatePerson(
-    profileId,
-    num(fd, "parentId"),
-    str(fd, "parentIdName"),
-    fallbackSex,
-  );
+  // Le sexe d'un parent créé à la volée vient de son prénom, jamais de celui de l'autre parent :
+  // un enfant peut avoir deux mères ou deux pères.
+  const parentId = await resolveOrCreatePerson(profileId, num(fd, "parentId"), str(fd, "parentIdName"));
   if (!parentId) return;
   await q.addParent(parentId, childId);
   await q.checkAndUpdatePersonCompletion(childId);
@@ -1233,7 +1224,8 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
           await q.updateUnion(person.unions[0].id, uPatch);
           updatedFields.push("Mariage mis à jour");
         } else if (spouseGivenNames || spouseSurname) {
-          const spouseSex = person.sex === "M" ? "F" : person.sex === "F" ? "M" : null;
+          // Le prénom d'abord : le conjoint peut être du même sexe.
+          const spouseSex = inferSex(spouseGivenNames ?? "") ?? (person.sex === "M" ? "F" : person.sex === "F" ? "M" : null);
           const spouseId = await q.createPerson(profileId, {
             given_names: spouseGivenNames || "",
             surname: spouseSurname || "",

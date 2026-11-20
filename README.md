@@ -69,6 +69,7 @@ Au premier lancement, la page `/login` propose de créer le compte administrateu
 - **Édition sur place** : un clic sur une case en pointillés permet de la saisir directement (Entrée enregistre, Échap annule). Les modifications s'affichent immédiatement, sans rechargement.
 - **Avancement** : la colonne de droite montre la liste de contrôle des critères (rempli, manquant ou dispensé), le statut de recherche et la racine Sosa.
 - **Rappels** : un commentaire ou une chose à faire peut être attaché à une fiche ; il remonte sur l'accueil dans « À faire sur vos fiches » jusqu'à ce qu'il soit coché.
+- **Toutes les familles** : un couple peut être de même sexe et un enfant peut avoir deux mères ou deux pères. Chaque parent est intitulé selon son propre sexe ; l'arbre, la numérotation Sosa et l'export GEDCOM les prennent en compte tous les deux.
 - **Sources et liens utiles** : notes, sources et recherche Geneanet préremplie avec les critères de la fiche.
 - **Navigation** : `J` / `K` (ou un glissement du doigt sur téléphone) pour passer à la fiche suivante ou précédente.
 - **Création** : la page « Nouvelle fiche » demande l'identité, le sexe, la naissance et le statut de vie.

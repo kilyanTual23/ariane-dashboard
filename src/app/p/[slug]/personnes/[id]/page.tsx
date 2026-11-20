@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import {
   addChildAction,
@@ -53,6 +53,7 @@ import { localActVersion } from "@/lib/act-downloader";
 import { detectPersonAnomalies } from "@/lib/anomalies";
 import { COMPLETION_CRITERIA } from "@/lib/completion";
 import { taskTitleFor } from "@/lib/names";
+import { orderParents, parentLabel } from "@/lib/parents";
 import { getProfileBySlug, listPersons, listPlaces, listSources, listTasks } from "@/lib/queries";
 import { generationOf } from "@/lib/stats";
 import { suggestRelatives } from "@/lib/suggest";
@@ -205,14 +206,14 @@ export default async function PersonPage({ params }: PageProps<"/p/[slug]/person
   const prev = index > 0 ? persons[index - 1] : null;
   const next = index >= 0 && index < persons.length - 1 ? persons[index + 1] : null;
 
-  const father = person.parents.find((p) => p.sex === "M") ?? null;
-  const mother = person.parents.find((p) => p.sex === "F" && p.id !== father?.id) ?? null;
-  const otherParents = person.parents.filter((p) => p.id !== father?.id && p.id !== mother?.id);
+  // Deux places de parent, chacune intitulée selon le sexe de la personne : deux mères ou deux pères s'affichent tels quels.
+  const { first: parentA, second: parentB, others: otherParents } = orderParents(person.parents);
   // Les fiches plausibles d'abord, dans chaque dialogue de rattachement.
   const suggestions = {
     child: suggestRelatives(person, persons, "child"),
     father: suggestRelatives(person, persons, "father"),
     mother: suggestRelatives(person, persons, "mother"),
+    parent: suggestRelatives(person, persons, "parent"),
     spouse: suggestRelatives(person, persons, "spouse"),
   };
 
@@ -274,12 +275,12 @@ export default async function PersonPage({ params }: PageProps<"/p/[slug]/person
     </>
   );
 
-  const addParent = (label: string, role: "father" | "mother") => (
+  const addParent = (label: string, role: "father" | "mother" | "parent") => (
     <FormDialog
       triggerClassName="text-xs text-fg-muted underline-offset-4 transition-colors hover:text-fg hover:underline"
       trigger={label}
       title="Rattacher un parent"
-      description={`Père ou mère de ${person.displayName}. Le sexe est déduit du prénom et se corrige sur la fiche.`}
+      description={`Parent de ${person.displayName}. Le sexe est déduit du prénom et se corrige sur la fiche.`}
       action={addParentAction}
       fields={{ slug, profileId: profile.id, childId: person.id }}
       submitLabel="Rattacher"
@@ -748,40 +749,41 @@ export default async function PersonPage({ params }: PageProps<"/p/[slug]/person
             }
           >
             <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-1">
-              <dt className="pt-2 text-xs text-fg-subtle">Père</dt>
-              <dd className="min-w-0">
-                {father ? (
-                  <Relative slug={slug} person={father} detach={detach(father, person.id, father.id, "le père")} />
-                ) : (
-                  <div className="flex min-h-8 items-center gap-3 text-ui text-fg-subtle">
-                    <span className="underline decoration-border-strong decoration-dashed underline-offset-[5px]">Inconnu</span>
-                    {addParent("Rattacher", "father")}
-                  </div>
-                )}
-              </dd>
+              {(parentA || !parentB ? [parentA, parentB] : [parentB, null]).map((parent, i) => {
+                // Sans aucun parent connu : « Père » et « Mère » ; à côté d'un parent connu : « Parent ».
+                const known = parentA ?? parentB;
+                const label = parent ? parentLabel(parent.sex) : known ? "Parent" : i === 0 ? "Père" : "Mère";
+                return (
+                  <Fragment key={parent?.id ?? `vide-${i}`}>
+                    <dt className="pt-2 text-xs text-fg-subtle">{label}</dt>
+                    <dd className="min-w-0">
+                      {parent ? (
+                        <Relative
+                          slug={slug}
+                          person={parent}
+                          detach={detach(parent, person.id, parent.id, `ce parent (${label.toLowerCase()})`)}
+                        />
+                      ) : (
+                        <div className="flex min-h-8 items-center gap-3 text-ui text-fg-subtle">
+                          <span className="underline decoration-border-strong decoration-dashed underline-offset-[5px]">
+                            {label === "Mère" ? "Inconnue" : "Inconnu"}
+                          </span>
+                          {addParent("Rattacher", known ? "parent" : i === 0 ? "father" : "mother")}
+                        </div>
+                      )}
+                    </dd>
+                  </Fragment>
+                );
+              })}
 
-              <dt className="pt-2 text-xs text-fg-subtle">Mère</dt>
-              <dd className="min-w-0">
-                {mother ? (
-                  <Relative slug={slug} person={mother} detach={detach(mother, person.id, mother.id, "la mère")} />
-                ) : (
-                  <div className="flex min-h-8 items-center gap-3 text-ui text-fg-subtle">
-                    <span className="underline decoration-border-strong decoration-dashed underline-offset-[5px]">Inconnue</span>
-                    {addParent("Rattacher", "mother")}
-                  </div>
-                )}
-              </dd>
-
-              {otherParents.length > 0 && (
-                <>
-                  <dt className="pt-2 text-xs text-fg-subtle">Parent</dt>
+              {otherParents.map((p) => (
+                <Fragment key={p.id}>
+                  <dt className="pt-2 text-xs text-fg-subtle">{parentLabel(p.sex)}</dt>
                   <dd className="min-w-0">
-                    {otherParents.map((p) => (
-                      <Relative key={p.id} slug={slug} person={p} detach={detach(p, person.id, p.id, "ce parent")} />
-                    ))}
+                    <Relative slug={slug} person={p} detach={detach(p, person.id, p.id, "ce parent")} />
                   </dd>
-                </>
-              )}
+                </Fragment>
+              ))}
 
               <dt className="pt-2 text-xs text-fg-subtle">
                 Enfants{person.children.length > 0 && <span className="num"> · {person.children.length}</span>}

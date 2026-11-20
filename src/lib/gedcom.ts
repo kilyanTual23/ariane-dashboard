@@ -226,6 +226,24 @@ export function generateGedcom(
     notes?: string | null;
   };
 
+  /**
+   * Les deux membres d'un couple dans les champs HUSB et WIFE de GEDCOM 5.5.1.
+   * Homme et femme : chacun à sa place. Même sexe ou sexe inconnu : dans l'ordre,
+   * pour que les deux conjoints (ou les deux parents) soient bien exportés.
+   */
+  const couple = (
+    a: { id: number; sex: string | null } | null | undefined,
+    b: { id: number; sex: string | null } | null | undefined,
+  ): { husbandId?: number; wifeId?: number } => {
+    if (a && b) {
+      if (a.sex === "F" && b.sex === "M") return { husbandId: b.id, wifeId: a.id };
+      return { husbandId: a.id, wifeId: b.id };
+    }
+    const only = a ?? b;
+    if (!only) return {};
+    return only.sex === "F" ? { wifeId: only.id } : { husbandId: only.id };
+  };
+
   const familiesMap = new Map<string, FamilyRecord>();
   let famCounter = 1;
 
@@ -239,20 +257,7 @@ export function generateGedcom(
     const person1 = p1 ? exportPersons.find((p) => p.id === p1) : null;
     const person2 = p2 ? exportPersons.find((p) => p.id === p2) : null;
 
-    let husbandId: number | undefined;
-    let wifeId: number | undefined;
-
-    if (person1?.sex === "M") husbandId = person1.id;
-    else if (person1?.sex === "F") wifeId = person1.id;
-
-    if (person2?.sex === "M") husbandId = person2.id;
-    else if (person2?.sex === "F") wifeId = person2.id;
-
-    // Si sexe non précisé pour un des conjoints
-    if (!husbandId && person1 && person1.id !== wifeId) husbandId = person1.id;
-    if (!wifeId && person2 && person2.id !== husbandId) wifeId = person2.id;
-    if (!husbandId && person2 && person2.id !== wifeId) husbandId = person2.id;
-    if (!wifeId && person1 && person1.id !== husbandId) wifeId = person1.id;
+    const { husbandId, wifeId } = couple(person1, person2);
 
     const famKey = [p1, p2].filter(Boolean).sort().join("_");
     const famId = `F${famCounter++}`;
@@ -280,8 +285,7 @@ export function generateGedcom(
         // Couple non déclaré dans unions, on crée une famille
         const p1 = exportPersons.find((p) => p.id === parentIds[0]);
         const p2 = exportPersons.find((p) => p.id === parentIds[1]);
-        const husbandId = p1?.sex === "M" ? p1.id : p2?.sex === "M" ? p2.id : p1?.id;
-        const wifeId = p1?.sex === "F" ? p1.id : p2?.sex === "F" ? p2.id : p2?.id;
+        const { husbandId, wifeId } = couple(p1, p2);
         fam = {
           id: `F${famCounter++}`,
           husbandId,

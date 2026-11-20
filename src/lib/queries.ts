@@ -3,6 +3,7 @@ import { queryAll, queryOne, execute, batch } from "./db";
 import { requireAccount } from "./access";
 import { ensureAuthSchema } from "./auth";
 import { computeCompletion } from "./completion";
+import { orderParents } from "./parents";
 import type {
   Person,
   PersonRef,
@@ -489,7 +490,8 @@ export const listParentChildLinks = cache(
 
 /**
  * Numérotation Sosa-Stradonitz depuis la racine du profil.
- * Le père prend 2n, la mère 2n+1 ; à sexe inconnu on garde l'ordre de saisie.
+ * Le père prend 2n, la mère 2n+1 ; deux parents de même sexe (ou de sexe inconnu)
+ * sont numérotés dans l'ordre de création des fiches (voir orderParents).
  */
 export async function recomputeSosa(profileId: number): Promise<void> {
   const profile = await queryOne<Profile>(`SELECT * FROM profiles WHERE id = ?`, [profileId]);
@@ -502,12 +504,13 @@ export async function recomputeSosa(profileId: number): Promise<void> {
     [profileId],
   );
 
-  const parentsOf = new Map<number, number[]>();
-  for (const r of rows) {
-    const list = parentsOf.get(r.child_id);
-    if (!list) parentsOf.set(r.child_id, [r.parent_id]);
-    else if (r.sex === "M") list.unshift(r.parent_id);
-    else list.push(r.parent_id);
+  const raw = new Map<number, { id: number; sex: string | null }[]>();
+  for (const r of rows) push(raw, r.child_id, { id: r.parent_id, sex: r.sex });
+  // [parent en 2n, parent en 2n+1] : une mère seule garde le numéro de la mère.
+  const parentsOf = new Map<number, (number | null)[]>();
+  for (const [child, list] of raw) {
+    const { first, second } = orderParents(list);
+    parentsOf.set(child, [first?.id ?? null, second?.id ?? null]);
   }
 
   const updates: InStatement[] = [];
@@ -522,7 +525,9 @@ export async function recomputeSosa(profileId: number): Promise<void> {
       sql: `UPDATE persons SET sosa = ? WHERE id = ?`,
       args: [sosa, personId],
     });
-    (parentsOf.get(personId) ?? []).slice(0, 2).forEach((pid, i) => queue.push([pid, sosa * 2 + i]));
+    (parentsOf.get(personId) ?? []).forEach((pid, i) => {
+      if (pid !== null) queue.push([pid, sosa * 2 + i]);
+    });
   }
 
   if (updates.length > 0) {

@@ -9,7 +9,8 @@ import type { Person } from "./types";
 
 export type Suggestion = { id: number; reason: string };
 
-type Kind = "child" | "father" | "mother" | "spouse";
+/** « parent » : sans préjuger du sexe (second parent d'une personne qui en a déjà un). */
+type Kind = "child" | "father" | "mother" | "parent" | "spouse";
 
 function placesOf(p: Person) {
   return new Set(
@@ -57,7 +58,6 @@ export function suggestRelatives(person: Person, all: Person[], kind: Kind, limi
     }
     if (kind === "father" && c.sex === "F") continue;
     if (kind === "mother" && c.sex === "M") continue;
-    if (kind === "spouse" && person.sex && c.sex === person.sex) continue;
     if (kind === "child" && c.parents.length >= 2) continue;
 
     if (kind === "child") {
@@ -70,7 +70,7 @@ export function suggestRelatives(person: Person, all: Person[], kind: Kind, limi
         score += 2;
         reasons.push("sans parents");
       }
-    } else if (kind === "father") {
+    } else if (kind === "father" || kind === "parent") {
       if (sameName(person.surname, c.surname)) {
         score += 4;
         reasons.push("même nom");

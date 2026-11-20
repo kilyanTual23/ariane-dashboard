@@ -2324,8 +2324,8 @@ export function ActViewerModal({
                             ),
                           ])}
 
-                          {/* 2. Époux (Partenaire 1) */}
-                          {renderSection("Époux (Partenaire 1)", [
+                          {/* 2. Premier conjoint (deux femmes ou deux hommes possibles : on le nomme) */}
+                          {renderSection(`Conjoint · ${currentContext?.union?.partner1?.displayName ?? "partenaire 1"}`, [
                             renderFieldCard(
                               "name",
                               "Prénom(s) & Nom époux",
@@ -2360,8 +2360,8 @@ export function ActViewerModal({
                             ),
                           ])}
 
-                          {/* 3. Parents de l'Époux */}
-                          {renderSection("Parents de l'Époux", [
+                          {/* 3. Parents du premier conjoint */}
+                          {renderSection(`Parents de ${currentContext?.union?.partner1?.displayName ?? "partenaire 1"}`, [
                             renderFieldCard(
                               "father",
                               "Père de l'époux",
@@ -2434,8 +2434,8 @@ export function ActViewerModal({
                             ) : null,
                           ])}
 
-                          {/* 4. Épouse (Partenaire 2) */}
-                          {renderSection("Épouse (Partenaire 2)", [
+                          {/* 4. Second conjoint */}
+                          {renderSection(`Conjoint · ${currentContext?.union?.partner2?.displayName ?? "partenaire 2"}`, [
                             renderFieldCard(
                               "spouse",
                               "Prénom(s) & Nom épouse",
@@ -2466,8 +2466,8 @@ export function ActViewerModal({
                             ),
                           ])}
 
-                          {/* 5. Parents de l'Épouse */}
-                          {renderSection("Parents de l'Épouse", [
+                          {/* 5. Parents du second conjoint */}
+                          {renderSection(`Parents de ${currentContext?.union?.partner2?.displayName ?? "partenaire 2"}`, [
                             renderFieldCard(
                               "spouse_father",
                               "Père de l'épouse",
