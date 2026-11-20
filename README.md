@@ -136,7 +136,7 @@ Sous 1024 px de large, Ariane bascule dans une interface pensée pour le télép
 |---|---|
 | `/` | Les profils du compte connecté |
 | `/compte` | Mon compte : nom, mot de passe ; gestion des comptes pour l'administrateur |
-| `/p/<profil>` | Tableau de bord : chiffres clés, « À faire sur vos fiches », alertes (incohérences, racine Sosa), fiches presque terminées, répartition par statut, modifications récentes |
+| `/p/<profil>` | Tableau de bord : anniversaires (naissances, mariages, décès) d’hier, d’aujourd’hui et de demain, chiffres clés, « À faire sur vos fiches », alertes (incohérences, racine Sosa), fiches presque terminées, répartition par statut, modifications récentes |
 | `/p/<profil>/personnes` | Toutes les fiches en grille, en liste triée par nom avec index alphabétique, ou en tableau par statut ; filtres (statut, commune, siècle, génération, branche) et vues enregistrées |
 | `/p/<profil>/personnes/<id>` | La fiche : état civil, actes et visionneuse, transcription IA, famille, notes, sources, rappels, avancement |
 | `/p/<profil>/personnes/nouvelle` | Création d'une fiche |

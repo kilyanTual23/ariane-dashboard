@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AnniversaryStrip } from "@/components/AnniversaryStrip";
 import { IconAlert, IconArrowRight, IconChart, IconClock, IconPlus, IconTarget, IconTree } from "@/components/icons";
 import { SlotStrip } from "@/components/PersonCard";
 import { ReminderBoard } from "@/components/PersonReminders";
 import { Avatar, Badge, buttonClass, Card, PageHeader, Stat, STATUS_DOT, StatusDot } from "@/components/ui";
+import { upcomingAnniversaries } from "@/lib/anniversaries";
 import { detectAllAnomalies } from "@/lib/anomalies";
 import { lifeSpan, missingHint } from "@/lib/names";
 import { getProfileBySlug, listPersons, listTasks } from "@/lib/queries";
@@ -90,6 +92,7 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
   const sosaRoot = persons.find((p) => p.id === profile.root_person_id) ?? null;
   const maxGen = stats.generations?.length ?? 0;
   const anomalies = detectAllAnomalies(persons);
+  const anniversaries = upcomingAnniversaries(persons);
   const completePercent = stats.total ? Math.round((stats.complete / stats.total) * 100) : 0;
 
   const touchedThisWeek = touchedSince(persons, 7);
@@ -138,6 +141,8 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
           </>
         }
       />
+
+      <AnniversaryStrip slug={slug} items={anniversaries} />
 
       {/* --------------------------------------------------------- chiffres */}
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
