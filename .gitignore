@@ -50,3 +50,6 @@ next-env.d.ts
 /data/.tmp.*
 /data/actes/*
 !/data/actes/.gitkeep
+
+# Vidéos de lancement générées par /brag (jamais déployées)
+brag-output*/

@@ -493,7 +493,7 @@ async function downloadGoogleDrive(url: string): Promise<Buffer> {
 
 /* ----------------------------------------------------------- Navigateur Chrome */
 
-function getChromeExecutablePath(): string | null {
+export function getChromeExecutablePath(): string | null {
   if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(/*turbopackIgnore: true*/ process.env.PUPPETEER_EXECUTABLE_PATH)) {
     return process.env.PUPPETEER_EXECUTABLE_PATH;
   }

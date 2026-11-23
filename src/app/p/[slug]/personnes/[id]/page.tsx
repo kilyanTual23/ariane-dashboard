@@ -549,6 +549,8 @@ export default async function PersonPage({ params }: PageProps<"/p/[slug]/person
                     slug={slug}
                     personId={person.id}
                     actKind="birth"
+                    searchPlace={person.birth_place}
+                    searchYear={person.birth_year}
                     label="Acte"
                     value={person.birth_source}
                     isIgnored={Boolean(person.birth_source_ignored)}
@@ -637,6 +639,8 @@ export default async function PersonPage({ params }: PageProps<"/p/[slug]/person
                       slug={slug}
                       unionId={union.id}
                       actKind="marriage"
+                      searchPlace={union.place}
+                      searchYear={union.year}
                       label="Acte"
                       value={union.source}
                       isIgnored={Boolean(union.source_ignored)}
@@ -720,6 +724,8 @@ export default async function PersonPage({ params }: PageProps<"/p/[slug]/person
                         slug={slug}
                         personId={person.id}
                         actKind="death"
+                        searchPlace={person.death_place}
+                        searchYear={person.death_year}
                         label="Acte"
                         value={person.death_source}
                         isIgnored={Boolean(person.death_source_ignored)}

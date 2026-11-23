@@ -101,7 +101,8 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
   // Une personne n'apparaît qu'une fois sur la page : rappels, puis presque finies, puis récentes.
   const shown = new Set(reminders.map((t) => t.person_id));
   const almost = persons
-    .filter((p) => p.completion.score < p.completion.total && !shown.has(p.id))
+    // Une fiche bloquée n'est pas « presque terminée » : on ne peut pas la boucler pour l'instant.
+    .filter((p) => p.completion.score < p.completion.total && p.status !== "Bloqué" && !shown.has(p.id))
     .sort(
       (a, b) =>
         a.completion.missing.length - b.completion.missing.length ||

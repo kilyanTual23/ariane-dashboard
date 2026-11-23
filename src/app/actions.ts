@@ -8,6 +8,7 @@ import { normalizePlace, parseDateInput } from "@/lib/dates";
 import { inferSex } from "@/lib/names";
 import * as q from "@/lib/queries";
 import { downloadAct, removeLocalAct } from "@/lib/act-downloader";
+import { resolvePlace, searchRegisters, type ArchiveSearchResult } from "@/lib/archives";
 import {
   ownedPerson,
   ownedPersons,
@@ -1686,5 +1687,47 @@ export async function saveNotebookAction(input: {
   } catch (err) {
     unstable_rethrow(err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/* ---------------------------------------------------------- recherche d'actes */
+
+/**
+ * Registres numérisés d'une commune pour une année, sur le site des archives départementales.
+ * Le lieu de la fiche suffit (« Billé, Bretagne, France ») : commune et département en sont déduits.
+ * La commune et le département peuvent aussi être imposés depuis le dialogue.
+ */
+export async function searchArchivesAction(input: {
+  place?: string | null;
+  commune?: string | null;
+  dept?: string | null;
+  year: number;
+}): Promise<{ result: ArchiveSearchResult; commune: string; dept: string | null }> {
+  await requireAccount();
+  const year = Math.round(Number(input.year));
+  let commune = input.commune?.trim() ?? "";
+  let dept = input.dept?.trim() || null;
+  if ((!commune || !dept) && input.place) {
+    const resolved = await resolvePlace(input.place);
+    commune ||= resolved.commune;
+    dept ||= resolved.dept;
+  }
+  if (!commune) return { result: { ok: false, error: "Indiquez la commune de l’acte." }, commune, dept };
+  if (!year || year < 1500 || year > new Date().getFullYear()) {
+    return { result: { ok: false, error: "Indiquez l’année de l’acte." }, commune, dept };
+  }
+  if (!dept) {
+    return {
+      result: { ok: false, error: `Département de « ${commune} » non reconnu : choisissez-le dans la liste.` },
+      commune,
+      dept,
+    };
+  }
+  try {
+    return { result: await searchRegisters(dept, commune, year), commune, dept };
+  } catch (err) {
+    unstable_rethrow(err);
+    const msg = err instanceof Error ? err.message : String(err);
+    return { result: { ok: false, error: `Le site des archives n’a pas répondu : ${msg}` }, commune, dept };
   }
 }

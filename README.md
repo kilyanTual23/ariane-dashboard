@@ -82,6 +82,14 @@ Chaque case d'acte (naissance, mariage, décès) dispose d'une visionneuse plein
 - **Carnet à portée de main** : le bouton « Carnet » de la visionneuse ouvre le carnet sans quitter l'acte, y compris en plein écran.
 - **Téléchargement en masse** : `npm run actes:download` rapatrie en local tous les actes d'un profil.
 
+### Recherche des registres en ligne
+Chaque département a son propre site d'archives et son propre formulaire. Depuis une case d'acte vide, le bouton **Chercher** (ou « Chercher le registre en ligne » dans le menu `…`) interroge directement le site du département :
+- **Préremplie** avec le lieu et l'année de la fiche : la commune d'époque et le département sont déduits du lieu (« Fleurigné, La Chapelle-Fleurigné, Bretagne, France » → Fleurigné, Ille-et-Vilaine).
+- **Les bons registres d'abord** : ceux qui contiennent le type d'acte cherché (marqués « Correspond »), puis les autres, et les tables à part. Chaque registre indique sa paroisse, ses années, sa cote et son nombre de vues.
+- **Ouvrir** mène à la première page du registre dans la visionneuse du site ; une fois l'acte trouvé, on colle le lien de la page dans le dialogue et Ariane télécharge l'image.
+- **Commune ambiguë ou mal orthographiée** : le dialogue propose les noms connus du site en un clic.
+- **Départements branchés** : Ille-et-Vilaine (35, plateforme Thot, via un Chrome sans interface sur le serveur, une dizaine de secondes) et Mayenne (53, plateforme Pleade, une à deux secondes). Les résultats sont gardés en mémoire 12 h. Chaque plateforme a son connecteur dans `src/lib/archives/` : ajouter un département revient à en écrire un et à l'inscrire dans `src/lib/archives/index.ts`.
+
 ### 3. Transcription paléographique par IA
 Intégrée à la visionneuse, elle s'appuie sur les modèles de vision (Google Gemini, OpenAI, Groq, avec secours local Tesseract) :
 - **Transcription intégrale** du texte d'époque (registres paroissiaux, état civil) avec résolution des abréviations.
@@ -250,6 +258,7 @@ src/
 ├── lib/
 │   ├── access.ts             # Contrôle d'accès : chaque donnée appartient-elle au compte connecté ?
 │   ├── act-downloader.ts     # Téléchargement d'actes par portail d'archives (Puppeteer si besoin)
+│   ├── archives/             # Recherche des registres sur les sites des archives (un connecteur par plateforme)
 │   ├── auth.ts               # Comptes, mots de passe et sessions
 │   ├── transcription-parser.ts # Structuration des retours de transcription
 │   ├── completion.ts         # Calcul de complétion et dispenses

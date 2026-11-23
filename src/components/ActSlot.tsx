@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState, useTransition } from "react";
 
-import { downloadActAction, toggleActIgnoredAction } from "@/app/actions";
+import { downloadActAction, setPersonField, setUnionField, toggleActIgnoredAction } from "@/app/actions";
 import { Dialog, toFormData } from "@/components/Dialog";
 import {
   IconBan,
@@ -13,6 +13,7 @@ import {
   IconImage,
   IconMore,
   IconPencil,
+  IconSearch,
   IconUndo,
   Spinner,
 } from "@/components/icons";
@@ -21,6 +22,11 @@ import { Menu, MenuItem, MenuSeparator } from "@/components/Menu";
 import { errorMessage, useToast } from "@/components/Toast";
 import { buttonClass } from "@/components/ui";
 import { sourceLabel } from "@/lib/dates";
+
+// Recherche du registre sur le site des archives départementales : chargée à l'ouverture.
+const ArchiveSearchDialog = dynamic(() => import("@/components/ArchiveSearchDialog").then((m) => m.ArchiveSearchDialog), {
+  ssr: false,
+});
 
 // La visionneuse est lourde (canvas, OCR) : chargée seulement quand on l'ouvre.
 const ActViewerModal = dynamic(() => import("@/components/ActViewerModal").then((m) => m.ActViewerModal), {
@@ -45,6 +51,8 @@ export function ActSlot({
   localVersion = null,
   viewerTitle,
   variant = "slot",
+  searchPlace,
+  searchYear,
 }: {
   slug: string;
   personId?: number;
@@ -59,12 +67,16 @@ export function ActSlot({
   viewerTitle?: string;
   /** « cell » : cellule de tableau sans cadre ni intitulé (la colonne le porte). */
   variant?: "slot" | "cell";
+  /** Lieu et année de l'événement : préremplissent la recherche du registre en ligne. */
+  searchPlace?: string | null;
+  searchYear?: number | null;
 }) {
   const cell = variant === "cell";
   const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [ignoreOpen, setIgnoreOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [editingUrl, setEditingUrl] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [optimisticIgnored, setOptimisticIgnored] = useState(isIgnored);
@@ -114,6 +126,19 @@ export function ActSlot({
   const onLinkSaved = (saved: string) => {
     setEditingUrl(false);
     download(saved);
+  };
+
+  // Lien trouvé grâce à la recherche d'archives : enregistré comme si on l'avait collé dans la case.
+  const pickLink = (url: string) => {
+    startTransition(async () => {
+      try {
+        if (target.kind === "union") await setUnionField({ slug, unionId: target.unionId, field: "source", value: url });
+        else await setPersonField({ slug, personId: target.personId, field: target.field, value: url });
+        onLinkSaved(url);
+      } catch (err) {
+        toast.error("Enregistrement impossible", errorMessage(err));
+      }
+    });
   };
 
   const ignore = () => {
@@ -201,7 +226,12 @@ export function ActSlot({
           Modifier le lien ou la cote
         </MenuItem>
       )}
-      {(isLink || filled) && <MenuSeparator />}
+      {!optimisticIgnored && (
+        <MenuItem icon={<IconSearch size={14} />} onSelect={() => setArchiveOpen(true)}>
+          Chercher le registre en ligne
+        </MenuItem>
+      )}
+      {(isLink || filled || !optimisticIgnored) && <MenuSeparator />}
       {optimisticIgnored ? (
         <MenuItem icon={<IconUndo size={14} />} onSelect={restore}>
           Exiger de nouveau cet acte
@@ -269,6 +299,17 @@ export function ActSlot({
               OK
             </button>
           )}
+          {!filled && !editingUrl && (
+            <button
+              type="button"
+              onClick={() => setArchiveOpen(true)}
+              className={buttonClass("quiet", "shrink-0 text-fg-subtle", "xs")}
+              title="Chercher le registre sur le site des archives départementales"
+            >
+              <IconSearch size={12} />
+              {!cell && "Chercher"}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -327,6 +368,17 @@ export function ActSlot({
           />
         </label>
       </Dialog>
+
+      {archiveOpen && (
+        <ArchiveSearchDialog
+          open={archiveOpen}
+          onClose={() => setArchiveOpen(false)}
+          actKind={actKind}
+          place={searchPlace}
+          year={searchYear}
+          onPickLink={pickLink}
+        />
+      )}
 
       {viewerOpen && localImageUrl && (
         <ActViewerModal
