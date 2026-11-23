@@ -7,13 +7,14 @@ import type { Kinship, Status } from "@/lib/types";
 /* ------------------------------------------------------------------ couleurs */
 
 /**
- * Les cinq états de recherche. Ce sont les seules couleurs de l'interface :
+ * Les six états de recherche. Ce sont les seules couleurs de l'interface :
  * palette validée pour les daltonismes, et toujours accompagnée du mot.
  */
 export const STATUS_DOT: Record<Status, string> = {
   "Pas commencé": "bg-neutral",
   "En recherche": "bg-info-dot",
   Bloqué: "bg-danger-dot",
+  Récent: "bg-recent-dot",
   Complet: "bg-ok-dot",
   "Complet (lacunes)": "bg-teal",
 };
@@ -23,6 +24,7 @@ export const STATUS_TEXT: Record<Status, string> = {
   "Pas commencé": "text-fg-muted",
   "En recherche": "text-info",
   Bloqué: "text-danger",
+  Récent: "text-recent",
   Complet: "text-ok",
   "Complet (lacunes)": "text-teal",
 };
@@ -32,6 +34,7 @@ export const STATUS_SOFT: Record<Status, string> = {
   "Pas commencé": "bg-neutral-soft text-fg-muted",
   "En recherche": "bg-info-soft text-info",
   Bloqué: "bg-danger-soft text-danger",
+  Récent: "bg-recent-soft text-recent",
   Complet: "bg-ok-soft text-ok",
   "Complet (lacunes)": "bg-teal-soft text-teal",
 };
@@ -41,6 +44,7 @@ export const STATUS_MEANING: Record<Status, string> = {
   "Pas commencé": "Personne ne s’en est encore occupé",
   "En recherche": "En cours, ou des pistes sont ouvertes",
   Bloqué: "Plus rien à tirer pour l’instant",
+  Récent: "Personne vivante : recherche en pause",
   Complet: "Rien de plus à trouver",
   "Complet (lacunes)": "Recherche close malgré des actes introuvables",
 };

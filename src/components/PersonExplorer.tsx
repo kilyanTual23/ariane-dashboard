@@ -110,7 +110,7 @@ const PRESETS: SavedView[] = [
 ];
 
 /** Les statuts proposés en onglets : « Complet » regroupe aussi les complètes avec lacunes. */
-const STATUS_TABS: Status[] = ["Pas commencé", "En recherche", "Bloqué", "Complet"];
+const STATUS_TABS: Status[] = ["Pas commencé", "En recherche", "Bloqué", "Récent", "Complet"];
 
 function statusMatches(filter: string, status: Status) {
   if (!filter) return true;

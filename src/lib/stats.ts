@@ -248,7 +248,7 @@ export function computeLeads(persons: Person[], limit = 20): Lead[] {
 
     if (person.status === "En recherche") score += 15;
     if (person.status === "Pas commencé") score += 8;
-    if (person.status === "Bloqué") score -= 15;
+    if (person.status === "Bloqué" || person.status === "Récent") score -= 15;
 
     const knownPlace = commune(person.birth_place ?? person.death_place ?? person.unions[0]?.place);
     const knownYear = person.birth_year ?? person.proximity_year ?? person.death_year;

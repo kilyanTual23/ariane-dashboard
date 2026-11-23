@@ -12,7 +12,7 @@ import { detectAllAnomalies } from "@/lib/anomalies";
 import { lifeSpan, missingHint } from "@/lib/names";
 import { getProfileBySlug, listPersons, listTasks } from "@/lib/queries";
 import { computeStats, generationOf } from "@/lib/stats";
-import { STATUSES, type Person } from "@/lib/types";
+import { isPaused, STATUSES, type Person } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -101,8 +101,8 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
   // Une personne n'apparaît qu'une fois sur la page : rappels, puis presque finies, puis récentes.
   const shown = new Set(reminders.map((t) => t.person_id));
   const almost = persons
-    // Une fiche bloquée n'est pas « presque terminée » : on ne peut pas la boucler pour l'instant.
-    .filter((p) => p.completion.score < p.completion.total && p.status !== "Bloqué" && !shown.has(p.id))
+    // Une fiche bloquée ou « récente » (vivante, mise de côté) n'est pas « presque terminée ».
+    .filter((p) => p.completion.score < p.completion.total && !isPaused(p.status) && !shown.has(p.id))
     .sort(
       (a, b) =>
         a.completion.missing.length - b.completion.missing.length ||

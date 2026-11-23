@@ -2,10 +2,16 @@ export const STATUSES = [
   "Pas commencé",
   "En recherche",
   "Bloqué",
+  // Personne encore vivante, sur laquelle on ne travaille pas : traitée comme « Bloqué ».
+  "Récent",
   "Complet",
   "Complet (lacunes)",
 ] as const;
 export type Status = (typeof STATUSES)[number];
+
+/** Statuts mis de côté : ni « presque terminés » ni prioritaires dans les pistes. */
+export const PAUSED_STATUSES: readonly Status[] = ["Bloqué", "Récent"];
+export const isPaused = (status: string) => (PAUSED_STATUSES as readonly string[]).includes(status);
 
 export const KINSHIPS = [
   "SOSA",

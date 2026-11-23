@@ -160,14 +160,15 @@ Sous 1024 px de large, Ariane bascule dans une interface pensée pour le télép
 
 ## Statuts
 
-Les fiches se répartissent en cinq statuts, toujours affichés avec leur libellé :
+Les fiches se répartissent en six statuts, toujours affichés avec leur libellé :
 - **Pas commencé** (gris) : fiche créée sans recherche active.
 - **En recherche** (bleu) : recherches documentaires en cours.
 - **Bloqué** (rose / rouge) : recherche arrêtée faute de sources.
+- **Récent** (sable) : personne encore vivante, sur laquelle on ne travaille pas. Comme « Bloqué », elle sort des fiches « presque terminées » de l'accueil et passe après les autres dans les pistes.
 - **Complet** (vert) : tous les faits et actes renseignés (100 %).
 - **Complet (lacunes)** (sarcelle) : recherche aboutie avec des dispenses d'actes justifiées.
 
-Sur la page Personnes, l'affichage « Tableau » (ou `/p/<profil>/personnes?vue=kanban`) range les fiches en colonnes par statut ; il suffit de faire glisser une fiche pour changer son statut.
+Sur la page Personnes, l'affichage « Tableau » (ou `/p/<profil>/personnes?vue=kanban`) range les fiches en colonnes par statut (Pas commencé, En recherche, Bloqué, Récent, Complet) ; il suffit de faire glisser une fiche pour changer son statut.
 
 ---
 

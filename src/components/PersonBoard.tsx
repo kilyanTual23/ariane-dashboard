@@ -13,13 +13,14 @@ import { lifeSpan, missingHint, shortPlace } from "@/lib/names";
 import { STATUSES, type Status } from "@/lib/types";
 
 /** Le cycle de vie d'une fiche, de gauche à droite. */
-const COLUMNS = ["Pas commencé", "En recherche", "Bloqué", "Complet"] as const;
+const COLUMNS = ["Pas commencé", "En recherche", "Bloqué", "Récent", "Complet"] as const;
 type Column = (typeof COLUMNS)[number];
 
 const HINT: Record<Column, string> = {
   "Pas commencé": "Personne ne s’en est encore occupé",
   "En recherche": "En cours, ou des pistes ouvertes",
   Bloqué: "Plus rien à tirer pour l’instant",
+  Récent: "Personnes vivantes, mises de côté",
   Complet: "Toutes les cases sont remplies ou dispensées",
 };
 

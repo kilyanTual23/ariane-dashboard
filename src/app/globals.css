@@ -33,6 +33,10 @@ html[data-theme="light"] {
   --ok-soft: #e9f6ee;
   --teal: #0d9b8a;
   --teal-soft: #e0f6f2;
+  /* « Récent » : personne vivante mise de côté, une teinte sable. */
+  --recent: #7d5f33;
+  --recent-dot: #b8925a;
+  --recent-soft: #f5eee2;
   --info: #3451c4;
   --info-dot: #3e63dd;
   --info-soft: #edf1fd;
@@ -82,6 +86,9 @@ html[data-theme="light"] {
     --ok-soft: #132d21;
     --teal: #0bd8b6;
     --teal-soft: #0d2d2a;
+    --recent: #dcbf8f;
+    --recent-dot: #c49a5c;
+    --recent-soft: #2b2419;
     --info: #9eb1ff;
     --info-dot: #7c9cff;
     --info-soft: #182449;
@@ -129,6 +136,9 @@ html[data-theme="dark"] {
   --ok-soft: #132d21;
   --teal: #0bd8b6;
   --teal-soft: #0d2d2a;
+  --recent: #dcbf8f;
+  --recent-dot: #c49a5c;
+  --recent-soft: #2b2419;
   --info: #9eb1ff;
   --info-dot: #7c9cff;
   --info-soft: #182449;
@@ -273,6 +283,9 @@ html[data-accent="graphite"][data-theme="dark"] {
   --color-ok-soft: var(--ok-soft);
   --color-teal: var(--teal);
   --color-teal-soft: var(--teal-soft);
+  --color-recent: var(--recent);
+  --color-recent-dot: var(--recent-dot);
+  --color-recent-soft: var(--recent-soft);
   --color-info: var(--info);
   --color-info-dot: var(--info-dot);
   --color-info-soft: var(--info-soft);
