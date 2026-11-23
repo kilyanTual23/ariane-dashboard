@@ -36,6 +36,7 @@ TURSO_AUTH_TOKEN=votre_token_turso
 # Optionnel : transcription paléographique par IA
 # (la clé peut aussi être saisie directement dans la visionneuse d'actes)
 GEMINI_API_KEY=AIzaSy...
+# ou ANTHROPIC_API_KEY=sk-ant-...  (Claude)
 # ou OPENAI_API_KEY=sk-...
 # ou une clé Groq (gsk_...) saisie dans la visionneuse
 ```
@@ -91,7 +92,7 @@ Chaque département a son propre site d'archives et son propre formulaire. Depui
 - **Départements branchés** : Ille-et-Vilaine (35, plateforme Thot, via un Chrome sans interface sur le serveur, une dizaine de secondes) et Mayenne (53, plateforme Pleade, une à deux secondes). Les résultats sont gardés en mémoire 12 h. Chaque plateforme a son connecteur dans `src/lib/archives/` : ajouter un département revient à en écrire un et à l'inscrire dans `src/lib/archives/index.ts`.
 
 ### 3. Transcription paléographique par IA
-Intégrée à la visionneuse, elle s'appuie sur les modèles de vision (Google Gemini, OpenAI, Groq, avec secours local Tesseract) :
+Intégrée à la visionneuse, elle s'appuie sur les modèles de vision (Google Gemini, Claude, OpenAI, Groq, avec secours local Tesseract). Le moteur est choisi d'après la clé saisie : `AIza…` Gemini, `sk-ant-…` Claude, `sk-…` OpenAI, `gsk_…` Groq.
 - **Transcription intégrale** du texte d'époque (registres paroissiaux, état civil) avec résolution des abréviations.
 - **Analyse structurée** : événement, date, paroisse ou commune, officiants et témoins.
 - **Parents** : repérage des mentions de décès (*feu*, *feue*, *défunt*) et de leurs dates et lieux, fréquents dans les actes de mariage ; déduction de l'année de naissance à partir des âges.
@@ -220,9 +221,9 @@ Interface sobre et typographique conçue pour de longues sessions de travail :
 `npm run deploy` (`scripts/deploy.mjs`) :
 1. commite les modifications locales en attente (`chore(deploy): auto-deploy <date>`) ;
 2. pousse la branche `master` vers le dépôt du VPS (`git push vps master`) ;
-3. lance sur le VPS `npm run build` puis `pm2 restart ariane`.
+3. lance sur le VPS `npm ci` (dépendances exactes de `package-lock.json`), `npm run build` puis `pm2 restart ariane`.
 
-Le script ne lance jamais `npm install` sur le VPS : une nouvelle dépendance doit y être installée à la main. Pour garder un historique lisible, mieux vaut faire un vrai commit avant de déployer.
+Une dépendance ajoutée en local est donc installée sur le serveur au déploiement suivant. Pour garder un historique lisible, mieux vaut faire un vrai commit avant de déployer.
 
 Historique : le tag `antigravity-final` marque le dernier état de la version développée avec Antigravity ; la refonte réalisée avec Claude Code commence au commit suivant.
 

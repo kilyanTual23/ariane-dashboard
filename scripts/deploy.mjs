@@ -28,9 +28,11 @@ try {
   console.log("\n[2/3] Envoi direct du code vers le VPS (git push vps master)...");
   run("git push vps master");
 
-  // 3. Compilation et redemarrage sur le VPS
-  console.log("\n[3/3] Compilation Next.js et redemarrage PM2 sur le serveur...");
-  const remoteCmd = `set -e; cd ${VPS_DIR}; npm run build; pm2 restart ariane`;
+  // 3. Dependances, compilation et redemarrage sur le VPS.
+  //    npm ci installe exactement les versions de package-lock.json : une dependance
+  //    ajoutee en local est donc presente sur le serveur avant le build.
+  console.log("\n[3/3] Installation des dependances, compilation Next.js et redemarrage PM2 sur le serveur...");
+  const remoteCmd = `set -e; cd ${VPS_DIR}; npm ci --no-audit --no-fund; npm run build; pm2 restart ariane`;
   run(`ssh -o BatchMode=yes ${VPS_USER}@${VPS_HOST} "${remoteCmd}"`);
 
   console.log("\n========================================");

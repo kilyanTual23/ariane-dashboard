@@ -1727,7 +1727,7 @@ export function ActViewerModal({
                     {ocrEngine === "gemini" && (
                       <label className="mt-4 block">
                         <span className="label flex items-center justify-between gap-2">
-                          Clé d’accès (Gemini, Groq ou OpenAI)
+                          Clé d’accès (Gemini, Claude, OpenAI ou Groq)
                           {geminiApiKey && (
                             <span className="flex items-center gap-1 font-normal text-ok">
                               <IconCheck size={12} />
@@ -1739,7 +1739,7 @@ export function ActViewerModal({
                           type="password"
                           value={geminiApiKey}
                           onChange={(e) => handleSaveGeminiKey(e.target.value)}
-                          placeholder="AIza…, gsk_… ou sk-…"
+                          placeholder="AIza…, sk-ant-…, sk-… ou gsk_…"
                           autoComplete="off"
                           className="field"
                         />
@@ -1760,6 +1760,15 @@ export function ActViewerModal({
                             className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
                           >
                             Alternative gratuite : Groq
+                            <IconArrowUpRight size={11} />
+                          </a>
+                          <a
+                            href="https://console.anthropic.com/settings/keys"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+                          >
+                            Clé Claude
                             <IconArrowUpRight size={11} />
                           </a>
                         </span>

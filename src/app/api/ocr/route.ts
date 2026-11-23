@@ -4,6 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 import Tesseract from "tesseract.js";
 import { GoogleGenAI } from "@google/genai";
+import { CLAUDE_OCR_MODEL, transcribeWithClaude } from "@/lib/ocr-claude";
 import { getActStorageDir } from "@/lib/act-downloader";
 import { canReadActFile } from "@/lib/access";
 import { parseTranscription, cleanTranscriptionText } from "@/lib/transcription-parser";
@@ -297,14 +298,20 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Moteur IA Paléographe (Gemini Vision / OpenAI / Groq)
-    const apiKey = (rawApiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || "").trim();
+    const apiKey = (
+      rawApiKey ||
+      process.env.GEMINI_API_KEY ||
+      process.env.OPENAI_API_KEY ||
+      process.env.ANTHROPIC_API_KEY ||
+      ""
+    ).trim();
 
     if (engine === "gemini" || engine === "ai") {
       if (!apiKey) {
         return NextResponse.json(
           {
             error:
-              "Clé API manquante. Veuillez saisir une clé Google AI Studio (ou OpenAI) dans le panneau.",
+              "Clé API manquante. Veuillez saisir une clé Google AI Studio, Claude ou OpenAI dans le panneau.",
           },
           { status: 400 },
         );
@@ -318,7 +325,20 @@ export async function POST(req: NextRequest) {
 
       const base64Image = aiBuffer.toString("base64");
 
-      // A) Clé OpenAI (commence par "sk-")
+      // A) Clé Claude (commence par "sk-ant-") : à tester avant OpenAI, dont les clés commencent aussi par "sk-".
+      if (apiKey.startsWith("sk-ant-")) {
+        try {
+          const text = await transcribeWithClaude(apiKey, paleographyPrompt, base64Image);
+          const extractedData = parseTranscription(text);
+          const cleanText = cleanTranscriptionText(text);
+          return NextResponse.json({ ok: true, engine: `claude (${CLAUDE_OCR_MODEL})`, text: cleanText, extractedData });
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          return NextResponse.json({ error: `Échec Claude : ${msg}` }, { status: 502 });
+        }
+      }
+
+      // B) Clé OpenAI (commence par "sk-")
       if (apiKey.startsWith("sk-")) {
         try {
           const oaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -363,7 +383,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // B) Clé Groq (commence par "gsk_")
+      // C) Clé Groq (commence par "gsk_")
       if (apiKey.startsWith("gsk_")) {
         try {
           const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -408,7 +428,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // C) Google Gemini via le SDK officiel @google/genai
+      // D) Google Gemini via le SDK officiel @google/genai
       try {
         const ai = new GoogleGenAI({
           apiKey,
@@ -560,7 +580,7 @@ export async function POST(req: NextRequest) {
         console.error("[Gemini API Error]:", msg);
         return NextResponse.json(
           {
-            error: `Erreur API Gemini : ${msg}. Si votre compte Google a des restrictions régionales ou de quota, vous pouvez également utiliser une clé gratuite Groq (gsk_...) ou OpenAI (sk-...).`,
+            error: `Erreur API Gemini : ${msg}. Si votre compte Google a des restrictions régionales ou de quota, vous pouvez également utiliser une clé Claude (sk-ant-...), OpenAI (sk-...) ou Groq (gsk_...).`,
           },
           { status: 502 },
         );
