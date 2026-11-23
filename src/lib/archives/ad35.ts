@@ -1,6 +1,8 @@
+import type { Frame, Page } from "puppeteer-core";
+
 import { getChromeExecutablePath } from "../act-downloader";
 import type { ArchiveRegister, ArchiveSearchResult, DepartmentConnector } from "./types";
-import { closest, communeKey, kindsOf } from "./util";
+import { closest, communeKey, kindsOf, registerLabel } from "./util";
 
 /**
  * Ille-et-Vilaine (35) — plateforme Thot. Le formulaire « Registres paroissiaux et état civil »
@@ -45,8 +47,9 @@ async function search(commune: string, year: number): Promise<ArchiveSearchResul
       );
       await page.goto(`${BASE}/`, { waitUntil: "networkidle2" });
       await page.goto(`${BASE}/Recherche/FrmRechFrame.asp?MOD=10`, { waitUntil: "networkidle2" });
-      const form = page.frames().find((f) => /FrmRechDOCCritere/.test(f.url()));
-      if (!form) throw new Error("Formulaire de recherche du 35 introuvable");
+      // Le cadre du formulaire se charge après la page : on l'attend (jusqu'à 15 s).
+      const form = await waitForFrame(page, /FrmRechDOCCritere/, "#txt_CIN_LISTE0");
+      if (!form) throw new Error("Le formulaire de recherche du 35 ne s’est pas chargé (site lent ou indisponible)");
 
       // Liste des paroisses / communes proposées par le site
       const list = await form.evaluate(() =>
@@ -72,9 +75,8 @@ async function search(commune: string, year: number): Promise<ArchiveSearchResul
         form.evaluate(() => (document.querySelector("form button[type=submit]") as HTMLButtonElement).click()),
       ]);
       await new Promise((r) => setTimeout(r, 600));
-      const listFrame = page.frames().find((f) => /FrmRechListeHaut/.test(f.url()));
-      if (!listFrame) throw new Error("Résultats du 35 introuvables");
-      await listFrame.waitForSelector("body");
+      const listFrame = await waitForFrame(page, /FrmRechListeHaut/, "body");
+      if (!listFrame) throw new Error("La liste des résultats du 35 ne s’est pas chargée");
 
       const rows: Row[] = await listFrame.evaluate(() =>
         [...document.querySelectorAll("tr")]
@@ -126,7 +128,7 @@ async function search(commune: string, year: number): Promise<ArchiveSearchResul
           dept: "35",
           commune: communeKey(r.commune) === key ? commune : capitalize(r.commune),
           parish: r.parish && communeKey(r.parish) !== communeKey(r.commune) ? capitalize(r.parish) : null,
-          typeLabel: r.type,
+          typeLabel: registerLabel(r.type, r.years),
           kinds,
           isTable,
           years: r.years.replace(/\s*-\s*/g, "-"),
@@ -144,6 +146,17 @@ async function search(commune: string, year: number): Promise<ArchiveSearchResul
       await browser.close().catch(() => undefined);
     }
   });
+}
+
+/** Attend qu'un cadre de la page (repéré par son adresse) soit chargé et contienne `selector`. */
+async function waitForFrame(page: Page, url: RegExp, selector: string, timeoutMs = 15000): Promise<Frame | null> {
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    const frame = page.frames().find((f) => url.test(f.url()));
+    if (frame && (await frame.$(selector).catch(() => null))) return frame;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return null;
 }
 
 /** « SAINT-AUBIN-DU-CORMIER » → « Saint-Aubin-du-Cormier ». */

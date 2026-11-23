@@ -24,6 +24,28 @@ export function kindsOf(label: string): { kinds: ActKind[]; isTable: boolean } {
   return { kinds: [...kinds], isTable: /table/.test(l) };
 }
 
+/**
+ * Libellé lisible de ce que contient un registre : « Baptêmes, mariages et sépultures »,
+ * « Naissances et mariages », « Décès »… Avant 1793 (registres paroissiaux) on parle de
+ * baptêmes et de sépultures, ensuite (état civil) de naissances et de décès.
+ */
+export function registerLabel(raw: string, years: string): string {
+  const { kinds, isTable } = kindsOf(raw);
+  const clean = raw.replace(/\s+/g, " ").trim();
+  const nice = clean ? clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase() : "";
+  if (isTable) return nice || "Tables";
+  if (!kinds.length) return nice && !/^registres?( d'actes)?$/i.test(nice) ? nice : "Type d’actes non précisé";
+  const first = Number(years.match(/\d{4}/)?.[0] ?? 0);
+  const parish = first > 0 && first < 1793;
+  const words = [
+    kinds.includes("birth") ? (parish ? "baptêmes" : "naissances") : null,
+    kinds.includes("marriage") ? "mariages" : null,
+    kinds.includes("death") ? (parish ? "sépultures" : "décès") : null,
+  ].filter((w): w is string => !!w);
+  const text = words.length > 1 ? `${words.slice(0, -1).join(", ")} et ${words[words.length - 1]}` : words[0];
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36";
 

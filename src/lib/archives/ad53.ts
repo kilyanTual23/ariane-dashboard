@@ -1,5 +1,5 @@
 import type { ArchiveRegister, ArchiveSearchResult, DepartmentConnector } from "./types";
-import { communeKey, decodeEntities, fetchText, kindsOf, mapLimit, stripTags } from "./util";
+import { communeKey, decodeEntities, fetchText, kindsOf, mapLimit, registerLabel, stripTags } from "./util";
 
 /**
  * Mayenne (53) — plateforme Pleade, base « ead2 » (registres paroissiaux et d'état civil).
@@ -51,14 +51,18 @@ async function fragment(item: RssItem): Promise<Omit<ArchiveRegister, "dept"> | 
   const parish = path.slice(2).find((t) => !series(t)) ?? null;
   const cote = stripTags(html.match(/class="pl-tbl-unitid">([\s\S]*?)<\/td>/)?.[1] ?? "") || null;
   const years = stripTags(html.match(/class="pl-tbl-unitdate">([\s\S]*?)<\/td>/)?.[1] ?? "") || item.years;
-  const typesBlock = html.match(/Types d(?:'|&#0?39;|&apos;|’)actes\s*:\s*<\/span>([\s\S]*?)<\/p>/)?.[1] ?? "";
-  const types = [...typesBlock.matchAll(/<a [^>]*>([\s\S]*?)<\/a>/g)].map((m) => stripTags(m[1]));
-  const docType = stripTags(html.match(/Types de documents\s*:\s*<\/span>([\s\S]*?)<\/p>/)?.[1] ?? "");
+  // Descripteurs repérés par leur code de champ, stable (l'intitulé affiché, lui, varie selon les jours).
+  const terms = [...html.matchAll(/href="docsearch-term\.xsp\?[^"]*?f=(\w+)&amp;v=[^"]*"[^>]*>([\s\S]*?)<\/a>/g)].map(
+    ([, field, text]) => ({ field, text: stripTags(text) }),
+  );
+  const types = terms.filter((t) => t.field === "lflisteacte").map((t) => t.text);
+  const docType = terms.filter((t) => t.field === "lftypedocec").map((t) => t.text).join(", ");
   const viewer =
     item.viewer ?? decodeEntities(html.match(/pl-pgd-medias-thumbnail"[^>]*href="([^"]+)"/)?.[1] ?? "") ?? "";
   if (!viewer) return null;
-  const typeLabel = types.join(", ") || docType || "Registre";
-  const { kinds, isTable } = kindsOf(`${typeLabel} ${docType}`);
+  const raw = types.join(", ") || docType;
+  const { kinds, isTable } = kindsOf(`${raw} ${docType}`);
+  const typeLabel = registerLabel(isTable && !/table/i.test(raw) ? `Tables ${raw}` : raw, years);
   return {
     id: item.c,
     commune,
@@ -79,8 +83,10 @@ async function search(commune: string, year: number): Promise<ArchiveSearchResul
   for (let start = 0; start < Math.min(total, 100); start += 20) {
     const page = await rssPage(commune, year, start);
     total = page.total;
-    items.push(...page.items);
-    if (page.items.length === 0) break;
+    // Le flux renvoie parfois les mêmes lignes d'une page à l'autre : on ne garde chaque registre qu'une fois.
+    const fresh = page.items.filter((it) => !items.some((x) => x.c === it.c));
+    items.push(...fresh);
+    if (fresh.length === 0) break;
   }
   const regs = (await mapLimit(items, 6, (it) => fragment(it).catch(() => null))).filter(
     (r): r is Omit<ArchiveRegister, "dept"> => !!r,
