@@ -49,7 +49,7 @@ import { PlaceField } from "@/components/PlaceField";
 import { SegmentedAction } from "@/components/SegmentedAction";
 import { StatusPicker } from "@/components/StatusPicker";
 import { Avatar, Badge, buttonClass, Kbd } from "@/components/ui";
-import { localActVersion } from "@/lib/act-downloader";
+import { localActVersion, localActViews } from "@/lib/act-downloader";
 import { detectPersonAnomalies } from "@/lib/anomalies";
 import { COMPLETION_CRITERIA } from "@/lib/completion";
 import { taskTitleFor } from "@/lib/names";
@@ -555,6 +555,7 @@ export default async function PersonPage({ params }: PageProps<"/p/[slug]/person
                     value={person.birth_source}
                     isIgnored={Boolean(person.birth_source_ignored)}
                     localVersion={localActVersion({ kind: "person", personId: person.id, actKind: "birth" })}
+                    extraViews={localActViews({ kind: "person", personId: person.id, actKind: "birth" })}
                     viewerTitle={`Acte de naissance · ${person.displayName}`}
                   />
                 </Cell>
@@ -645,6 +646,7 @@ export default async function PersonPage({ params }: PageProps<"/p/[slug]/person
                       value={union.source}
                       isIgnored={Boolean(union.source_ignored)}
                       localVersion={localActVersion({ kind: "union", unionId: union.id })}
+                    extraViews={localActViews({ kind: "union", unionId: union.id })}
                       viewerTitle={`Acte de mariage · ${person.displayName}${union.spouse ? ` & ${union.spouse.displayName}` : ""}`}
                     />
                   </Cell>
@@ -730,6 +732,7 @@ export default async function PersonPage({ params }: PageProps<"/p/[slug]/person
                         value={person.death_source}
                         isIgnored={Boolean(person.death_source_ignored)}
                         localVersion={localActVersion({ kind: "person", personId: person.id, actKind: "death" })}
+                    extraViews={localActViews({ kind: "person", personId: person.id, actKind: "death" })}
                         viewerTitle={`Acte de décès · ${person.displayName}`}
                       />
                     </Cell>

@@ -49,6 +49,7 @@ export function ActSlot({
   value,
   isIgnored,
   localVersion = null,
+  extraViews = [],
   viewerTitle,
   variant = "slot",
   searchPlace,
@@ -63,6 +64,8 @@ export function ActSlot({
   isIgnored: boolean;
   /** Version de la copie locale de l'image (null : pas encore téléchargée). */
   localVersion?: number | null;
+  /** Liens des vues collées à la suite de la première (acte sur plusieurs vues). */
+  extraViews?: string[];
   /** Titre de la visionneuse, par exemple « Acte de naissance · Jean TUAL ». */
   viewerTitle?: string;
   /** « cell » : cellule de tableau sans cadre ni intitulé (la colonne le porte). */
@@ -387,6 +390,7 @@ export function ActSlot({
           imageUrl={localImageUrl}
           title={viewerTitle ?? label}
           originalUrl={value}
+          extraViews={extraViews}
           downloadFilename={`acte_${slug}_${actKind}_${personId ?? unionId}.jpg`}
           slug={slug}
           personId={personId}

@@ -7,7 +7,7 @@ import { checkpointDb } from "@/lib/db";
 import { normalizePlace, parseDateInput } from "@/lib/dates";
 import { inferSex } from "@/lib/names";
 import * as q from "@/lib/queries";
-import { downloadAct, removeLocalAct } from "@/lib/act-downloader";
+import { addActView, downloadAct, removeLocalAct } from "@/lib/act-downloader";
 import { resolvePlace, searchRegisters, type ArchiveSearchResult } from "@/lib/archives";
 import {
   ownedPerson,
@@ -266,6 +266,28 @@ export async function downloadActAction(fd: FormData): Promise<{ ok: boolean; er
     await refreshProfile(slug, personId ?? undefined);
   }
   return { ok: result.ok, error: result.error };
+}
+
+/** Acte sur plusieurs vues du registre : la vue de ce lien est collée à droite de l'image de l'acte. */
+export async function addActViewAction(fd: FormData): Promise<{ ok: boolean; views?: number; error?: string }> {
+  const url = str(fd, "url");
+  const slug = str(fd, "slug");
+  const personId = num(fd, "personId");
+  const unionId = num(fd, "unionId");
+  const actKind = str(fd, "actKind");
+
+  if (!url) return { ok: false, error: "Collez le lien de la vue à ajouter" };
+  if (personId) await ownedPerson(personId);
+  else if (unionId) await ownedUnion(unionId);
+
+  let result: { ok: boolean; views?: number; error?: string } = { ok: false, error: "Acte introuvable" };
+  if (personId && (actKind === "birth" || actKind === "death")) {
+    result = await addActView({ kind: "person", personId, actKind }, url);
+  } else if (unionId) {
+    result = await addActView({ kind: "union", unionId }, url);
+  }
+  if (result.ok && slug) await refreshProfile(slug, personId ?? undefined);
+  return result;
 }
 
 /** Création express : un nom suffit, le reste se remplit dans la fiche. */

@@ -52,6 +52,66 @@ export function localActVersion(target: ActTarget): number | null {
 /** Supprime la copie locale : elle ne correspond plus au lien de l'acte. */
 export function removeLocalAct(target: ActTarget): void {
   fs.rmSync(getActFilePath(target), { force: true });
+  fs.rmSync(getActViewsPath(target), { force: true });
+}
+
+/* ------------------------------------------------- acte sur plusieurs vues */
+
+/**
+ * Un acte peut continuer sur la vue suivante du registre. Les vues ajoutées sont collées
+ * à droite de la première, dans la même image ; leurs liens sont notés à côté
+ * (person_12_birth.views.json) pour savoir ce que contient l'image.
+ */
+export const MAX_EXTRA_VIEWS = 3;
+const VIEW_GAP = 32;
+
+function getActViewsPath(target: ActTarget): string {
+  return getActFilePath(target).replace(/\.jpg$/, ".views.json");
+}
+
+/** Liens des vues ajoutées à la première, dans l'ordre. */
+export function localActViews(target: ActTarget): string[] {
+  try {
+    const data = JSON.parse(fs.readFileSync(getActViewsPath(target), "utf8"));
+    return Array.isArray(data?.views) ? data.views.filter((v: unknown): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Colle une vue à droite de l'image, à la même hauteur, séparée par une bande grise. */
+async function appendView(current: Buffer, next: Buffer): Promise<Buffer> {
+  const a = await sharp(current).rotate().jpeg().toBuffer({ resolveWithObject: true });
+  const height = a.info.height;
+  const b = await sharp(next).rotate().resize({ height }).jpeg().toBuffer({ resolveWithObject: true });
+  return sharp({
+    create: { width: a.info.width + VIEW_GAP + b.info.width, height, channels: 3, background: { r: 200, g: 200, b: 200 } },
+  })
+    .composite([
+      { input: a.data, left: 0, top: 0 },
+      { input: b.data, left: a.info.width + VIEW_GAP, top: 0 },
+    ])
+    .jpeg({ quality: 88 })
+    .toBuffer();
+}
+
+/** Ajoute la vue de ce lien à l'acte déjà téléchargé. */
+export async function addActView(target: ActTarget, url: string): Promise<{ ok: boolean; views?: number; error?: string }> {
+  if (!url?.startsWith("http")) return { ok: false, error: "Collez le lien (permalien) de la vue à ajouter" };
+  if (!hasLocalAct(target)) return { ok: false, error: "Téléchargez d’abord l’image de l’acte" };
+  const views = localActViews(target);
+  if (views.length >= MAX_EXTRA_VIEWS) return { ok: false, error: `${MAX_EXTRA_VIEWS} vues ajoutées au plus` };
+  try {
+    const next = await fetchActImage(url);
+    const merged = await appendView(fs.readFileSync(getActFilePath(target)), next);
+    fs.writeFileSync(getActFilePath(target), merged);
+    fs.writeFileSync(getActViewsPath(target), JSON.stringify({ views: [...views, url] }));
+    return { ok: true, views: views.length + 1 };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[ActDownloader] Vue ajoutée ${url}:`, msg);
+    return { ok: false, error: msg };
+  }
 }
 
 export function getLocalActUrl(target: ActTarget): string | null {
@@ -146,6 +206,54 @@ export async function convertPdfToJpeg(pdfBuffer: Buffer): Promise<Buffer> {
   }
 }
 
+/**
+ * Image d'une vue d'archives, d'après son lien : téléchargée selon le site, PDF converti,
+ * et vérifiée (une page d'erreur ou de connexion n'est pas un acte). Lève une erreur sinon.
+ */
+export async function fetchActImage(url: string): Promise<Buffer> {
+  if (!url || !url.startsWith("http")) throw new Error("URL invalide");
+  let imageBuffer: Buffer | null = null;
+
+  if (url.includes("ille-et-vilaine.fr")) {
+    imageBuffer = await downloadIlleEtVilaine(url);
+  } else if (url.includes("lamayenne.fr")) {
+    imageBuffer = await downloadMayenne(url);
+  } else if (url.includes("correze.fr")) {
+    imageBuffer = await downloadCorreze(url);
+  } else if (url.includes("drive.google.com") || url.includes("docs.google.com")) {
+    imageBuffer = await downloadGoogleDrive(url);
+  } else if (url.includes("archivesdepartementales76.net")) {
+    imageBuffer = await downloadSeineMaritime(url);
+  } else if (url.includes("archives-manche.fr")) {
+    imageBuffer = await downloadManche(url);
+  } else if (url.includes("archinoe.net") || url.includes("archinoe.fr") || url.includes("archinoe")) {
+    imageBuffer = await downloadArchinoe(url);
+  } else if (url.includes("archives.gironde.fr") || url.includes("gironde.fr")) {
+    imageBuffer = await downloadGironde(url);
+  } else if (url.match(/\.(pdf|jpe?g|png|webp)($|\?)/i)) {
+    const directRes = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (directRes.ok) {
+      imageBuffer = Buffer.from(await directRes.arrayBuffer());
+    }
+  } else {
+    throw new Error("Archive non supportée pour le téléchargement automatique");
+  }
+
+  if (!imageBuffer || imageBuffer.length < 1024) throw new Error("Image vide ou non récupérable");
+
+  // Détection et conversion automatique si le document reçu est un PDF
+  if (imageBuffer.subarray(0, 5).toString().startsWith("%PDF-")) {
+    imageBuffer = await convertPdfToJpeg(imageBuffer);
+  }
+
+  const meta = await sharp(imageBuffer)
+    .metadata()
+    .catch(() => null);
+  if (!meta?.width || !meta.height) throw new Error("Le lien ne mène pas à une image d’acte");
+  return imageBuffer;
+}
+
+/** Télécharge l'acte de ce lien : une seule vue, les vues ajoutées auparavant sont oubliées. */
 export async function downloadAct(
   url: string,
   target: ActTarget,
@@ -153,56 +261,11 @@ export async function downloadAct(
   if (!url || !url.startsWith("http")) {
     return { ok: false, error: "URL invalide" };
   }
-
   const filename = getActFilename(target);
-  const destPath = path.join(getActStorageDir(), filename);
-
   try {
-    let imageBuffer: Buffer | null = null;
-
-    if (url.includes("ille-et-vilaine.fr")) {
-      imageBuffer = await downloadIlleEtVilaine(url);
-    } else if (url.includes("lamayenne.fr")) {
-      imageBuffer = await downloadMayenne(url);
-    } else if (url.includes("correze.fr")) {
-      imageBuffer = await downloadCorreze(url);
-    } else if (url.includes("drive.google.com") || url.includes("docs.google.com")) {
-      imageBuffer = await downloadGoogleDrive(url);
-    } else if (url.includes("archivesdepartementales76.net")) {
-      imageBuffer = await downloadSeineMaritime(url);
-    } else if (url.includes("archives-manche.fr")) {
-      imageBuffer = await downloadManche(url);
-    } else if (url.includes("archinoe.net") || url.includes("archinoe.fr") || url.includes("archinoe")) {
-      imageBuffer = await downloadArchinoe(url);
-    } else if (url.includes("archives.gironde.fr") || url.includes("gironde.fr")) {
-      imageBuffer = await downloadGironde(url);
-    } else if (url.match(/\.(pdf|jpe?g|png|webp)($|\?)/i)) {
-      const directRes = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-      if (directRes.ok) {
-        imageBuffer = Buffer.from(await directRes.arrayBuffer());
-      }
-    } else {
-      return { ok: false, error: "Archive non supportée pour le téléchargement automatique" };
-    }
-
-    if (!imageBuffer || imageBuffer.length < 1024) {
-      return { ok: false, error: "Image vide ou non récupérable" };
-    }
-
-    // Détection et conversion automatique si le document reçu est un PDF
-    if (imageBuffer.subarray(0, 5).toString().startsWith("%PDF-")) {
-      imageBuffer = await convertPdfToJpeg(imageBuffer);
-    }
-
-    // Une page d'erreur ou de connexion n'est pas un acte : on ne l'enregistre pas.
-    const meta = await sharp(imageBuffer)
-      .metadata()
-      .catch(() => null);
-    if (!meta?.width || !meta.height) {
-      return { ok: false, error: "Le lien ne mène pas à une image d’acte" };
-    }
-
-    fs.writeFileSync(destPath, imageBuffer);
+    const imageBuffer = await fetchActImage(url);
+    fs.writeFileSync(path.join(getActStorageDir(), filename), imageBuffer);
+    fs.rmSync(getActViewsPath(target), { force: true });
     return { ok: true, filename, size: imageBuffer.length };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import {
+  addActViewAction,
+  downloadActAction,
   appendTranscriptionToNotesAction,
   saveTranscriptionToRecordAction,
   getActViewerContextAction,
@@ -38,6 +40,7 @@ import {
   useNotebookOpen,
   VIEWER_PANEL_WIDTH,
 } from "@/components/Notebook";
+import { errorMessage, useToast } from "@/components/Toast";
 import { buttonClass } from "@/components/ui";
 import {
   parseTranscription,
@@ -105,6 +108,7 @@ export function ActViewerModal({
   imageUrl,
   title,
   originalUrl,
+  extraViews = [],
   downloadFilename,
   slug,
   personId,
@@ -116,6 +120,8 @@ export function ActViewerModal({
   imageUrl: string;
   title: string;
   originalUrl?: string | null;
+  /** Liens des vues collées à droite de la première : l'acte continue sur la vue suivante. */
+  extraViews?: string[];
   downloadFilename?: string;
   slug?: string;
   personId?: number;
@@ -123,6 +129,12 @@ export function ActViewerModal({
   actKind?: "birth" | "death" | "marriage";
 }) {
   const router = useRouter();
+  const toast = useToast();
+  // Acte sur plusieurs vues : lien de la vue suivante à coller à droite de l'image.
+  const [viewFormOpen, setViewFormOpen] = useState(false);
+  const [viewUrl, setViewUrl] = useState("");
+  const [viewError, setViewError] = useState<string | null>(null);
+  const [viewPending, startViewTransition] = useTransition();
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
@@ -1250,6 +1262,51 @@ export function ActViewerModal({
     return () => window.removeEventListener(FILL_EVENT, onFill);
   });
 
+  const viewIds = { slug, personId, unionId, actKind };
+  const toViewForm = (fields: Record<string, string | number | undefined>) => {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) if (v !== undefined && v !== null) fd.append(k, String(v));
+    return fd;
+  };
+
+  const handleAddView = () => {
+    const url = viewUrl.trim();
+    if (!url) return;
+    setViewError(null);
+    startViewTransition(async () => {
+      try {
+        const res = await addActViewAction(toViewForm({ ...viewIds, url }));
+        if (!res.ok) {
+          setViewError(res.error ?? "Vue non ajoutée");
+          return;
+        }
+        // Les zones tracées restent valables : la première vue ne bouge pas, la suivante est à droite.
+        setViewUrl("");
+        setViewFormOpen(false);
+        toast.success("Vue ajoutée à l’acte", "Tracez la suite de l’acte sur la nouvelle vue, à droite.");
+        router.refresh();
+      } catch (err) {
+        setViewError(errorMessage(err));
+      }
+    });
+  };
+
+  /** Revenir à la seule première vue : on retélécharge le lien de l'acte. */
+  const handleResetViews = () => {
+    if (!originalUrl) return;
+    startViewTransition(async () => {
+      try {
+        const res = await downloadActAction(toViewForm({ ...viewIds, url: originalUrl }));
+        if (!res.ok) throw new Error(res.error);
+        clearZones();
+        setViewFormOpen(false);
+        router.refresh();
+      } catch (err) {
+        toast.error("Vues non retirées", errorMessage(err));
+      }
+    });
+  };
+
   const handleSyncFromTranscription = () => {
     if (!transcription) return;
     const parsed = parseTranscription(transcription);
@@ -1779,7 +1836,82 @@ export function ActViewerModal({
                 Effacer
               </button>
             )}
+            {slug && (personId || unionId) && (
+              <>
+                <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewFormOpen((o) => !o);
+                    setViewError(null);
+                  }}
+                  aria-expanded={viewFormOpen}
+                  title="L’acte continue sur la vue suivante du registre : ajoutez-la à droite de l’image"
+                  className={`flex h-full items-center gap-1 rounded-lg px-2 text-xs transition-colors ${
+                    viewFormOpen ? "bg-surface-2 font-medium text-fg" : "text-fg-muted hover:text-fg"
+                  }`}
+                >
+                  <IconPlus size={12} />
+                  Vue suivante
+                  {extraViews.length > 0 && (
+                    <span className="num rounded-full bg-surface-2 px-1.5 text-2xs text-fg-muted">{extraViews.length + 1} vues</span>
+                  )}
+                </button>
+              </>
+            )}
           </div>
+
+          {viewFormOpen && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAddView();
+              }}
+              className="absolute bottom-16 left-4 z-20 w-[min(26rem,calc(100%-2rem))] rounded-xl border border-border bg-surface p-3.5 shadow-pop"
+            >
+              <p className="text-ui font-semibold">L’acte continue sur la vue suivante ?</p>
+              <p className="mt-1 text-xs text-fg-muted">
+                Sur le site des archives, ouvrez la vue où l’acte continue et copiez son permalien. Elle sera collée à
+                droite de l’image ; tracez ensuite une zone sur chaque vue (« Ajouter la suite ») pour tout lire d’un trait.
+              </p>
+              <div className="mt-2.5 flex gap-2">
+                <input
+                  autoFocus
+                  value={viewUrl}
+                  onChange={(e) => {
+                    setViewUrl(e.target.value);
+                    setViewError(null);
+                  }}
+                  placeholder="https://… lien de la vue suivante"
+                  aria-label="Lien de la vue suivante"
+                  className="field min-w-0 flex-1"
+                  disabled={viewPending}
+                />
+                <button type="submit" disabled={viewPending || !viewUrl.trim()} className={buttonClass("primary", "shrink-0", "md")}>
+                  {viewPending ? <Spinner size={13} /> : <IconPlus size={13} />}
+                  Ajouter
+                </button>
+              </div>
+              {viewPending && <p className="mt-2 text-xs text-fg-muted">Téléchargement de la vue… (jusqu’à une minute selon le site)</p>}
+              {viewError && <p className="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-xs text-danger">{viewError}</p>}
+              {extraViews.length > 0 && originalUrl && (
+                <p className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2.5 text-xs text-fg-muted">
+                  <span>
+                    {extraViews.length} vue{extraViews.length > 1 ? "s" : ""} ajoutée{extraViews.length > 1 ? "s" : ""} à la
+                    première.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleResetViews}
+                    disabled={viewPending}
+                    className="font-medium text-fg underline-offset-4 hover:underline"
+                  >
+                    Revenir à la seule première vue
+                  </button>
+                </p>
+              )}
+            </form>
+          )}
         </main>
 
         {/* Panneau latéral : report dans la fiche, texte transcrit, réglages */}
@@ -1883,6 +2015,19 @@ export function ActViewerModal({
                               Ajouter la suite
                             </button>{" "}
                             : tracez la deuxième partie, elle sera lue après la première.
+                            {slug && (personId || unionId) && (
+                              <>
+                                {" "}Sur une autre vue du registre ?{" "}
+                                <button
+                                  type="button"
+                                  onClick={() => setViewFormOpen(true)}
+                                  className="font-medium text-accent hover:underline"
+                                >
+                                  Ajouter la vue suivante
+                                </button>
+                                .
+                              </>
+                            )}
                           </p>
                         )}
                       </div>
