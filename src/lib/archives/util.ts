@@ -14,6 +14,18 @@ export function communeKey(name: string): string {
     .toUpperCase();
 }
 
+/**
+ * Nom de commune sans son article, au début (« La Neuville-Chant-d'Oisel ») ou rejeté
+ * à la fin entre parenthèses, comme aux Archives de la Seine-Maritime (« Neuville-Chant-d'Oisel (La) »).
+ */
+export function withoutArticle(name: string): string {
+  return name
+    .trim()
+    .replace(/\s*\((?:le|la|les|l[’'])\)\s*$/i, "")
+    .replace(/^(?:le|la|les)\s+|^l[’']\s*/i, "")
+    .trim();
+}
+
 /** Types d'actes couverts par un registre, d'après son libellé. */
 export function kindsOf(label: string): { kinds: ActKind[]; isTable: boolean } {
   const l = label.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();

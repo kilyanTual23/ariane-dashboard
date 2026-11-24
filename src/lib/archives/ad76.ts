@@ -1,15 +1,20 @@
 import { fetchAnubis } from "./anubis";
 import type { ArchiveRegister, ArchiveSearchResult, DepartmentConnector } from "./types";
-import { communeKey, kindsOf, mapLimit, registerLabel, stripTags } from "./util";
+import { communeKey as baseKey, kindsOf, mapLimit, registerLabel, stripTags, withoutArticle } from "./util";
 
 /**
  * Seine-Maritime (76) — recherche « État civil » du site des Archives (protégé par Anubis).
  * Le texte « commune » ramène aussi les communes voisines (« Senneville-sur-Fécamp ») :
  * on ne garde que la commune cherchée, ses paroisses et les anciennes communes du même nom.
  * 20 notices par page ; chaque notice donne paroisse, typologie, types d'actes, cote, vues.
+ * Le site rejette l'article à la fin (« Neuville-Chant-d'Oisel (La) ») et ne trouve rien
+ * si on le met devant : on cherche sans article, et on compare les noms sans article.
  */
 const BASE = "https://www.archivesdepartementales76.net";
 const MAX_PAGES = 10;
+
+/** Clé de comparaison d'un nom de commune, article ôté (devant ou entre parenthèses). */
+const communeKey = (name: string) => baseKey(withoutArticle(name));
 
 type Row = {
   commune: string;
@@ -56,13 +61,21 @@ function parse(html: string): { total: number; rows: Row[] } {
 }
 
 async function search(commune: string, year: number): Promise<ArchiveSearchResult> {
-  const first = parse(await fetchAnubis(resultsUrl(commune, year, 1)));
+  let query = withoutArticle(commune) || commune;
+  let first = parse(await fetchAnubis(resultsUrl(query, year, 1)));
+  // Rien avec le nom entier (écrit sans tirets, par exemple) : on cherche son mot le plus long,
+  // les registres d'autres communes sont écartés plus bas.
+  const longest = query.split(/[\s'’-]+/).sort((a, b) => b.length - a.length)[0];
+  if (!first.total && longest && longest.length >= 4 && longest !== query) {
+    query = longest;
+    first = parse(await fetchAnubis(resultsUrl(query, year, 1)));
+  }
   const perPage = first.rows.length || 20;
   const pages = Math.min(Math.ceil(first.total / perPage), MAX_PAGES);
   const rest = await mapLimit(
     Array.from({ length: Math.max(pages - 1, 0) }, (_, i) => i + 2),
     3,
-    async (p) => parse(await fetchAnubis(resultsUrl(commune, year, p))).rows,
+    async (p) => parse(await fetchAnubis(resultsUrl(query, year, p))).rows,
   );
   const rows = [...first.rows, ...rest.flat()];
 
