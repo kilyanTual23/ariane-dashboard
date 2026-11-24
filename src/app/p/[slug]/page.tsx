@@ -103,8 +103,10 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
   const almost = persons
     // Une fiche bloquée ou « récente » (vivante, mise de côté) n'est pas « presque terminée ».
     .filter((p) => p.completion.score < p.completion.total && !isPaused(p.status) && !shown.has(p.id))
+    // Les ancêtres directs (Sosa) passent avant les collatéraux.
     .sort(
       (a, b) =>
+        Number(!a.sosa) - Number(!b.sosa) ||
         a.completion.missing.length - b.completion.missing.length ||
         (a.sosa ?? 9e9) - (b.sosa ?? 9e9) ||
         a.displayName.localeCompare(b.displayName, "fr"),
@@ -224,7 +226,7 @@ export default async function ProfileHomePage({ params }: PageProps<"/p/[slug]">
           {almost.length > 0 && (
             <Card
               title="Presque terminées"
-              description="Les fiches qu’il reste le moins de cases à remplir pour boucler."
+              description="Les fiches qu’il reste le moins de cases à remplir pour boucler, ancêtres directs en tête."
               action={
                 <Link href={`${base}/personnes?tri=filled&ordre=desc`} className={buttonClass("quiet", "", "sm")}>
                   Tout voir
