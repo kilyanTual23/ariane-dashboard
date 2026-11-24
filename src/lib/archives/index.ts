@@ -1,12 +1,14 @@
+import { ad19 } from "./ad19";
 import { ad35 } from "./ad35";
 import { ad53 } from "./ad53";
+import { ad76 } from "./ad76";
 import type { ActKind, ArchiveRegister, ArchiveSearchResult, DepartmentConnector } from "./types";
 import { communeKey } from "./util";
 
 export type { ActKind, ArchiveRegister, ArchiveSearchResult } from "./types";
 
 /** Départements branchés. En ajouter un = écrire son connecteur et l'inscrire ici. */
-export const CONNECTORS: Record<string, DepartmentConnector> = { "35": ad35, "53": ad53 };
+export const CONNECTORS: Record<string, DepartmentConnector> = { "19": ad19, "35": ad35, "53": ad53, "76": ad76 };
 export const SUPPORTED_DEPTS = Object.values(CONNECTORS).map((c) => ({ code: c.code, name: c.name }));
 
 /* ------------------------------------------------- lieu → commune + département */

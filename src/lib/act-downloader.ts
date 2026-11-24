@@ -523,6 +523,28 @@ export function getChromeExecutablePath(): string | null {
 
 /* ----------------------------------------------------------- Seine-Maritime (76) */
 
+/**
+ * Numéro de vue d'un lien du 76. Le permalien de la visionneuse garde « /dao/0/1 » dans le
+ * chemin et met la vraie vue dans le paramètre id : « …/dao/0/1?id=…%2Fcanvas%2F0%2F37 ».
+ * On lit donc d'abord le canvas (décodé), puis le chemin.
+ */
+export function seineMaritimePage(url: string): number {
+  let decoded = url;
+  try {
+    decoded = decodeURIComponent(url);
+  } catch {
+    /* lien mal encodé : on lit tel quel */
+  }
+  const m = decoded.match(/\/canvas\/\d+\/(\d+)/) ?? decoded.match(/\/dao\/\d+\/(\d+)/);
+  const n = m ? parseInt(m[1], 10) : 1;
+  return n > 0 ? n : 1;
+}
+
+/** « …/ark:/50278/<registre>/img:AD76_EC_5MI1621_02_0245 » → « AD76_EC_5MI1621_02_0245 ». */
+export function seineMaritimeImage(url: string): string | null {
+  return url.match(/\/img:([\w.-]+?)(?:\.jpe?g)?(?:[/?#]|$)/i)?.[1] ?? null;
+}
+
 async function downloadSeineMaritime(url: string): Promise<Buffer> {
   const chromePath = getChromeExecutablePath();
   if (!chromePath) throw new Error("Chrome/Edge introuvable pour contourner la protection Anubis");
@@ -538,8 +560,7 @@ async function downloadSeineMaritime(url: string): Promise<Buffer> {
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "networkidle2", timeout: 35000 });
 
-    const pageNumMatch = url.match(/\/dao\/\d+\/(\d+)/);
-    const pageNum = pageNumMatch ? parseInt(pageNumMatch[1], 10) : 1;
+    const pageNum = seineMaritimePage(url);
 
     const manifest = await page.evaluate(async () => {
       const arkMatch = window.location.pathname.match(/\/ark:\/50278\/[a-f0-9]+/);
@@ -550,11 +571,19 @@ async function downloadSeineMaritime(url: string): Promise<Buffer> {
 
     if (!manifest) throw new Error("Manifeste 76 introuvable");
 
-    const canvases = manifest.sequences?.[0]?.canvases || [];
+    type IiifResource = { "@id"?: string; service?: { "@id"?: string } };
+    type IiifCanvas = { "@id"?: string; images?: { resource?: IiifResource }[] };
+    const canvases: IiifCanvas[] = manifest.sequences?.[0]?.canvases || [];
+    // Permalien d'une vue précise : « …/img:AD76_EC_5MI1621_02_0245 » désigne l'image par son nom de fichier.
+    const imgName = seineMaritimeImage(url);
     const canvas =
-      canvases.find((c: Record<string, unknown>) => typeof c["@id"] === "string" && c["@id"].includes(`/canvas/0/${pageNum}`)) ||
+      (imgName && canvases.find((c) => JSON.stringify(c.images ?? "").includes(`/${imgName}.`))) ||
+      canvases.find((c) => c["@id"]?.endsWith(`/canvas/0/${pageNum}`)) ||
       canvases[pageNum - 1] ||
       canvases[0];
+    if (imgName && !JSON.stringify(canvas?.images ?? "").includes(`/${imgName}.`)) {
+      throw new Error(`Vue ${imgName} introuvable dans le registre`);
+    }
 
     const imgRes = canvas?.images?.[0]?.resource;
     const service = imgRes?.service?.["@id"];

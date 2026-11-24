@@ -10,9 +10,15 @@ import type { ActKind, ArchiveRegister, ArchiveSearchResult } from "@/lib/archiv
 
 /** Départements branchés (tenu à jour avec src/lib/archives/index.ts). */
 const DEPTS = [
-  { code: "35", name: "Ille-et-Vilaine" },
-  { code: "53", name: "Mayenne" },
+  { code: "19", name: "Corrèze", of: "de la Corrèze" },
+  { code: "35", name: "Ille-et-Vilaine", of: "d’Ille-et-Vilaine" },
+  { code: "53", name: "Mayenne", of: "de la Mayenne" },
+  { code: "76", name: "Seine-Maritime", of: "de la Seine-Maritime" },
 ];
+
+/** « Ille-et-Vilaine » → « d’Ille-et-Vilaine », « Corrèze » → « de la Corrèze ». */
+const deptOf = (nameOrCode?: string | null) =>
+  DEPTS.find((d) => d.name === nameOrCode || d.code === nameOrCode)?.of ?? "";
 
 const KIND_LABEL: Record<ActKind, string> = { birth: "naissance", marriage: "mariage", death: "décès" };
 
@@ -170,7 +176,7 @@ export function ArchiveSearchDialog({
         {pending ? (
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-ui text-fg-muted">
             <Spinner size={18} />
-            <p>Recherche sur le site des archives{deptName ? ` ${deptName === "Ille-et-Vilaine" ? "d’Ille-et-Vilaine" : "de la Mayenne"}` : ""}…</p>
+            <p>Recherche sur le site des archives{deptName ? ` ${deptOf(deptName)}` : ""}…</p>
             {slow && <p className="text-xs text-fg-subtle">Ce site est lent : comptez une dizaine de secondes.</p>}
           </div>
         ) : !result ? (
@@ -206,7 +212,7 @@ export function ArchiveSearchDialog({
           <div>
             <p className="mb-2 text-xs text-fg-subtle">
               {result.commune} · <span className="num">{result.year}</span> · Archives{" "}
-              {result.dept === "35" ? "d’Ille-et-Vilaine" : "de la Mayenne"} ·{" "}
+              {deptOf(result.dept)} ·{" "}
               <span className="num">{result.registers.length}</span> registre{result.registers.length > 1 ? "s" : ""}
             </p>
             <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
