@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 
+import { fetchAnubis } from "@/lib/archives/anubis";
+
 export type ActTarget =
   | { kind: "person"; personId: number; actKind: "birth" | "death" }
   | { kind: "union"; unionId: number };
@@ -93,6 +95,49 @@ async function appendView(current: Buffer, next: Buffer): Promise<Buffer> {
     ])
     .jpeg({ quality: 88 })
     .toBuffer();
+}
+
+/* Vue suivante en un clic : seulement là où l'on sait déduire la vue suivante du lien. */
+
+const AD76 = "https://www.archivesdepartementales76.net";
+
+/** Le site sait-il trouver la vue suivante de ce lien ? */
+export function supportsNextView(url: string | null | undefined): boolean {
+  return Boolean(url?.includes("archivesdepartementales76.net") && url.match(/\/ark:\/50278\/[0-9a-f]+/));
+}
+
+/**
+ * Lien de la vue qui suit celle de ce lien, dans le même registre (Seine-Maritime).
+ * Le manifeste IIIF du registre donne l'ordre des vues ; un permalien « img: » y est retrouvé par son nom.
+ */
+export async function nextViewUrl(url: string): Promise<string> {
+  const ark = url.match(/\/ark:\/50278\/[0-9a-f]+/)?.[0];
+  if (!ark || !url.includes("archivesdepartementales76.net")) {
+    throw new Error("Vue suivante automatique : seulement pour les Archives de la Seine-Maritime");
+  }
+  const manifest = JSON.parse(await fetchAnubis(`${AD76}${ark}/manifest`)) as {
+    sequences?: { canvases?: { "@id"?: string; images?: unknown }[] }[];
+  };
+  const canvases = manifest.sequences?.[0]?.canvases ?? [];
+  if (!canvases.length) throw new Error("Registre de Seine-Maritime illisible (manifeste vide)");
+  const imgName = seineMaritimeImage(url);
+  const index = imgName
+    ? canvases.findIndex((c) => JSON.stringify(c.images ?? "").includes(`/${imgName}.`))
+    : Math.min(seineMaritimePage(url), canvases.length) - 1;
+  if (index < 0) throw new Error("Vue introuvable dans le registre");
+  const next = canvases[index + 1];
+  if (!next?.["@id"]) throw new Error("C’est la dernière vue du registre");
+  return `${AD76}${ark}/dao/0/1?id=${encodeURIComponent(next["@id"])}`;
+}
+
+/** Ajoute la vue qui suit la dernière vue de l'acte (le lien de l'acte, ou la dernière vue ajoutée). */
+export async function addNextActView(target: ActTarget, actUrl: string): Promise<{ ok: boolean; views?: number; error?: string }> {
+  const last = localActViews(target).at(-1) ?? actUrl;
+  try {
+    return await addActView(target, await nextViewUrl(last));
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 /** Ajoute la vue de ce lien à l'acte déjà téléchargé. */

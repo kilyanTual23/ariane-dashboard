@@ -7,7 +7,7 @@ import { checkpointDb } from "@/lib/db";
 import { normalizePlace, parseDateInput } from "@/lib/dates";
 import { inferSex } from "@/lib/names";
 import * as q from "@/lib/queries";
-import { addActView, downloadAct, removeLocalAct } from "@/lib/act-downloader";
+import { addActView, addNextActView, downloadAct, removeLocalAct } from "@/lib/act-downloader";
 import { resolvePlace, searchRegisters, type ArchiveSearchResult } from "@/lib/archives";
 import {
   ownedPerson,
@@ -280,11 +280,14 @@ export async function addActViewAction(fd: FormData): Promise<{ ok: boolean; vie
   if (personId) await ownedPerson(personId);
   else if (unionId) await ownedUnion(unionId);
 
+  // « next » : la vue qui suit la dernière vue de l'acte ; `url` est alors le lien de l'acte.
+  const next = str(fd, "next") === "1";
+  const add = (target: Parameters<typeof addActView>[0]) => (next ? addNextActView(target, url) : addActView(target, url));
   let result: { ok: boolean; views?: number; error?: string } = { ok: false, error: "Acte introuvable" };
   if (personId && (actKind === "birth" || actKind === "death")) {
-    result = await addActView({ kind: "person", personId, actKind }, url);
+    result = await add({ kind: "person", personId, actKind });
   } else if (unionId) {
-    result = await addActView({ kind: "union", unionId }, url);
+    result = await add({ kind: "union", unionId });
   }
   if (result.ok && slug) await refreshProfile(slug, personId ?? undefined);
   return result;

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -26,7 +27,9 @@ import {
 } from "@/components/icons";
 import { errorMessage, useToast } from "@/components/Toast";
 import { buttonClass, Kbd } from "@/components/ui";
+import type { GlobalSearchItem } from "@/components/CommandPalette";
 import type { NotebookPage } from "@/lib/queries";
+import { searchList } from "@/lib/search";
 import { MOBILE_QUERY, useIsMobile, useKeyboardInset } from "@/lib/use-media";
 
 /*
@@ -36,6 +39,8 @@ import { MOBILE_QUERY, useIsMobile, useKeyboardInset } from "@/lib/use-media";
  * Tout s'enregistre seul pendant la frappe, sur tous les appareils.
  * Plusieurs pages, en onglets : une par recherche, par branche, par acte en cours de lecture…
  * Quand un acte est ouvert dans la visionneuse, une page peut remplir sa fiche (l'IA range les notes).
+ * « /Armand » propose les personnes de l'arbre : Tab ou Entrée insère un lien vers sa fiche,
+ * écrit [Armand TUAL](/p/…/personnes/12), repris sous la page et ouvrable d'un Ctrl-clic.
  */
 
 /* ---------------------------------------------------- état d'affichage */
@@ -168,13 +173,37 @@ function savedLabel(stamp: string | null) {
 
 type SaveStatus = "saved" | "dirty" | "saving" | "error";
 
+/** Lien vers une page de l'application, écrit [titre](/p/…). */
+const MENTION_RE = /\[([^\]\n]+)\]\((\/p\/[^\s)]+)\)/g;
+
+/** Lien sous le curseur (pour l'ouvrir d'un Ctrl-clic). */
+function mentionAt(text: string, pos: number): string | null {
+  for (const m of text.matchAll(MENTION_RE)) {
+    if (m.index! <= pos && pos <= m.index! + m[0].length) return m[2];
+  }
+  return null;
+}
+
+/** « /Arm » juste avant le curseur, en début de ligne ou après une espace : la recherche en cours. */
+function mentionQuery(text: string, caret: number): { start: number; query: string } | null {
+  const m = text.slice(0, caret).match(/(?:^|[\s(])\/([^\s/\[\]()][^\n/\[\]()]{0,40})$/);
+  if (!m) return null;
+  return { start: caret - m[1].length - 1, query: m[1] };
+}
+
 /** Pages citées dans le carnet (« → Titre (/p/…) ») : on y revient d'un clic. */
 function citedPages(text: string) {
   const seen = new Set<string>();
   const out: { title: string; href: string }[] = [];
-  // Ligne par ligne : le titre est tout ce qui précède le chemin, parenthèses comprises.
   for (const line of text.split("\n")) {
-    for (const m of line.matchAll(/\((\/p\/[^\s)]+)\)/g)) {
+    // Liens nommés : [Armand TUAL](/p/…/personnes/12)
+    for (const m of line.matchAll(MENTION_RE)) {
+      if (seen.has(m[2])) continue;
+      seen.add(m[2]);
+      out.push({ title: m[1], href: m[2] });
+    }
+    // Pages insérées : « → Titre (/p/…) » ; le titre est tout ce qui précède le chemin.
+    for (const m of line.replace(MENTION_RE, "").matchAll(/\((\/p\/[^\s)]+)\)/g)) {
       const href = m[1];
       if (seen.has(href)) continue;
       seen.add(href);
@@ -202,7 +231,19 @@ function readActivePage(pages: NotebookPage[]): number {
   return pages[0]?.id ?? 0;
 }
 
-export function Notebook({ profileId, initialPages }: { profileId: number; initialPages: NotebookPage[] }) {
+export function Notebook({
+  profileId,
+  slug,
+  people,
+  initialPages,
+}: {
+  profileId: number;
+  slug: string;
+  /** Personnes de l'arbre, pour les liens « /Nom ». */
+  people: GlobalSearchItem[];
+  initialPages: NotebookPage[];
+}) {
+  const router = useRouter();
   const state = useNotebookState();
   const mobile = useIsMobile();
   const keyboard = useKeyboardInset();
@@ -223,6 +264,17 @@ export function Notebook({ profileId, initialPages }: { profileId: number; initi
   const latest = useRef<{ pageId: number; content: string } | null>(null);
   const drag = useRef<{ y: number; dy: number; moved: boolean } | null>(null);
   const panel = useRef<HTMLDivElement>(null);
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  /** Position du curseur à rétablir dès que le nouveau texte est affiché (avant toute autre frappe). */
+  const pendingCaret = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const el = area.current;
+    if (pendingCaret.current === null || !el) return;
+    el.focus();
+    el.setSelectionRange(pendingCaret.current, pendingCaret.current);
+    pendingCaret.current = null;
+  });
 
   const page = pages.find((p) => p.id === activeId) ?? pages[0];
   const text = page?.content ?? "";
@@ -402,13 +454,8 @@ export function Notebook({ profileId, initialPages }: { profileId: number; initi
     const end = el?.selectionEnd ?? text.length;
     const before = text.slice(0, start);
     const glue = before && !before.endsWith("\n") ? "\n" : "";
+    pendingCaret.current = before.length + glue.length + snippet.length;
     change(`${before}${glue}${snippet}${text.slice(end)}`);
-    requestAnimationFrame(() => {
-      if (!el) return;
-      const pos = before.length + glue.length + snippet.length;
-      el.focus();
-      el.setSelectionRange(pos, pos);
-    });
   };
 
   const insertPage = () => {
@@ -460,13 +507,109 @@ export function Notebook({ profileId, initialPages }: { profileId: number; initi
       </nav>
     ) : null;
 
+  /* ---- liens « /Nom » vers les fiches ---- */
+
+  const suggestions = mention
+    ? searchList(
+        people,
+        mention.query,
+        (p) => ({ name: p.name, givenNames: p.givenNames, surname: p.surname, sosa: p.sosa, birthYear: p.birthYear, deathYear: p.deathYear }),
+        6,
+      )
+    : [];
+  const mentionOpen = Boolean(mention && suggestions.length);
+
+  /** Relit le texte autour du curseur : une recherche « /… » est-elle en cours ? */
+  const syncMention = (el: HTMLTextAreaElement) => {
+    const found = el.selectionStart === el.selectionEnd ? mentionQuery(el.value, el.selectionStart) : null;
+    setMention((cur) => (cur?.start === found?.start && cur?.query === found?.query ? cur : found));
+    if (found?.query !== mention?.query) setMentionIndex(0);
+  };
+
+  const pickMention = (person: GlobalSearchItem) => {
+    const el = area.current;
+    if (!mention || !el) return;
+    const caret = el.selectionStart;
+    const link = `[${person.name}](/p/${slug}/personnes/${person.id}) `;
+    pendingCaret.current = mention.start + link.length;
+    change(text.slice(0, mention.start) + link + text.slice(caret));
+    setMention(null);
+  };
+
+  const mentionList = mentionOpen ? (
+    <div role="listbox" aria-label="Personnes" className="shrink-0 border-t border-border bg-surface-2/50 p-1">
+      {suggestions.map((p, i) => (
+        <button
+          key={p.id}
+          type="button"
+          role="option"
+          aria-selected={i === mentionIndex}
+          // mousedown : on garde le focus (et le curseur) dans la page.
+          onMouseDown={(e) => {
+            e.preventDefault();
+            pickMention(p);
+          }}
+          onMouseEnter={() => setMentionIndex(i)}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs ${
+            i === mentionIndex ? "bg-surface text-fg shadow-xs" : "text-fg-muted"
+          }`}
+        >
+          <span className="min-w-0 flex-1 truncate font-medium text-fg">{p.name}</span>
+          {(p.birthYear || p.deathYear) && (
+            <span className="num shrink-0 text-fg-subtle">
+              {p.birthYear ?? "?"}–{p.deathYear ?? ""}
+            </span>
+          )}
+          {p.sosa ? <span className="num shrink-0 rounded bg-accent-soft px-1 text-2xs text-accent-text">Sosa {p.sosa}</span> : null}
+        </button>
+      ))}
+      <p className="px-2.5 pb-0.5 pt-1 text-2xs text-fg-subtle">
+        <Kbd>Tab</Kbd> ou <Kbd>Entrée</Kbd> pour insérer le lien · <Kbd>Échap</Kbd> pour fermer
+      </p>
+    </div>
+  ) : null;
+
   const editor = (
     <textarea
       ref={area}
       value={text}
-      onChange={(e) => change(e.target.value)}
-      onBlur={flush}
+      onChange={(e) => {
+        change(e.target.value);
+        syncMention(e.target);
+      }}
+      onSelect={(e) => syncMention(e.currentTarget)}
+      onBlur={() => {
+        flush();
+        setMention(null);
+      }}
+      onClick={(e) => {
+        // Ctrl-clic (ou Cmd-clic) sur un lien : on ouvre la fiche.
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const href = mentionAt(text, e.currentTarget.selectionStart);
+        if (!href) return;
+        flush();
+        router.push(href);
+        if (mobile) setNotebookState("collapsed");
+      }}
       onKeyDown={(e) => {
+        if (mentionOpen) {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            const n = suggestions.length;
+            setMentionIndex((i) => (i + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
+            return;
+          }
+          if (e.key === "Tab" || e.key === "Enter") {
+            e.preventDefault();
+            pickMention(suggestions[Math.min(mentionIndex, suggestions.length - 1)]);
+            return;
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            setMention(null);
+            return;
+          }
+        }
         if (e.key === "Escape") {
           e.preventDefault();
           collapse();
@@ -476,7 +619,7 @@ export function Notebook({ profileId, initialPages }: { profileId: number; initi
       placeholder={
         act
           ? "Lisez l’acte et notez ce que vous y voyez : date, lieu, parents, âges, parrains… Abréviations et désordre permis.\n\nPuis « Remplir la fiche » : l’IA range vos notes dans les champs, sans rien inventer."
-          : "Hypothèses, pistes, cotes à vérifier, questions à poser…\n\nTout s’enregistre automatiquement, sur tous vos appareils."
+          : "Hypothèses, pistes, cotes à vérifier, questions à poser…\n\nTapez / suivi d’un nom (/Armand) pour lier une fiche. Tout s’enregistre automatiquement, sur tous vos appareils."
       }
       aria-label={page ? `Carnet, page ${page.title}` : "Carnet de notes"}
       className="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3 text-[0.9375rem] leading-relaxed text-fg outline-none placeholder:text-fg-subtle"
@@ -696,6 +839,7 @@ export function Notebook({ profileId, initialPages }: { profileId: number; initi
           <>
             {tabs}
             {editor}
+            {mentionList}
             {cited}
             {fillBar}
           </>
@@ -722,6 +866,7 @@ export function Notebook({ profileId, initialPages }: { profileId: number; initi
         <>
           {tabs}
           {editor}
+          {mentionList}
           {cited}
           {fillBar}
           <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-4 py-2 text-2xs text-fg-subtle">

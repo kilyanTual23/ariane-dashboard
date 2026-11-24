@@ -276,7 +276,7 @@ export function AppShell({
           </main>
         </div>
 
-        <Notebook profileId={profileId} initialPages={notebookPages} />
+        <Notebook profileId={profileId} slug={slug} people={searchItems} initialPages={notebookPages} />
       </div>
 
       <MobileTabBar base={base} pathname={pathname} openTasks={openTasks} profiles={profiles} slug={slug} />

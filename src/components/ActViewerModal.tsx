@@ -15,6 +15,7 @@ import {
   IconAlert,
   IconArrowUpRight,
   IconBookOpen,
+  IconChevronUp,
   IconCheck,
   IconCopy,
   IconDownload,
@@ -1291,6 +1292,28 @@ export function ActViewerModal({
     });
   };
 
+  // Seine-Maritime : la vue suivante se déduit du lien de l'acte, un clic suffit.
+  const oneClickNextView = Boolean(originalUrl?.includes("archivesdepartementales76.net") && /\/ark:\/50278\/[0-9a-f]+/.test(originalUrl));
+
+  const handleAddNextView = () => {
+    if (!originalUrl) return;
+    setViewError(null);
+    startViewTransition(async () => {
+      try {
+        const res = await addActViewAction(toViewForm({ ...viewIds, url: originalUrl, next: 1 }));
+        if (!res.ok) {
+          toast.error("Vue suivante non ajoutée", res.error ?? "");
+          return;
+        }
+        setViewFormOpen(false);
+        toast.success("Vue suivante ajoutée", "Elle est à droite de l’image : tracez-y la suite de l’acte.");
+        router.refresh();
+      } catch (err) {
+        toast.error("Vue suivante non ajoutée", errorMessage(err));
+      }
+    });
+  };
+
   /** Revenir à la seule première vue : on retélécharge le lien de l'acte. */
   const handleResetViews = () => {
     if (!originalUrl) return;
@@ -1842,21 +1865,44 @@ export function ActViewerModal({
                 <button
                   type="button"
                   onClick={() => {
+                    if (oneClickNextView) return handleAddNextView();
                     setViewFormOpen((o) => !o);
                     setViewError(null);
                   }}
-                  aria-expanded={viewFormOpen}
-                  title="L’acte continue sur la vue suivante du registre : ajoutez-la à droite de l’image"
-                  className={`flex h-full items-center gap-1 rounded-lg px-2 text-xs transition-colors ${
-                    viewFormOpen ? "bg-surface-2 font-medium text-fg" : "text-fg-muted hover:text-fg"
+                  disabled={viewPending}
+                  aria-expanded={oneClickNextView ? undefined : viewFormOpen}
+                  title={
+                    oneClickNextView
+                      ? "L’acte continue sur la vue suivante du registre : elle est ajoutée à droite de l’image, en un clic"
+                      : "L’acte continue sur la vue suivante du registre : ajoutez-la à droite de l’image"
+                  }
+                  className={`flex h-full items-center gap-1 rounded-lg px-2 text-xs transition-colors disabled:opacity-60 ${
+                    viewFormOpen && !oneClickNextView ? "bg-surface-2 font-medium text-fg" : "text-fg-muted hover:text-fg"
                   }`}
                 >
-                  <IconPlus size={12} />
-                  Vue suivante
-                  {extraViews.length > 0 && (
+                  {viewPending ? <Spinner size={12} /> : <IconPlus size={12} />}
+                  {viewPending ? "Ajout de la vue…" : "Vue suivante"}
+                  {extraViews.length > 0 && !viewPending && (
                     <span className="num rounded-full bg-surface-2 px-1.5 text-2xs text-fg-muted">{extraViews.length + 1} vues</span>
                   )}
                 </button>
+                {oneClickNextView && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewFormOpen((o) => !o);
+                      setViewError(null);
+                    }}
+                    aria-expanded={viewFormOpen}
+                    title="Autre vue (lien à coller), ou revenir à la seule première vue"
+                    aria-label="Autres options de vues"
+                    className={`flex h-full items-center rounded-lg px-1.5 text-xs transition-colors ${
+                      viewFormOpen ? "bg-surface-2 text-fg" : "text-fg-subtle hover:text-fg"
+                    }`}
+                  >
+                    <IconChevronUp size={12} />
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -2020,10 +2066,11 @@ export function ActViewerModal({
                                 {" "}Sur une autre vue du registre ?{" "}
                                 <button
                                   type="button"
-                                  onClick={() => setViewFormOpen(true)}
+                                  onClick={() => (oneClickNextView ? handleAddNextView() : setViewFormOpen(true))}
+                                  disabled={viewPending}
                                   className="font-medium text-accent hover:underline"
                                 >
-                                  Ajouter la vue suivante
+                                  {viewPending ? "Ajout de la vue…" : "Ajouter la vue suivante"}
                                 </button>
                                 .
                               </>
