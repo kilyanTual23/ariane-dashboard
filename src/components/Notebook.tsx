@@ -39,8 +39,9 @@ import { MOBILE_QUERY, useIsMobile, useKeyboardInset } from "@/lib/use-media";
  * Tout s'enregistre seul pendant la frappe, sur tous les appareils.
  * Plusieurs pages, en onglets : une par recherche, par branche, par acte en cours de lecture…
  * Quand un acte est ouvert dans la visionneuse, une page peut remplir sa fiche (l'IA range les notes).
- * « /Armand » propose les personnes de l'arbre : Tab ou Entrée insère un lien vers sa fiche,
- * écrit [Armand TUAL](/p/…/personnes/12), repris sous la page et ouvrable d'un Ctrl-clic.
+ * « /Armand » propose les personnes de l'arbre : Tab ou Entrée insère un lien vers sa fiche.
+ * L'éditeur affiche le lien comme une étiquette cliquable portant le nom ; la page est enregistrée
+ * en texte, le lien écrit [Armand TUAL](/p/…/personnes/12).
  */
 
 /* ---------------------------------------------------- état d'affichage */
@@ -176,19 +177,69 @@ type SaveStatus = "saved" | "dirty" | "saving" | "error";
 /** Lien vers une page de l'application, écrit [titre](/p/…). */
 const MENTION_RE = /\[([^\]\n]+)\]\((\/p\/[^\s)]+)\)/g;
 
-/** Lien sous le curseur (pour l'ouvrir d'un Ctrl-clic). */
-function mentionAt(text: string, pos: number): string | null {
-  for (const m of text.matchAll(MENTION_RE)) {
-    if (m.index! <= pos && pos <= m.index! + m[0].length) return m[2];
-  }
-  return null;
+/** « /Arm » juste avant le curseur, en début de ligne ou après une espace : la recherche en cours. */
+const MENTION_QUERY_RE = /(?:^|[\s(])\/([^\s/\[\]()][^\n/\[\]()]{0,40})$/;
+
+/** Texte sans les adresses des liens : « [Armand TUAL](/p/…) » → « Armand TUAL » (pour l'IA, l'aperçu…). */
+function plainText(text: string) {
+  return text.replace(MENTION_RE, "$1");
 }
 
-/** « /Arm » juste avant le curseur, en début de ligne ou après une espace : la recherche en cours. */
-function mentionQuery(text: string, caret: number): { start: number; query: string } | null {
-  const m = text.slice(0, caret).match(/(?:^|[\s(])\/([^\s/\[\]()][^\n/\[\]()]{0,40})$/);
-  if (!m) return null;
-  return { start: caret - m[1].length - 1, query: m[1] };
+/* ---- éditeur : texte enregistré ⇄ contenu affiché ---- */
+
+const CHIP_CLASS =
+  "rounded bg-accent-soft px-1 font-medium text-accent-text underline decoration-accent-text/30 underline-offset-2 cursor-pointer hover:decoration-accent-text";
+
+function escapeHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function chipElement(name: string, href: string): HTMLAnchorElement {
+  const a = document.createElement("a");
+  a.href = href;
+  a.dataset.mention = "";
+  a.contentEditable = "false";
+  a.className = CHIP_CLASS;
+  a.textContent = name;
+  return a;
+}
+
+/** Texte enregistré → contenu de l'éditeur : liens en étiquettes, retours à la ligne en <br>. */
+function textToHtml(text: string): string {
+  const lines = (t: string) => escapeHtml(t).replace(/\n/g, "<br>");
+  let out = "";
+  let last = 0;
+  for (const m of text.matchAll(MENTION_RE)) {
+    out += lines(text.slice(last, m.index));
+    out += `<a href="${escapeHtml(m[2])}" data-mention="" contenteditable="false" class="${CHIP_CLASS}">${escapeHtml(m[1])}</a>`;
+    last = m.index! + m[0].length;
+  }
+  out += lines(text.slice(last));
+  // Une ligne vide finale ne s'affiche qu'avec un <br> de plus.
+  return text.endsWith("\n") ? `${out}<br>` : out;
+}
+
+/** Contenu de l'éditeur → texte enregistré. */
+function htmlToText(root: HTMLElement): string {
+  let out = "";
+  const walk = (node: Node, isRoot: boolean) => {
+    node.childNodes.forEach((child, i) => {
+      if (child.nodeType === Node.TEXT_NODE) out += (child as Text).data.replace(/\u00a0/g, " ");
+      else if (child instanceof HTMLBRElement) {
+        // Le dernier <br> ne fait que porter une ligne vide (voir textToHtml).
+        if (!(isRoot && i === node.childNodes.length - 1)) out += "\n";
+      } else if (child instanceof HTMLAnchorElement && child.dataset.mention !== undefined) {
+        out += `[${child.textContent ?? ""}](${child.getAttribute("href") ?? ""})`;
+      } else if (child instanceof HTMLElement) {
+        // Bloc ajouté par le navigateur (collage, Entrée) : une ligne.
+        const block = /^(DIV|P)$/.test(child.tagName);
+        if (block && out && !out.endsWith("\n")) out += "\n";
+        walk(child, false);
+      }
+    });
+  };
+  walk(root, true);
+  return out;
 }
 
 /** Pages citées dans le carnet (« → Titre (/p/…) ») : on y revient d'un clic. */
@@ -196,13 +247,8 @@ function citedPages(text: string) {
   const seen = new Set<string>();
   const out: { title: string; href: string }[] = [];
   for (const line of text.split("\n")) {
-    // Liens nommés : [Armand TUAL](/p/…/personnes/12)
-    for (const m of line.matchAll(MENTION_RE)) {
-      if (seen.has(m[2])) continue;
-      seen.add(m[2]);
-      out.push({ title: m[1], href: m[2] });
-    }
-    // Pages insérées : « → Titre (/p/…) » ; le titre est tout ce qui précède le chemin.
+    // Anciennes pages insérées : « → Titre (/p/…) » ; le titre est tout ce qui précède le chemin.
+    // (Les liens [Nom](/p/…) sont cliquables dans le texte même.)
     for (const m of line.replace(MENTION_RE, "").matchAll(/\((\/p\/[^\s)]+)\)/g)) {
       const href = m[1];
       if (seen.has(href)) continue;
@@ -216,7 +262,7 @@ function citedPages(text: string) {
 
 /** Première ligne non vide : l'aperçu de l'onglet replié. */
 function preview(text: string) {
-  return text.split("\n").find((l) => l.trim())?.trim() ?? "";
+  return plainText(text).split("\n").find((l) => l.trim())?.trim() ?? "";
 }
 
 /* ------------------------------------------------------------- carnet */
@@ -258,7 +304,7 @@ export function Notebook({
   const [renaming, setRenaming] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [, startTransition] = useTransition();
-  const area = useRef<HTMLTextAreaElement>(null);
+  const area = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Dernier texte tapé, et sa page : c'est lui qu'on enregistre. */
   const latest = useRef<{ pageId: number; content: string } | null>(null);
@@ -266,15 +312,12 @@ export function Notebook({
   const panel = useRef<HTMLDivElement>(null);
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
-  /** Position du curseur à rétablir dès que le nouveau texte est affiché (avant toute autre frappe). */
-  const pendingCaret = useRef<number | null>(null);
-  useLayoutEffect(() => {
-    const el = area.current;
-    if (pendingCaret.current === null || !el) return;
-    el.focus();
-    el.setSelectionRange(pendingCaret.current, pendingCaret.current);
-    pendingCaret.current = null;
-  });
+  /** Où commence la recherche « /… » en cours, dans le texte affiché. */
+  const mentionAnchor = useRef<{ node: Text; start: number } | null>(null);
+  /** Dernier texte lu dans l'éditeur : s'il diffère du texte de la page, c'est qu'il vient d'ailleurs. */
+  const shown = useRef<string | null>(null);
+  /** Éditeur où ce texte est affiché (il est recréé quand le carnet se replie puis se déplie). */
+  const shownIn = useRef<HTMLDivElement | null>(null);
 
   const page = pages.find((p) => p.id === activeId) ?? pages[0];
   const text = page?.content ?? "";
@@ -437,9 +480,9 @@ export function Notebook({
 
   /** Remplir la fiche de l'acte ouvert : la sélection si l'on en a fait une, sinon toute la page. */
   const fillAct = () => {
-    const el = area.current;
-    const selected = el && el.selectionEnd > el.selectionStart ? text.slice(el.selectionStart, el.selectionEnd) : "";
-    const notes = (selected || text).trim();
+    const sel = window.getSelection();
+    const inEditor = sel && !sel.isCollapsed && area.current?.contains(sel.anchorNode);
+    const notes = (inEditor ? sel.toString() : plainText(text)).trim();
     if (!notes) return;
     flush();
     window.dispatchEvent(new CustomEvent(FILL_EVENT, { detail: { notes } }));
@@ -447,21 +490,68 @@ export function Notebook({
     setNotebookState("collapsed");
   };
 
-  /** Insère un texte au curseur et garde la frappe là où elle était. */
-  const insert = (snippet: string) => {
+  /** Lit l'éditeur et enregistre ; relit aussi une éventuelle recherche « /… ». */
+  const readEditor = () => {
     const el = area.current;
-    const start = el?.selectionStart ?? text.length;
-    const end = el?.selectionEnd ?? text.length;
-    const before = text.slice(0, start);
-    const glue = before && !before.endsWith("\n") ? "\n" : "";
-    pendingCaret.current = before.length + glue.length + snippet.length;
-    change(`${before}${glue}${snippet}${text.slice(end)}`);
+    if (!el) return;
+    const value = htmlToText(el);
+    shown.current = value;
+    if (value !== text) change(value);
+    syncMention();
   };
 
+  /** Curseur dans l'éditeur (à la fin s'il était ailleurs). */
+  const caretRange = (): Range | null => {
+    const el = area.current;
+    if (!el) return null;
+    const sel = window.getSelection();
+    if (sel?.rangeCount && el.contains(sel.getRangeAt(0).startContainer)) return sel.getRangeAt(0);
+    el.focus({ preventScroll: true });
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(false);
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+    return r;
+  };
+
+  /** Pose des nœuds à la place de la plage, puis le curseur juste après. */
+  const placeNodes = (range: Range, nodes: Node[]) => {
+    range.deleteContents();
+    const frag = document.createDocumentFragment();
+    nodes.forEach((n) => frag.appendChild(n));
+    const lastNode = nodes[nodes.length - 1];
+    range.insertNode(frag);
+    const after = document.createRange();
+    after.setStartAfter(lastNode);
+    after.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(after);
+    readEditor();
+  };
+
+  /** Insère un texte au curseur. */
+  const insert = (snippet: string) => {
+    const range = caretRange();
+    if (range) placeNodes(range, [document.createTextNode(snippet)]);
+  };
+
+  /** Lien vers la page affichée, au curseur. */
   const insertPage = () => {
     const title = document.title.replace(/\s*·\s*Ariane$/, "");
-    insert(`→ ${title} (${window.location.pathname})\n`);
+    const range = caretRange();
+    if (range) placeNodes(range, [chipElement(title, window.location.pathname), document.createTextNode(" ")]);
   };
+
+  // Le texte de la page change sans venir de l'éditeur (autre page, autre appareil) : on l'affiche.
+  useLayoutEffect(() => {
+    const el = area.current;
+    if (!el || (shownIn.current === el && shown.current === text)) return;
+    el.innerHTML = textToHtml(text);
+    shown.current = text;
+    shownIn.current = el;
+  });
 
   if (state === "closed") return null;
   // En plein écran, seul l'élément concerné est affiché : le carnet le rejoint.
@@ -486,6 +576,7 @@ export function Notebook({
     );
 
   const links = citedPages(text);
+  const wordCount = plainText(text).trim() ? plainText(text).trim().split(/\s+/).length : 0;
   const cited =
     links.length > 0 ? (
       <nav aria-label="Pages citées" className="flex shrink-0 gap-1.5 overflow-x-auto border-t border-border px-3 py-2">
@@ -519,21 +610,34 @@ export function Notebook({
     : [];
   const mentionOpen = Boolean(mention && suggestions.length);
 
-  /** Relit le texte autour du curseur : une recherche « /… » est-elle en cours ? */
-  const syncMention = (el: HTMLTextAreaElement) => {
-    const found = el.selectionStart === el.selectionEnd ? mentionQuery(el.value, el.selectionStart) : null;
+  /** Relit le texte avant le curseur : une recherche « /… » est-elle en cours ? */
+  const syncMention = () => {
+    const sel = window.getSelection();
+    const node = sel?.anchorNode;
+    let found: { start: number; query: string } | null = null;
+    if (sel?.isCollapsed && node instanceof Text && area.current?.contains(node)) {
+      const m = node.data.slice(0, sel.anchorOffset).match(MENTION_QUERY_RE);
+      if (m) {
+        const start = sel.anchorOffset - m[1].length - 1;
+        mentionAnchor.current = { node, start };
+        found = { start, query: m[1] };
+      }
+    }
+    if (!found) mentionAnchor.current = null;
     setMention((cur) => (cur?.start === found?.start && cur?.query === found?.query ? cur : found));
     if (found?.query !== mention?.query) setMentionIndex(0);
   };
 
   const pickMention = (person: GlobalSearchItem) => {
-    const el = area.current;
-    if (!mention || !el) return;
-    const caret = el.selectionStart;
-    const link = `[${person.name}](/p/${slug}/personnes/${person.id}) `;
-    pendingCaret.current = mention.start + link.length;
-    change(text.slice(0, mention.start) + link + text.slice(caret));
+    const anchor = mentionAnchor.current;
+    const sel = window.getSelection();
+    if (!anchor || !sel?.rangeCount) return;
+    const range = document.createRange();
+    range.setStart(anchor.node, anchor.start);
+    range.setEnd(sel.anchorNode ?? anchor.node, sel.anchorOffset);
     setMention(null);
+    mentionAnchor.current = null;
+    placeNodes(range, [chipElement(person.name, `/p/${slug}/personnes/${person.id}`), document.createTextNode(" ")]);
   };
 
   const mentionList = mentionOpen ? (
@@ -570,60 +674,80 @@ export function Notebook({
   ) : null;
 
   const editor = (
-    <textarea
-      ref={area}
-      value={text}
-      onChange={(e) => {
-        change(e.target.value);
-        syncMention(e.target);
-      }}
-      onSelect={(e) => syncMention(e.currentTarget)}
-      onBlur={() => {
-        flush();
-        setMention(null);
-      }}
-      onClick={(e) => {
-        // Ctrl-clic (ou Cmd-clic) sur un lien : on ouvre la fiche.
-        if (!(e.ctrlKey || e.metaKey)) return;
-        const href = mentionAt(text, e.currentTarget.selectionStart);
-        if (!href) return;
-        flush();
-        router.push(href);
-        if (mobile) setNotebookState("collapsed");
-      }}
-      onKeyDown={(e) => {
-        if (mentionOpen) {
-          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-            e.preventDefault();
-            const n = suggestions.length;
-            setMentionIndex((i) => (i + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
-            return;
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {!text && (
+        <p className="pointer-events-none absolute inset-x-4 top-3 whitespace-pre-line text-[0.9375rem] leading-relaxed text-fg-subtle" aria-hidden>
+          {act
+            ? "Lisez l’acte et notez ce que vous y voyez : date, lieu, parents, âges, parrains… Abréviations et désordre permis.\n\nPuis « Remplir la fiche » : l’IA range vos notes dans les champs, sans rien inventer."
+            : "Hypothèses, pistes, cotes à vérifier, questions à poser…\n\nTapez / suivi d’un nom (/Armand) pour lier une fiche. Tout s’enregistre automatiquement, sur tous vos appareils."}
+        </p>
+      )}
+      <div
+        ref={area}
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        tabIndex={0}
+        spellCheck
+        aria-label={page ? `Carnet, page ${page.title}` : "Carnet de notes"}
+        onInput={readEditor}
+        onKeyUp={(e) => {
+          if (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End") syncMention();
+        }}
+        onMouseUp={syncMention}
+        onBlur={() => {
+          flush();
+          setMention(null);
+        }}
+        onPaste={(e) => {
+          // Texte seul : pas de mise en forme venue d'ailleurs.
+          e.preventDefault();
+          const pasted = e.clipboardData.getData("text/plain");
+          if (pasted) document.execCommand("insertText", false, pasted);
+        }}
+        onClick={(e) => {
+          // Un clic sur un lien ouvre la fiche.
+          const chip = (e.target as HTMLElement).closest("a[data-mention]");
+          if (!chip) return;
+          e.preventDefault();
+          flush();
+          router.push(chip.getAttribute("href") ?? "/");
+          if (mobile) setNotebookState("collapsed");
+        }}
+        onKeyDown={(e) => {
+          if (mentionOpen) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              const n = suggestions.length;
+              setMentionIndex((i) => (i + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
+              return;
+            }
+            if (e.key === "Tab" || e.key === "Enter") {
+              e.preventDefault();
+              pickMention(suggestions[Math.min(mentionIndex, suggestions.length - 1)]);
+              return;
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setMention(null);
+              return;
+            }
           }
-          if (e.key === "Tab" || e.key === "Enter") {
+          if (e.key === "Enter") {
+            // Un simple retour à la ligne (pas de nouveau paragraphe).
             e.preventDefault();
-            pickMention(suggestions[Math.min(mentionIndex, suggestions.length - 1)]);
+            document.execCommand("insertLineBreak");
             return;
           }
           if (e.key === "Escape") {
             e.preventDefault();
-            setMention(null);
-            return;
+            collapse();
           }
-        }
-        if (e.key === "Escape") {
-          e.preventDefault();
-          collapse();
-        }
-      }}
-      spellCheck
-      placeholder={
-        act
-          ? "Lisez l’acte et notez ce que vous y voyez : date, lieu, parents, âges, parrains… Abréviations et désordre permis.\n\nPuis « Remplir la fiche » : l’IA range vos notes dans les champs, sans rien inventer."
-          : "Hypothèses, pistes, cotes à vérifier, questions à poser…\n\nTapez / suivi d’un nom (/Armand) pour lier une fiche. Tout s’enregistre automatiquement, sur tous vos appareils."
-      }
-      aria-label={page ? `Carnet, page ${page.title}` : "Carnet de notes"}
-      className="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3 text-[0.9375rem] leading-relaxed text-fg outline-none placeholder:text-fg-subtle"
-    />
+        }}
+        className="min-h-0 w-full flex-1 overflow-y-auto whitespace-pre-wrap break-words px-4 py-3 text-[0.9375rem] leading-relaxed text-fg outline-none"
+      />
+    </div>
   );
 
   const tools = (
@@ -876,7 +1000,7 @@ export function Notebook({
               <span className="ml-0.5">monter ou descendre</span>
             </span>
             <span className="num">
-              {text.trim() ? text.trim().split(/\s+/).length : 0} mot{text.trim().split(/\s+/).length > 1 ? "s" : ""}
+              {wordCount} mot{wordCount > 1 ? "s" : ""}
             </span>
           </footer>
         </>
