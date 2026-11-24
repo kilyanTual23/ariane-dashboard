@@ -40,6 +40,7 @@ import {
 import { Menu, MenuLabel, MenuLink, MenuSeparator } from "@/components/Menu";
 import { MobileTabBar, MobileTopBar } from "@/components/MobileChrome";
 import { Notebook, toggleNotebook, useNotebookOpen } from "@/components/Notebook";
+import type { NotebookPage } from "@/lib/queries";
 import { buttonClass, Kbd } from "@/components/ui";
 import { useTheme, type Theme } from "@/lib/theme";
 
@@ -78,7 +79,7 @@ export function AppShell({
   personCount,
   openTasks,
   initialCollapsed,
-  notebook,
+  notebookPages,
   children,
 }: {
   slug: string;
@@ -89,7 +90,7 @@ export function AppShell({
   personCount: number;
   openTasks: number;
   initialCollapsed: boolean;
-  notebook: { content: string; updated_at: string | null };
+  notebookPages: NotebookPage[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -275,7 +276,7 @@ export function AppShell({
           </main>
         </div>
 
-        <Notebook profileId={profileId} initialContent={notebook.content} initialUpdatedAt={notebook.updated_at} />
+        <Notebook profileId={profileId} initialPages={notebookPages} />
       </div>
 
       <MobileTabBar base={base} pathname={pathname} openTasks={openTasks} profiles={profiles} slug={slug} />

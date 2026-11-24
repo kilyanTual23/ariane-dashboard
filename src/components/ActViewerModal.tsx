@@ -30,7 +30,14 @@ import {
   IconX,
   Spinner,
 } from "@/components/icons";
-import { toggleNotebook, useNotebookOpen } from "@/components/Notebook";
+import {
+  FILL_EVENT,
+  openNotebookPage,
+  setNotebookAct,
+  toggleNotebook,
+  useNotebookOpen,
+  VIEWER_PANEL_WIDTH,
+} from "@/components/Notebook";
 import { buttonClass } from "@/components/ui";
 import {
   parseTranscription,
@@ -151,6 +158,7 @@ export function ActViewerModal({
   // État de l'OCR
   const [ocrEngine, setOcrEngine] = useState<"tesseract" | "gemini">("gemini");
   const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [analyzingNotes, setAnalyzingNotes] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState("");
   const [ocrElapsed, setOcrElapsed] = useState(0);
@@ -571,6 +579,14 @@ export function ActViewerModal({
       if (savedKey) setGeminiApiKey(savedKey);
     }
   }, []);
+
+  // Le carnet sait quel acte est ouvert : une page peut alors remplir sa fiche (voir handleAnalyzeNotes).
+  const notebookPageTitle = title || "Lecture d’un acte";
+  useEffect(() => {
+    if (!isOpen) return;
+    setNotebookAct({ title: notebookPageTitle, sidePanel: ocrOpen });
+    return () => setNotebookAct(null);
+  }, [isOpen, notebookPageTitle, ocrOpen]);
 
   // Synchroniser automatiquement les champs dès qu'une transcription est présente
   useEffect(() => {
@@ -1155,6 +1171,59 @@ export function ActViewerModal({
     }
   };
 
+  /** Remplissage intelligent : les notes prises dans le carnet en lisant l'acte, rangées par l'IA dans les champs. */
+  const handleAnalyzeNotes = async (notes: string) => {
+    if (!notes.trim()) return;
+    setOcrOpen(true);
+    setAnalyzingNotes(true);
+    abortControllerRef.current?.abort();
+    const ac = new AbortController();
+    abortControllerRef.current = ac;
+    setOcrLoading(true);
+    setOcrElapsed(0);
+    setOcrProgress("L’IA range vos notes dans la fiche…");
+    setSaveSuccess(false);
+    const timer = setInterval(() => setOcrElapsed((t) => t + 1), 1000);
+    setPinnedSourceKey(null);
+    try {
+      const res = await fetch("/api/ocr/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: ac.signal,
+        body: JSON.stringify({ notes, apiKey: geminiApiKey.trim() || undefined, actKind }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur lors de l’analyse des notes");
+      // Les notes en tête du texte : les citations « source » de chaque champ s'y surlignent.
+      setTranscription(`### Mes notes\n\n${notes.split("\n").join("  \n")}\n\n${data.text || ""}`.trim());
+      setEditMode(false);
+      applyParsedData(data.extractedData || parseTranscription(data.text || ""));
+      setSidebarTab("compare");
+    } catch (err: unknown) {
+      if (ac.signal.aborted) return;
+      setTranscription(`⚠️ Erreur : ${err instanceof Error ? err.message : String(err)}`);
+      setSidebarTab("transcription");
+    } finally {
+      clearInterval(timer);
+      setOcrLoading(false);
+      setAnalyzingNotes(false);
+      setOcrProgress("");
+      setOcrElapsed(0);
+      abortControllerRef.current = null;
+    }
+  };
+
+  // « Remplir la fiche » dans le carnet. (Réabonné à chaque rendu : l'écouteur voit l'état à jour.)
+  useEffect(() => {
+    if (!isOpen) return;
+    const onFill = (e: Event) => {
+      const notes = (e as CustomEvent<{ notes: string }>).detail?.notes;
+      if (notes) void handleAnalyzeNotes(notes);
+    };
+    window.addEventListener(FILL_EVENT, onFill);
+    return () => window.removeEventListener(FILL_EVENT, onFill);
+  });
+
   const handleSyncFromTranscription = () => {
     if (!transcription) return;
     const parsed = parseTranscription(transcription);
@@ -1358,6 +1427,57 @@ export function ActViewerModal({
       };
     });
 
+
+  const renderApiKeyField = (className = "mt-4 block") => (
+    <label className={className}>
+      <span className="label flex items-center justify-between gap-2">
+        Clé d’accès (Gemini, Claude, OpenAI ou Groq)
+        {geminiApiKey && (
+          <span className="flex items-center gap-1 font-normal text-ok">
+            <IconCheck size={12} />
+            Enregistrée sur cet appareil
+          </span>
+        )}
+      </span>
+      <input
+        type="password"
+        value={geminiApiKey}
+        onChange={(e) => handleSaveGeminiKey(e.target.value)}
+        placeholder="AIza…, sk-ant-…, sk-… ou gsk_…"
+        autoComplete="off"
+        className="field"
+      />
+      <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <a
+          href="https://aistudio.google.com/apikey"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+        >
+          Obtenir une clé Google AI Studio
+          <IconArrowUpRight size={11} />
+        </a>
+        <a
+          href="https://console.groq.com/keys"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+        >
+          Alternative gratuite : Groq
+          <IconArrowUpRight size={11} />
+        </a>
+        <a
+          href="https://console.anthropic.com/settings/keys"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+        >
+          Clé Claude
+          <IconArrowUpRight size={11} />
+        </a>
+      </span>
+    </label>
+  );
 
   return (
     <div
@@ -1634,7 +1754,7 @@ export function ActViewerModal({
 
         {/* Panneau latéral : report dans la fiche, texte transcrit, réglages */}
         {ocrOpen && (
-          <aside className="z-20 flex w-[min(40rem,94vw)] shrink-0 animate-slide-in-right flex-col border-l border-border bg-surface">
+          <aside style={{ width: VIEWER_PANEL_WIDTH }} className="z-20 flex shrink-0 animate-slide-in-right flex-col border-l border-border bg-surface">
             <div className="flex shrink-0 items-center gap-1 border-b border-border px-3">
               {transcription ? (
                 <nav className="flex items-center gap-0.5" aria-label="Panneau de transcription">
@@ -1690,7 +1810,9 @@ export function ActViewerModal({
                   <div>
                     <p className="text-sm font-medium text-fg">{ocrProgress || `Analyse en cours… ${ocrElapsed} s`}</p>
                     <p className="mx-auto mt-1 max-w-xs text-xs text-fg-muted">
-                      {ocrEngine === "gemini"
+                      {analyzingNotes
+                        ? "Vos notes sont lues et réparties entre les champs de la fiche. Rien n’est enregistré sans vous."
+                        : ocrEngine === "gemini"
                         ? "L’IA paléographe déchiffre l’écriture et repère les informations généalogiques."
                         : "Tesseract reconnaît les caractères du document."}
                     </p>
@@ -1781,62 +1903,29 @@ export function ActViewerModal({
                         </label>
                       ))}
                     </div>
-                    {ocrEngine === "gemini" && (
-                      <label className="mt-4 block">
-                        <span className="label flex items-center justify-between gap-2">
-                          Clé d’accès (Gemini, Claude, OpenAI ou Groq)
-                          {geminiApiKey && (
-                            <span className="flex items-center gap-1 font-normal text-ok">
-                              <IconCheck size={12} />
-                              Enregistrée sur cet appareil
-                            </span>
-                          )}
-                        </span>
-                        <input
-                          type="password"
-                          value={geminiApiKey}
-                          onChange={(e) => handleSaveGeminiKey(e.target.value)}
-                          placeholder="AIza…, sk-ant-…, sk-… ou gsk_…"
-                          autoComplete="off"
-                          className="field"
-                        />
-                        <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                          <a
-                            href="https://aistudio.google.com/apikey"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
-                          >
-                            Obtenir une clé Google AI Studio
-                            <IconArrowUpRight size={11} />
-                          </a>
-                          <a
-                            href="https://console.groq.com/keys"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
-                          >
-                            Alternative gratuite : Groq
-                            <IconArrowUpRight size={11} />
-                          </a>
-                          <a
-                            href="https://console.anthropic.com/settings/keys"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-fg-muted underline-offset-4 hover:text-fg hover:underline"
-                          >
-                            Clé Claude
-                            <IconArrowUpRight size={11} />
-                          </a>
-                        </span>
-                      </label>
-                    )}
+                    {ocrEngine === "gemini" && renderApiKeyField()}
                   </section>
 
                   <button type="button" onClick={handleRunOcr} className={buttonClass("primary", "w-full", "lg")}>
                     <IconSparkles size={15} />
                     {transcription ? "Relancer l’analyse" : "Lancer la transcription"}
                   </button>
+
+                  <section className="border-t border-border pt-5">
+                    <h4 className="text-ui font-semibold">Vous préférez lire vous-même ?</h4>
+                    <p className="mt-1 text-xs text-fg-muted">
+                      Notez ce que vous lisez dans le Carnet, en style libre. « Remplir la fiche », au bas du Carnet, fait
+                      ranger vos notes dans les champs par l’IA, sans qu’elle lise l’image (même clé que ci-dessus).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => openNotebookPage(notebookPageTitle)}
+                      className={buttonClass("secondary", "mt-2.5", "sm")}
+                    >
+                      <IconBookOpen size={13} />
+                      Prendre des notes sur cet acte
+                    </button>
+                  </section>
                 </div>
               ) : sidebarTab === "transcription" ? (
                 /* Onglet 2 : texte transcrit */

@@ -138,6 +138,7 @@ export async function deleteProfile(id: number): Promise<void> {
   await batch(statements);
   await ensureNotebookTable();
   await execute(`DELETE FROM notebooks WHERE profile_id = ?`, [id]);
+  await execute(`DELETE FROM notebook_pages WHERE profile_id = ?`, [id]);
   await execute(`DELETE FROM profiles WHERE id = ?`, [id]);
 }
 
@@ -655,41 +656,92 @@ export const listAllSourcesForProfile = cache(async (profileId: number): Promise
 /* ------------------------------------------------------------------ carnet */
 
 /**
- * Carnet de notes du profil : un bloc-notes libre, ouvert depuis n'importe quelle page.
- * La table se crée d'elle-même au premier usage (aucune migration à lancer).
+ * Carnet de notes du profil : des pages libres (onglets), ouvertes depuis n'importe quelle page.
+ * Les tables se créent d'elles-mêmes au premier usage (aucune migration à lancer).
+ * L'ancien carnet d'une seule page (table notebooks) devient la première page, « Notes ».
  */
 let notebookReady: Promise<void> | null = null;
 function ensureNotebookTable(): Promise<void> {
-  notebookReady ??= execute(
-    `CREATE TABLE IF NOT EXISTS notebooks (
-       profile_id INTEGER PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
-       content    TEXT NOT NULL DEFAULT '',
-       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-     )`,
-  )
-    .then(() => undefined)
-    .catch((err) => {
-      notebookReady = null;
-      throw err;
-    });
+  notebookReady ??= (async () => {
+    await execute(
+      `CREATE TABLE IF NOT EXISTS notebooks (
+         profile_id INTEGER PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+         content    TEXT NOT NULL DEFAULT '',
+         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+       )`,
+    );
+    await execute(
+      `CREATE TABLE IF NOT EXISTS notebook_pages (
+         id         INTEGER PRIMARY KEY,
+         profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+         title      TEXT NOT NULL DEFAULT 'Notes',
+         content    TEXT NOT NULL DEFAULT '',
+         position   INTEGER NOT NULL DEFAULT 0,
+         created_at TEXT NOT NULL DEFAULT (datetime('now')),
+         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+       )`,
+    );
+    await execute(`CREATE INDEX IF NOT EXISTS idx_notebook_pages_profile ON notebook_pages(profile_id, position)`);
+  })().catch((err) => {
+    notebookReady = null;
+    throw err;
+  });
   return notebookReady;
 }
 
-export type Notebook = { content: string; updated_at: string | null };
+export type NotebookPage = { id: number; title: string; content: string; updated_at: string | null };
 
-export async function getNotebook(profileId: number): Promise<Notebook> {
+const PAGE_COLUMNS = `id, title, content, updated_at`;
+
+export async function listNotebookPages(profileId: number): Promise<NotebookPage[]> {
   await ensureNotebookTable();
-  const row = await queryOne<Notebook>(`SELECT content, updated_at FROM notebooks WHERE profile_id = ?`, [profileId]);
-  return row ?? { content: "", updated_at: null };
+  const pages = await queryAll<NotebookPage>(
+    `SELECT ${PAGE_COLUMNS} FROM notebook_pages WHERE profile_id = ? ORDER BY position, id`,
+    [profileId],
+  );
+  if (pages.length) return pages;
+  // Premier passage : la page unique de l'ancien carnet (ou une page vide) devient « Notes ».
+  const old = await queryOne<{ content: string }>(`SELECT content FROM notebooks WHERE profile_id = ?`, [profileId]);
+  return [await createNotebookPage(profileId, "Notes", old?.content ?? "")];
 }
 
-export async function saveNotebook(profileId: number, content: string): Promise<string> {
+/** Page d'un profil, ou null si elle n'en fait pas partie. */
+export async function getNotebookPage(profileId: number, pageId: number): Promise<NotebookPage | null> {
   await ensureNotebookTable();
-  await execute(
-    `INSERT INTO notebooks (profile_id, content, updated_at) VALUES (?, ?, datetime('now'))
-     ON CONFLICT(profile_id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at`,
-    [profileId, content],
+  return queryOne<NotebookPage>(`SELECT ${PAGE_COLUMNS} FROM notebook_pages WHERE id = ? AND profile_id = ?`, [
+    pageId,
+    profileId,
+  ]);
+}
+
+export async function createNotebookPage(profileId: number, title: string, content = ""): Promise<NotebookPage> {
+  await ensureNotebookTable();
+  const info = await execute(
+    `INSERT INTO notebook_pages (profile_id, title, content, position)
+     VALUES (?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM notebook_pages WHERE profile_id = ?))`,
+    [profileId, title, content, profileId],
   );
-  const row = await queryOne<{ updated_at: string }>(`SELECT updated_at FROM notebooks WHERE profile_id = ?`, [profileId]);
-  return row?.updated_at ?? "";
+  return (await getNotebookPage(profileId, info.lastInsertRowid!))!;
+}
+
+export async function saveNotebookPage(profileId: number, pageId: number, content: string): Promise<string | null> {
+  await ensureNotebookTable();
+  const res = await execute(
+    `UPDATE notebook_pages SET content = ?, updated_at = datetime('now') WHERE id = ? AND profile_id = ?`,
+    [content, pageId, profileId],
+  );
+  if (!res.rowsAffected) return null;
+  return (await getNotebookPage(profileId, pageId))?.updated_at ?? "";
+}
+
+export async function renameNotebookPage(profileId: number, pageId: number, title: string): Promise<boolean> {
+  await ensureNotebookTable();
+  const res = await execute(`UPDATE notebook_pages SET title = ? WHERE id = ? AND profile_id = ?`, [title, pageId, profileId]);
+  return res.rowsAffected > 0;
+}
+
+export async function deleteNotebookPage(profileId: number, pageId: number): Promise<boolean> {
+  await ensureNotebookTable();
+  const res = await execute(`DELETE FROM notebook_pages WHERE id = ? AND profile_id = ?`, [pageId, profileId]);
+  return res.rowsAffected > 0;
 }

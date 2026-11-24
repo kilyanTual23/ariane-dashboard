@@ -14,7 +14,8 @@ export const CLAUDE_OCR_MODEL: string = "claude-haiku-5-5";
 /** Modèles qui acceptent la relance automatique sur un autre modèle en cas de refus (pas Haiku). */
 const SUPPORTS_FALLBACK = new Set(["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-2"]);
 
-export async function transcribeWithClaude(apiKey: string, prompt: string, jpegBase64: string): Promise<string> {
+/** Sans image (`jpegBase64` absent), le prompt seul : c’est l’analyse des notes prises par l’utilisateur. */
+export async function transcribeWithClaude(apiKey: string, prompt: string, jpegBase64?: string): Promise<string> {
   const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 2 });
 
   try {
@@ -31,8 +32,10 @@ export async function transcribeWithClaude(apiKey: string, prompt: string, jpegB
         {
           role: "user",
           content: [
-            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpegBase64 } },
-            { type: "text", text: prompt },
+            ...(jpegBase64
+              ? [{ type: "image" as const, source: { type: "base64" as const, media_type: "image/jpeg" as const, data: jpegBase64 } }]
+              : []),
+            { type: "text" as const, text: prompt },
           ],
         },
       ],

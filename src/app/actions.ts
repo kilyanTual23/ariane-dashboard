@@ -1674,16 +1674,66 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
  * Carnet : enregistrement silencieux pendant la frappe. Aucune revalidation de page,
  * pour ne jamais recharger l'écran sous les doigts de l'utilisateur.
  */
-export async function saveNotebookAction(input: {
+export async function saveNotebookPageAction(input: {
   profileId: number;
+  pageId: number;
   content: string;
 }): Promise<{ ok: boolean; updatedAt?: string; error?: string }> {
-  if (!input.profileId || typeof input.content !== "string") return { ok: false, error: "Carnet introuvable" };
-  if (input.content.length > 200_000) return { ok: false, error: "Le carnet est trop long (200 000 caractères au plus)" };
+  if (!input.profileId || !input.pageId || typeof input.content !== "string") return { ok: false, error: "Page introuvable" };
+  if (input.content.length > 200_000) return { ok: false, error: "La page est trop longue (200 000 caractères au plus)" };
   try {
     await ownedProfile(input.profileId);
-    const updatedAt = await q.saveNotebook(input.profileId, input.content);
+    const updatedAt = await q.saveNotebookPage(input.profileId, input.pageId, input.content);
+    if (updatedAt === null) return { ok: false, error: "Cette page a été supprimée" };
     return { ok: true, updatedAt };
+  } catch (err) {
+    unstable_rethrow(err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+const pageTitle = (t: string) => t.replace(/\s+/g, " ").trim().slice(0, 80);
+
+/** Nouvelle page du carnet (un onglet). */
+export async function createNotebookPageAction(input: {
+  profileId: number;
+  title: string;
+  content?: string;
+}): Promise<{ ok: boolean; page?: q.NotebookPage; error?: string }> {
+  const title = pageTitle(input.title ?? "");
+  if (!input.profileId || !title) return { ok: false, error: "Donnez un nom à la page" };
+  try {
+    await ownedProfile(input.profileId);
+    return { ok: true, page: await q.createNotebookPage(input.profileId, title, input.content ?? "") };
+  } catch (err) {
+    unstable_rethrow(err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function renameNotebookPageAction(input: {
+  profileId: number;
+  pageId: number;
+  title: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const title = pageTitle(input.title ?? "");
+  if (!input.profileId || !input.pageId || !title) return { ok: false, error: "Donnez un nom à la page" };
+  try {
+    await ownedProfile(input.profileId);
+    return (await q.renameNotebookPage(input.profileId, input.pageId, title))
+      ? { ok: true }
+      : { ok: false, error: "Page introuvable" };
+  } catch (err) {
+    unstable_rethrow(err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function deleteNotebookPageAction(input: { profileId: number; pageId: number }): Promise<{ ok: boolean; error?: string }> {
+  if (!input.profileId || !input.pageId) return { ok: false, error: "Page introuvable" };
+  try {
+    await ownedProfile(input.profileId);
+    return (await q.deleteNotebookPage(input.profileId, input.pageId)) ? { ok: true } : { ok: false, error: "Page introuvable" };
   } catch (err) {
     unstable_rethrow(err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };

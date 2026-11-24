@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import { saveNotebookAction } from "@/app/actions";
+import {
+  createNotebookPageAction,
+  deleteNotebookPageAction,
+  renameNotebookPageAction,
+  saveNotebookPageAction,
+} from "@/app/actions";
 import {
   IconArrowUpRight,
   IconBookOpen,
@@ -14,11 +19,14 @@ import {
   IconLink,
   IconMaximize,
   IconMinimize,
+  IconPlus,
+  IconSparkles,
   IconX,
   Spinner,
 } from "@/components/icons";
 import { errorMessage, useToast } from "@/components/Toast";
 import { buttonClass, Kbd } from "@/components/ui";
+import type { NotebookPage } from "@/lib/queries";
 import { MOBILE_QUERY, useIsMobile, useKeyboardInset } from "@/lib/use-media";
 
 /*
@@ -26,6 +34,8 @@ import { MOBILE_QUERY, useIsMobile, useKeyboardInset } from "@/lib/use-media";
  * messagerie. Replié, ce n'est qu'un onglet ; un clic sur l'en-tête le fait monter
  * ou descendre, et la page reste visible et utilisable derrière.
  * Tout s'enregistre seul pendant la frappe, sur tous les appareils.
+ * Plusieurs pages, en onglets : une par recherche, par branche, par acte en cours de lecture…
+ * Quand un acte est ouvert dans la visionneuse, une page peut remplir sa fiche (l'IA range les notes).
  */
 
 /* ---------------------------------------------------- état d'affichage */
@@ -98,6 +108,44 @@ function useFullscreenHost() {
   );
 }
 
+/* ------------------------------------------- lien avec la visionneuse */
+
+/**
+ * Acte ouvert dans la visionneuse : le carnet propose alors de remplir sa fiche avec une page.
+ * `sidePanel` : le panneau de transcription occupe la droite ; le carnet se range à sa gauche
+ * pour ne pas couvrir le bouton qui reporte les champs dans la fiche.
+ */
+export type NotebookAct = { title: string; sidePanel?: boolean };
+
+/** Largeur du panneau de transcription de la visionneuse (voir ActViewerModal). */
+export const VIEWER_PANEL_WIDTH = "min(40rem, 94vw)";
+
+const ACT_EVENT = "ariane-notebook-act";
+/** Le carnet demande à la visionneuse de remplir la fiche avec ces notes. */
+export const FILL_EVENT = "ariane-notebook-fill";
+const OPEN_PAGE_EVENT = "ariane-notebook-open-page";
+
+let currentAct: NotebookAct | null = null;
+
+function subscribeAct(onChange: () => void) {
+  window.addEventListener(ACT_EVENT, onChange);
+  return () => window.removeEventListener(ACT_EVENT, onChange);
+}
+
+export function setNotebookAct(act: NotebookAct | null) {
+  currentAct = act;
+  window.dispatchEvent(new Event(ACT_EVENT));
+}
+
+function useNotebookAct() {
+  return useSyncExternalStore(subscribeAct, () => currentAct, () => null);
+}
+
+/** Ouvre le carnet sur la page de ce nom (créée si besoin) : la page de lecture d'un acte. */
+export function openNotebookPage(title: string) {
+  window.dispatchEvent(new CustomEvent(OPEN_PAGE_EVENT, { detail: { title } }));
+}
+
 /* ------------------------------------------------------------- outils */
 
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -144,54 +192,80 @@ function preview(text: string) {
 
 /* ------------------------------------------------------------- carnet */
 
-export function Notebook({
-  profileId,
-  initialContent,
-  initialUpdatedAt,
-}: {
-  profileId: number;
-  initialContent: string;
-  initialUpdatedAt: string | null;
-}) {
+const PAGE_KEY = "ariane-notebook-page";
+
+function readActivePage(pages: NotebookPage[]): number {
+  try {
+    const id = Number(localStorage.getItem(PAGE_KEY));
+    if (pages.some((p) => p.id === id)) return id;
+  } catch {}
+  return pages[0]?.id ?? 0;
+}
+
+export function Notebook({ profileId, initialPages }: { profileId: number; initialPages: NotebookPage[] }) {
   const state = useNotebookState();
   const mobile = useIsMobile();
   const keyboard = useKeyboardInset();
   const fullscreenHost = useFullscreenHost();
+  const act = useNotebookAct();
   const toast = useToast();
 
-  const [text, setText] = useState(initialContent);
-  const [savedAt, setSavedAt] = useState(initialUpdatedAt);
+  const [pages, setPages] = useState(initialPages);
+  const [activeId, setActiveId] = useState(() => (typeof window === "undefined" ? (initialPages[0]?.id ?? 0) : readActivePage(initialPages)));
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [tall, setTall] = useState(false);
+  const [renaming, setRenaming] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [, startTransition] = useTransition();
   const area = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latest = useRef(text);
+  /** Dernier texte tapé, et sa page : c'est lui qu'on enregistre. */
+  const latest = useRef<{ pageId: number; content: string } | null>(null);
   const drag = useRef<{ y: number; dy: number; moved: boolean } | null>(null);
   const panel = useRef<HTMLDivElement>(null);
 
-  // Une version plus récente arrive du serveur (autre appareil) : on la prend si rien n'est en cours.
-  const [lastInitial, setLastInitial] = useState(initialUpdatedAt);
-  if (initialUpdatedAt !== lastInitial) {
-    setLastInitial(initialUpdatedAt);
-    if (status === "saved" && initialUpdatedAt && (!savedAt || initialUpdatedAt > savedAt)) {
-      setText(initialContent);
-      setSavedAt(initialUpdatedAt);
+  const page = pages.find((p) => p.id === activeId) ?? pages[0];
+  const text = page?.content ?? "";
+  const savedAt = page?.updated_at ?? null;
+
+  // Des pages plus récentes arrivent du serveur (autre appareil) : on les prend si rien n'est en cours.
+  const [lastInitial, setLastInitial] = useState(initialPages);
+  if (initialPages !== lastInitial) {
+    setLastInitial(initialPages);
+    if (status === "saved") {
+      setPages((local) =>
+        initialPages.map((srv) => {
+          const mine = local.find((p) => p.id === srv.id);
+          return mine && mine.updated_at && (!srv.updated_at || mine.updated_at >= srv.updated_at) ? mine : srv;
+        }),
+      );
     }
   }
 
-  const save = (content: string) => {
+  const selectPage = (id: number) => {
+    flush();
+    setActiveId(id);
+    setConfirmDelete(null);
+    try {
+      localStorage.setItem(PAGE_KEY, String(id));
+    } catch {}
+  };
+
+  const setPageFields = (id: number, fields: Partial<NotebookPage>) =>
+    setPages((ps) => ps.map((p) => (p.id === id ? { ...p, ...fields } : p)));
+
+  const save = (pageId: number, content: string) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     setStatus("saving");
     startTransition(async () => {
       try {
-        const res = await saveNotebookAction({ profileId, content });
+        const res = await saveNotebookPageAction({ profileId, pageId, content });
         if (!res.ok) throw new Error(res.error);
         // Si l'on a retapé pendant l'enregistrement, la prochaine sauvegarde suivra.
-        if (latest.current === content) {
+        if (latest.current?.pageId === pageId && latest.current.content === content) {
           setStatus("saved");
-          setSavedAt(res.updatedAt ?? null);
+          setPageFields(pageId, { updated_at: res.updatedAt ?? null });
         }
       } catch (err) {
         setStatus("error");
@@ -201,16 +275,18 @@ export function Notebook({
   };
 
   const change = (value: string) => {
-    setText(value);
-    latest.current = value;
+    if (!page) return;
+    const pageId = page.id;
+    setPageFields(pageId, { content: value });
+    latest.current = { pageId, content: value };
     setStatus("dirty");
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => save(value), 700);
+    timer.current = setTimeout(() => save(pageId, value), 700);
   };
 
-  // Rien ne se perd : enregistrement immédiat en repliant, avertissement si l'on quitte trop tôt.
+  // Rien ne se perd : enregistrement immédiat en repliant ou en changeant de page, avertissement si l'on quitte trop tôt.
   const flush = () => {
-    if (timer.current) save(latest.current);
+    if (timer.current && latest.current) save(latest.current.pageId, latest.current.content);
   };
   useEffect(() => {
     const onLeave = (e: BeforeUnloadEvent) => {
@@ -231,6 +307,92 @@ export function Notebook({
   const closeAll = () => {
     flush();
     setNotebookState("closed");
+  };
+
+  /* ---- pages ---- */
+
+  const addPage = async (title: string, focusRename = false): Promise<NotebookPage | null> => {
+    flush();
+    const res = await createNotebookPageAction({ profileId, title });
+    if (!res.ok || !res.page) {
+      toast.error("Page non créée", res.error ?? "");
+      return null;
+    }
+    const created = res.page;
+    setPages((ps) => [...ps, created]);
+    selectPage(created.id);
+    if (focusRename) setRenaming(created.id);
+    else requestAnimationFrame(() => area.current?.focus({ preventScroll: true }));
+    return created;
+  };
+
+  const renamePage = (id: number, raw: string) => {
+    setRenaming(null);
+    const title = raw.replace(/\s+/g, " ").trim();
+    const before = pages.find((p) => p.id === id)?.title;
+    if (!title || title === before) return;
+    setPageFields(id, { title });
+    startTransition(async () => {
+      const res = await renameNotebookPageAction({ profileId, pageId: id, title });
+      if (!res.ok) {
+        setPageFields(id, { title: before });
+        toast.error("Page non renommée", res.error ?? "");
+      }
+    });
+  };
+
+  const removePage = (id: number) => {
+    const target = pages.find((p) => p.id === id);
+    if (!target || pages.length < 2) return;
+    // Une page écrite se supprime en deux clics ; une page vide, tout de suite.
+    if (target.content.trim() && confirmDelete !== id) {
+      setConfirmDelete(id);
+      return;
+    }
+    setConfirmDelete(null);
+    if (latest.current?.pageId === id && timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+      setStatus("saved");
+    }
+    const rest = pages.filter((p) => p.id !== id);
+    setPages(rest);
+    if (activeId === id) selectPage(rest[Math.max(0, pages.indexOf(target) - 1)].id);
+    startTransition(async () => {
+      const res = await deleteNotebookPageAction({ profileId, pageId: id });
+      if (!res.ok) {
+        setPages(pages);
+        toast.error("Page non supprimée", res.error ?? "");
+      }
+    });
+  };
+
+  // La visionneuse demande la page de lecture d'un acte : on la retrouve par son nom, ou on la crée.
+  // (Réabonné à chaque rendu : l'écouteur voit toujours les pages à jour.)
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const title = (e as CustomEvent<{ title: string }>).detail?.title;
+      if (!title) return;
+      setNotebookState("expanded");
+      const found = pages.find((p) => p.title === title);
+      if (!found) return void addPage(title);
+      selectPage(found.id);
+      requestAnimationFrame(() => area.current?.focus({ preventScroll: true }));
+    };
+    window.addEventListener(OPEN_PAGE_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_PAGE_EVENT, onOpen);
+  });
+
+  /** Remplir la fiche de l'acte ouvert : la sélection si l'on en a fait une, sinon toute la page. */
+  const fillAct = () => {
+    const el = area.current;
+    const selected = el && el.selectionEnd > el.selectionStart ? text.slice(el.selectionStart, el.selectionEnd) : "";
+    const notes = (selected || text).trim();
+    if (!notes) return;
+    flush();
+    window.dispatchEvent(new CustomEvent(FILL_EVENT, { detail: { notes } }));
+    // Replié, il laisse voir les champs remplis à vérifier dans la visionneuse.
+    setNotebookState("collapsed");
   };
 
   /** Insère un texte au curseur et garde la frappe là où elle était. */
@@ -267,7 +429,7 @@ export function Notebook({
     ) : status === "dirty" ? (
       "Modifications en cours…"
     ) : status === "error" ? (
-      <button type="button" onClick={() => save(latest.current)} className="font-medium text-danger underline-offset-4 hover:underline">
+      <button type="button" onClick={() => latest.current && save(latest.current.pageId, latest.current.content)} className="font-medium text-danger underline-offset-4 hover:underline">
         Non enregistré · réessayer
       </button>
     ) : savedAt ? (
@@ -276,11 +438,11 @@ export function Notebook({
       "Enregistrement automatique"
     );
 
-  const pages = citedPages(text);
+  const links = citedPages(text);
   const cited =
-    pages.length > 0 ? (
+    links.length > 0 ? (
       <nav aria-label="Pages citées" className="flex shrink-0 gap-1.5 overflow-x-auto border-t border-border px-3 py-2">
-        {pages.map((p) => (
+        {links.map((p) => (
           <Link
             key={p.href}
             href={p.href}
@@ -311,8 +473,12 @@ export function Notebook({
         }
       }}
       spellCheck
-      placeholder={"Hypothèses, pistes, cotes à vérifier, questions à poser…\n\nTout s’enregistre automatiquement, sur tous vos appareils."}
-      aria-label="Carnet de notes"
+      placeholder={
+        act
+          ? "Lisez l’acte et notez ce que vous y voyez : date, lieu, parents, âges, parrains… Abréviations et désordre permis.\n\nPuis « Remplir la fiche » : l’IA range vos notes dans les champs, sans rien inventer."
+          : "Hypothèses, pistes, cotes à vérifier, questions à poser…\n\nTout s’enregistre automatiquement, sur tous vos appareils."
+      }
+      aria-label={page ? `Carnet, page ${page.title}` : "Carnet de notes"}
       className="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3 text-[0.9375rem] leading-relaxed text-fg outline-none placeholder:text-fg-subtle"
     />
   );
@@ -339,6 +505,95 @@ export function Notebook({
     </div>
   );
 
+  /** Onglets : une page par sujet. Double-clic pour renommer. */
+  const tabs = (
+    <div className="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border px-2 py-1.5" role="tablist" aria-label="Pages du carnet">
+      {pages.map((p) => {
+        const active = p.id === page?.id;
+        if (renaming === p.id) {
+          return (
+            <input
+              key={p.id}
+              autoFocus
+              defaultValue={p.title}
+              maxLength={80}
+              onFocus={(e) => e.currentTarget.select()}
+              onBlur={(e) => renamePage(p.id, e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") setRenaming(null);
+              }}
+              aria-label="Nom de la page"
+              className="h-7 w-36 shrink-0 rounded-md border border-border-strong bg-surface px-2 text-xs text-fg outline-none"
+            />
+          );
+        }
+        return (
+          <div
+            key={p.id}
+            className={`group/tab flex h-7 max-w-44 shrink-0 items-center rounded-md text-xs transition-colors ${
+              active ? "bg-surface-2 font-medium text-fg" : "text-fg-muted hover:bg-surface-2/60 hover:text-fg"
+            }`}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => (active ? setRenaming(p.id) : selectPage(p.id))}
+              onDoubleClick={() => setRenaming(p.id)}
+              title={active ? "Renommer la page" : p.title}
+              className="h-full min-w-0 truncate px-2"
+            >
+              {p.title}
+            </button>
+            {active && pages.length > 1 && (
+              <button
+                type="button"
+                onClick={() => removePage(p.id)}
+                onBlur={() => setConfirmDelete(null)}
+                className={`mr-0.5 flex h-5 shrink-0 items-center justify-center rounded px-1 transition-colors ${
+                  confirmDelete === p.id ? "bg-danger-soft text-danger" : "text-fg-subtle hover:bg-surface hover:text-fg"
+                }`}
+                title="Supprimer la page"
+                aria-label={confirmDelete === p.id ? "Confirmer la suppression de la page" : "Supprimer la page"}
+              >
+                {confirmDelete === p.id ? <span className="text-2xs font-medium">Supprimer ?</span> : <IconX size={11} />}
+              </button>
+            )}
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => void addPage(`Page ${pages.length + 1}`, true)}
+        className={buttonClass("quiet", "shrink-0", "icon-sm")}
+        title="Nouvelle page"
+        aria-label="Nouvelle page"
+      >
+        <IconPlus size={14} />
+      </button>
+    </div>
+  );
+
+  /** Un acte est ouvert dans la visionneuse : la page peut remplir sa fiche. */
+  const fillBar = act ? (
+    <div className="flex shrink-0 items-center gap-2 border-t border-border bg-accent-soft/40 px-3 py-2">
+      <span className="min-w-0 flex-1 truncate text-2xs text-fg-muted" title={act.title}>
+        {act.title}
+      </span>
+      <button
+        type="button"
+        onClick={fillAct}
+        disabled={!text.trim()}
+        className={buttonClass("primary", "shrink-0", "sm")}
+        title="L’IA range les notes de cette page (ou le passage sélectionné) dans les champs de la fiche"
+      >
+        <IconSparkles size={13} />
+        Remplir la fiche
+      </button>
+    </div>
+  ) : null;
+
   /** En-tête : on clique pour monter ou descendre le carnet. */
   const header = (
     <div
@@ -359,7 +614,7 @@ export function Notebook({
       <IconBookOpen size={15} className="shrink-0 text-accent-text" />
       <span className="text-ui font-semibold">Carnet</span>
       <span className="min-w-0 flex-1 truncate text-2xs text-fg-subtle">
-        {expanded ? statusLabel : preview(text) || "Noter une idée…"}
+        {expanded ? statusLabel : (pages.length > 1 && page ? `${page.title} · ` : "") + (preview(text) || "Noter une idée…")}
       </span>
       {expanded && tools}
       <span className={buttonClass("quiet", "pointer-events-none", "icon-sm")} aria-hidden>
@@ -439,8 +694,10 @@ export function Notebook({
         {header}
         {expanded && (
           <>
+            {tabs}
             {editor}
             {cited}
+            {fillBar}
           </>
         )}
         {expanded && <div className="pb-safe shrink-0" />}
@@ -453,17 +710,20 @@ export function Notebook({
     <div
       role="complementary"
       aria-label="Carnet"
-      className="fixed bottom-0 right-6 z-[60] hidden w-[22.5rem] flex-col overflow-hidden rounded-t-xl border border-b-0 border-border bg-surface shadow-pop lg:flex"
+      className="fixed bottom-0 z-[60] hidden w-[22.5rem] flex-col overflow-hidden rounded-t-xl border border-b-0 border-border bg-surface shadow-pop lg:flex"
       style={{
+        right: act?.sidePanel ? `calc(${VIEWER_PANEL_WIDTH} + 1.5rem)` : "1.5rem",
         height: expanded ? (tall ? "calc(100dvh - 4rem)" : "min(30rem, calc(100dvh - 4rem))") : "2.75rem",
-        transition: "height 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+        transition: "height 260ms cubic-bezier(0.32, 0.72, 0, 1), right 260ms cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
       {header}
       {expanded && (
         <>
+          {tabs}
           {editor}
           {cited}
+          {fillBar}
           <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-4 py-2 text-2xs text-fg-subtle">
             <span className="flex items-center gap-1">
               <Kbd>Ctrl</Kbd>

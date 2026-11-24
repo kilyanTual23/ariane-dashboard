@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/AppShell";
 import type { GlobalSearchItem } from "@/components/CommandPalette";
-import { getNotebook, getProfileBySlug, listPersons, listProfiles, listTasks } from "@/lib/queries";
+import { listNotebookPages, getProfileBySlug, listPersons, listProfiles, listTasks } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +12,12 @@ export default async function ProfileLayout({ children, params }: LayoutProps<"/
   const profile = await getProfileBySlug(slug);
   if (!profile) notFound();
 
-  const [profiles, allTasks, persons, cookieStore, notebook] = await Promise.all([
+  const [profiles, allTasks, persons, cookieStore, notebookPages] = await Promise.all([
     listProfiles(),
     listTasks(profile.id),
     listPersons(profile.id),
     cookies(),
-    getNotebook(profile.id),
+    listNotebookPages(profile.id),
   ]);
   const openTasks = allTasks.filter((t) => t.status === "À faire" || t.status === "En cours").length;
 
@@ -47,7 +47,7 @@ export default async function ProfileLayout({ children, params }: LayoutProps<"/
       personCount={persons.length}
       openTasks={openTasks}
       initialCollapsed={cookieStore.get("ariane-sidebar")?.value === "collapsed"}
-      notebook={notebook}
+      notebookPages={notebookPages}
     >
       {children}
     </AppShell>
