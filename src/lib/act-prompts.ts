@@ -176,6 +176,11 @@ RÈGLES SUR LES NOTES :
 - Les parrain et marraine, témoins et officiers ne sont ni le père, ni la mère, ni le conjoint.
 - Si une date est écrite en chiffres (12/03/1742), réécris-la en toutes lettres (12 mars 1742).
 - Si un mot reste incertain dans les notes (point d'interrogation, « illisible »), garde-le tel quel avec le « ? ».
+- Les notes peuvent contenir des informations venues d'autres actes ou de recherches (ex. « père † 12/05/1790 à Dinan », « mère décédée en 1801 »). Reporte-les AUSSI, même si elles sont postérieures à l'acte :
+  décès du père → "father_death_date_raw" / "father_death_place" et "father_is_deceased": true ;
+  décès de la mère → "mother_death_date_raw" / "mother_death_place" et "mother_is_deceased": true ;
+  décès des parents du conjoint (ou de l'épouse) → "spouse_father_death_date_raw" / "spouse_father_death_place", "spouse_mother_death_date_raw" / "spouse_mother_death_place", avec le "…_is_deceased": true correspondant.
+  Une date de naissance ou de décès notée pour une personne va dans SES champs, jamais dans ceux du sujet.
 
 ${RULES}
 RÈGLE SUR LES CITATIONS SOURCES :

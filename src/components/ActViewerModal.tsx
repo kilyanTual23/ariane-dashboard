@@ -217,6 +217,10 @@ export function ActViewerModal({
   const [fieldSpouseMother, setFieldSpouseMother] = useState("");
   const [fieldSpouseMotherOccupation, setFieldSpouseMotherOccupation] = useState("");
   const [spouseMotherIsDeceased, setSpouseMotherIsDeceased] = useState(false);
+  const [fieldSpouseFatherDeathDate, setFieldSpouseFatherDeathDate] = useState("");
+  const [fieldSpouseFatherDeathPlace, setFieldSpouseFatherDeathPlace] = useState("");
+  const [fieldSpouseMotherDeathDate, setFieldSpouseMotherDeathDate] = useState("");
+  const [fieldSpouseMotherDeathPlace, setFieldSpouseMotherDeathPlace] = useState("");
 
   // Sélection des cases à valider dans l'Avant / Après
   const [selectedFieldKeys, setSelectedFieldKeys] = useState<Set<string>>(new Set());
@@ -454,6 +458,20 @@ export function ActViewerModal({
       setSpouseMotherIsDeceased(dec);
       newKeys.add("spouse_mother_status");
     }
+    // Décès des parents du conjoint : une date ou un lieu de décès vaut « décédé ».
+    for (const [date, place, setDate, setPlace, setDec, k] of [
+      [parsed.spouse_father_death_date_raw, parsed.spouse_father_death_place, setFieldSpouseFatherDeathDate, setFieldSpouseFatherDeathPlace, setSpouseFatherIsDeceased, "spouse_father"],
+      [parsed.spouse_mother_death_date_raw, parsed.spouse_mother_death_place, setFieldSpouseMotherDeathDate, setFieldSpouseMotherDeathPlace, setSpouseMotherIsDeceased, "spouse_mother"],
+    ] as const) {
+      setDate(date || "");
+      setPlace(place || "");
+      if (date) newKeys.add(`${k}_death_date`);
+      if (place) newKeys.add(`${k}_death_place`);
+      if (date || place) {
+        setDec(true);
+        newKeys.add(`${k}_status`);
+      }
+    }
 
     // De base tout décocher : l'utilisateur sélectionne ce qu'il souhaite ajouter
     setSelectedFieldKeys(new Set());
@@ -506,9 +524,13 @@ export function ActViewerModal({
         return s["spouse"] || s["bride"] || s["bride_name"] || s["marginal_marriage_spouse"];
       case "spouse_father":
       case "spouse_father_status":
+      case "spouse_father_death_date":
+      case "spouse_father_death_place":
         return s["spouse_father"] || s["bride_father"];
       case "spouse_mother":
       case "spouse_mother_status":
+      case "spouse_mother_death_date":
+      case "spouse_mother_death_place":
         return s["spouse_mother"] || s["bride_mother"];
       default:
         return s[key];
@@ -548,6 +570,10 @@ export function ActViewerModal({
       case "spouse_father": return "Père du conjoint";
       case "spouse_father_occupation": return "Profession père conjoint";
       case "spouse_father_status": return "État père conjoint";
+      case "spouse_father_death_date": return "Date de décès père conjoint";
+      case "spouse_father_death_place": return "Lieu de décès père conjoint";
+      case "spouse_mother_death_date": return "Date de décès mère conjoint";
+      case "spouse_mother_death_place": return "Lieu de décès mère conjoint";
       case "spouse_mother": return "Mère du conjoint";
       case "spouse_mother_occupation": return "Profession mère conjoint";
       case "spouse_mother_status": return "État mère conjoint";
@@ -1347,6 +1373,8 @@ export function ActViewerModal({
       }
       if (selectedFieldKeys.has("spouse_father_occupation") && fieldSpouseFatherOccupation.trim()) fd.append("spouse_father_occupation", fieldSpouseFatherOccupation.trim());
       if (selectedFieldKeys.has("spouse_father_status")) fd.append("spouse_father_is_deceased", spouseFatherIsDeceased ? "1" : "0");
+      if (selectedFieldKeys.has("spouse_father_death_date") && fieldSpouseFatherDeathDate.trim()) fd.append("spouse_father_death_date_raw", fieldSpouseFatherDeathDate.trim());
+      if (selectedFieldKeys.has("spouse_father_death_place") && fieldSpouseFatherDeathPlace.trim()) fd.append("spouse_father_death_place", fieldSpouseFatherDeathPlace.trim());
 
       if (fieldSpouseMother.trim()) {
         const smParts = splitFullName(fieldSpouseMother.trim());
@@ -1357,6 +1385,8 @@ export function ActViewerModal({
       }
       if (selectedFieldKeys.has("spouse_mother_occupation") && fieldSpouseMotherOccupation.trim()) fd.append("spouse_mother_occupation", fieldSpouseMotherOccupation.trim());
       if (selectedFieldKeys.has("spouse_mother_status")) fd.append("spouse_mother_is_deceased", spouseMotherIsDeceased ? "1" : "0");
+      if (selectedFieldKeys.has("spouse_mother_death_date") && fieldSpouseMotherDeathDate.trim()) fd.append("spouse_mother_death_date_raw", fieldSpouseMotherDeathDate.trim());
+      if (selectedFieldKeys.has("spouse_mother_death_place") && fieldSpouseMotherDeathPlace.trim()) fd.append("spouse_mother_death_place", fieldSpouseMotherDeathPlace.trim());
 
       if (selectedFieldKeys.has("marriage_date") && fieldMarriageDate.trim()) fd.append("marriage_date_raw", fieldMarriageDate.trim());
       if (selectedFieldKeys.has("marriage_place") && fieldMarriagePlace.trim()) fd.append("marriage_place", fieldMarriagePlace.trim());
@@ -2070,19 +2100,27 @@ export function ActViewerModal({
                         "father_status",
                         "father_birth_date",
                         "father_birth_place",
+                        "father_death_date",
+                        "father_death_place",
                         "mother",
                         "mother_occupation",
                         "mother_status",
                         "mother_birth_date",
                         "mother_birth_place",
+                        "mother_death_date",
+                        "mother_death_place",
                         "spouse",
                         "spouse_occupation",
                         "spouse_birth_date",
                         "spouse_birth_place",
                         "spouse_father",
                         "spouse_father_status",
+                        "spouse_father_death_date",
+                        "spouse_father_death_place",
                         "spouse_mother",
                         "spouse_mother_status",
+                        "spouse_mother_death_date",
+                        "spouse_mother_death_place",
                       ]
                     : actKind === "birth"
                     ? [
@@ -2170,6 +2208,18 @@ export function ActViewerModal({
                     if (Boolean(currentContext?.union?.partner2Father?.is_living === 0) !== spouseFatherIsDeceased) totalChangesCount++;
                     if (isTextDiff(currentContext?.union?.partner2Mother?.displayName, fieldSpouseMother)) totalChangesCount++;
                     if (Boolean(currentContext?.union?.partner2Mother?.is_living === 0) !== spouseMotherIsDeceased) totalChangesCount++;
+                    for (const [cur, val] of [
+                      [currentContext?.union?.partner1Father?.death_date_raw || currentContext?.person?.father?.death_date_raw, fieldFatherDeathDate],
+                      [currentContext?.union?.partner1Father?.death_place || currentContext?.person?.father?.death_place, fieldFatherDeathPlace],
+                      [currentContext?.union?.partner1Mother?.death_date_raw || currentContext?.person?.mother?.death_date_raw, fieldMotherDeathDate],
+                      [currentContext?.union?.partner1Mother?.death_place || currentContext?.person?.mother?.death_place, fieldMotherDeathPlace],
+                      [currentContext?.union?.partner2Father?.death_date_raw, fieldSpouseFatherDeathDate],
+                      [currentContext?.union?.partner2Father?.death_place, fieldSpouseFatherDeathPlace],
+                      [currentContext?.union?.partner2Mother?.death_date_raw, fieldSpouseMotherDeathDate],
+                      [currentContext?.union?.partner2Mother?.death_place, fieldSpouseMotherDeathPlace],
+                    ] as const) {
+                      if (isTextDiff(cur, val)) totalChangesCount++;
+                    }
                   } else if (actKind === "birth") {
                     if (isTextDiff(currentContext?.person?.birth_date_raw, fieldBirthDate || fieldDate)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.birth_place, fieldBirthPlace || fieldPlace)) totalChangesCount++;
@@ -2182,15 +2232,15 @@ export function ActViewerModal({
                     if (Boolean(currentContext?.person?.father?.is_living === 0) !== fatherIsDeceased) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.father?.birth_date_raw, fieldFatherBirthDate)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.father?.birth_place, fieldFatherBirthPlace)) totalChangesCount++;
-                    if (isTextDiff(null, fieldFatherDeathDate)) totalChangesCount++;
-                    if (isTextDiff(null, fieldFatherDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.death_date_raw, fieldFatherDeathDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.death_place, fieldFatherDeathPlace)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.mother?.displayName, fieldMother)) totalChangesCount++;
                     if (isTextDiff(null, fieldMotherOccupation)) totalChangesCount++;
                     if (Boolean(currentContext?.person?.mother?.is_living === 0) !== motherIsDeceased) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.mother?.birth_date_raw, fieldMotherBirthDate)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.mother?.birth_place, fieldMotherBirthPlace)) totalChangesCount++;
-                    if (isTextDiff(null, fieldMotherDeathDate)) totalChangesCount++;
-                    if (isTextDiff(null, fieldMotherDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.death_date_raw, fieldMotherDeathDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.death_place, fieldMotherDeathPlace)) totalChangesCount++;
                     if (isTextDiff(currentContext?.union?.partner2?.displayName, fieldSpouse)) totalChangesCount++;
                     if (isTextDiff(currentContext?.union?.date_raw, fieldMarriageDate)) totalChangesCount++;
                     if (isTextDiff(currentContext?.union?.place, fieldMarriagePlace)) totalChangesCount++;
@@ -2206,15 +2256,15 @@ export function ActViewerModal({
                     if (Boolean(currentContext?.person?.father?.is_living === 0) !== fatherIsDeceased) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.father?.birth_date_raw, fieldFatherBirthDate)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.father?.birth_place, fieldFatherBirthPlace)) totalChangesCount++;
-                    if (isTextDiff(null, fieldFatherDeathDate)) totalChangesCount++;
-                    if (isTextDiff(null, fieldFatherDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.death_date_raw, fieldFatherDeathDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.father?.death_place, fieldFatherDeathPlace)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.mother?.displayName, fieldMother)) totalChangesCount++;
                     if (isTextDiff(null, fieldMotherOccupation)) totalChangesCount++;
                     if (Boolean(currentContext?.person?.mother?.is_living === 0) !== motherIsDeceased) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.mother?.birth_date_raw, fieldMotherBirthDate)) totalChangesCount++;
                     if (isTextDiff(currentContext?.person?.mother?.birth_place, fieldMotherBirthPlace)) totalChangesCount++;
-                    if (isTextDiff(null, fieldMotherDeathDate)) totalChangesCount++;
-                    if (isTextDiff(null, fieldMotherDeathPlace)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.death_date_raw, fieldMotherDeathDate)) totalChangesCount++;
+                    if (isTextDiff(currentContext?.person?.mother?.death_place, fieldMotherDeathPlace)) totalChangesCount++;
                     if (isTextDiff(currentContext?.union?.partner2?.displayName, fieldSpouse)) totalChangesCount++;
                     if (isTextDiff(currentContext?.union?.date_raw, fieldMarriageDate)) totalChangesCount++;
                     if (isTextDiff(currentContext?.union?.place, fieldMarriagePlace)) totalChangesCount++;
@@ -2552,6 +2602,20 @@ export function ActViewerModal({
                               fieldFatherBirthPlace,
                               setFieldFatherBirthPlace
                             ) : null,
+                            fieldFatherDeathDate ? renderFieldCard(
+                              "father_death_date",
+                              "Date décès père époux",
+                              currentContext?.union?.partner1Father?.death_date_raw || currentContext?.person?.father?.death_date_raw,
+                              fieldFatherDeathDate,
+                              setFieldFatherDeathDate
+                            ) : null,
+                            fieldFatherDeathPlace ? renderFieldCard(
+                              "father_death_place",
+                              "Lieu décès père époux",
+                              currentContext?.union?.partner1Father?.death_place || currentContext?.person?.father?.death_place,
+                              fieldFatherDeathPlace,
+                              setFieldFatherDeathPlace
+                            ) : null,
                             renderFieldCard(
                               "mother",
                               "Mère de l'époux",
@@ -2586,6 +2650,20 @@ export function ActViewerModal({
                               currentContext?.union?.partner1Mother?.birth_place || currentContext?.person?.mother?.birth_place,
                               fieldMotherBirthPlace,
                               setFieldMotherBirthPlace
+                            ) : null,
+                            fieldMotherDeathDate ? renderFieldCard(
+                              "mother_death_date",
+                              "Date décès mère époux",
+                              currentContext?.union?.partner1Mother?.death_date_raw || currentContext?.person?.mother?.death_date_raw,
+                              fieldMotherDeathDate,
+                              setFieldMotherDeathDate
+                            ) : null,
+                            fieldMotherDeathPlace ? renderFieldCard(
+                              "mother_death_place",
+                              "Lieu décès mère époux",
+                              currentContext?.union?.partner1Mother?.death_place || currentContext?.person?.mother?.death_place,
+                              fieldMotherDeathPlace,
+                              setFieldMotherDeathPlace
                             ) : null,
                           ])}
 
@@ -2637,6 +2715,20 @@ export function ActViewerModal({
                               spouseFatherIsDeceased,
                               setSpouseFatherIsDeceased
                             ),
+                            fieldSpouseFatherDeathDate ? renderFieldCard(
+                              "spouse_father_death_date",
+                              "Date décès père épouse",
+                              currentContext?.union?.partner2Father?.death_date_raw,
+                              fieldSpouseFatherDeathDate,
+                              setFieldSpouseFatherDeathDate
+                            ) : null,
+                            fieldSpouseFatherDeathPlace ? renderFieldCard(
+                              "spouse_father_death_place",
+                              "Lieu décès père épouse",
+                              currentContext?.union?.partner2Father?.death_place,
+                              fieldSpouseFatherDeathPlace,
+                              setFieldSpouseFatherDeathPlace
+                            ) : null,
                             renderFieldCard(
                               "spouse_mother",
                               "Mère de l'épouse",
@@ -2651,6 +2743,20 @@ export function ActViewerModal({
                               spouseMotherIsDeceased,
                               setSpouseMotherIsDeceased
                             ),
+                            fieldSpouseMotherDeathDate ? renderFieldCard(
+                              "spouse_mother_death_date",
+                              "Date décès mère épouse",
+                              currentContext?.union?.partner2Mother?.death_date_raw,
+                              fieldSpouseMotherDeathDate,
+                              setFieldSpouseMotherDeathDate
+                            ) : null,
+                            fieldSpouseMotherDeathPlace ? renderFieldCard(
+                              "spouse_mother_death_place",
+                              "Lieu décès mère épouse",
+                              currentContext?.union?.partner2Mother?.death_place,
+                              fieldSpouseMotherDeathPlace,
+                              setFieldSpouseMotherDeathPlace
+                            ) : null,
                           ])}
                         </div>
                       ) : (

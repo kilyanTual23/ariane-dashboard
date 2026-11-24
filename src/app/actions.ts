@@ -743,6 +743,34 @@ export async function appendTranscriptionToNotesAction(fd: FormData): Promise<{ 
   }
 }
 
+/**
+ * Père et mère d'une fiche. Un parent dont le sexe n'est pas renseigné prend la place restante
+ * (sinon on ne le reconnaît pas, et le report d'un acte crée un doublon).
+ */
+function fatherAndMother<P extends { id: number; sex: "M" | "F" | null }>(parents: P[]): { father: P | null; mother: P | null } {
+  let father = parents.find((p) => p.sex === "M") ?? null;
+  let mother = parents.find((p) => p.sex === "F") ?? null;
+  const unknown = parents.filter((p) => p.sex !== "M" && p.sex !== "F");
+  if (!father && mother) father = unknown[0] ?? null;
+  else if (father && !mother) mother = unknown[0] ?? null;
+  else if (!father && !mother) [father = null, mother = null] = unknown;
+  return { father, mother };
+}
+
+/** Date et lieu de décès lus dans un acte : champs de fiche, et la personne n'est plus vivante. */
+function deathPatch(dateRaw: string | null, place: string | null): q.PersonInput {
+  const patch: q.PersonInput = {};
+  if (dateRaw) {
+    const d = parseDateInput(dateRaw);
+    patch.death_date_raw = d.canonical;
+    patch.death_date_iso = d.iso;
+    if (d.year) patch.death_year = d.year;
+  }
+  if (place) patch.death_place = normalizePlace(place);
+  if (dateRaw || place) patch.is_living = 0;
+  return patch;
+}
+
 export interface ActViewerParentContext {
   id: number;
   displayName: string;
@@ -808,14 +836,7 @@ export async function getActViewerContextAction(
     if (profileId) {
       const p = await q.getPerson(profileId, personId);
       if (p) {
-        let fatherRef = p.parents.find((parent) => parent.sex === "M");
-        let motherRef = p.parents.find((parent) => parent.sex === "F");
-        if (!fatherRef && p.parents.length > 0 && p.parents[0].id !== motherRef?.id) {
-          fatherRef = p.parents[0];
-        }
-        if (!motherRef && p.parents.length > 1 && p.parents[1].id !== fatherRef?.id) {
-          motherRef = p.parents[1];
-        }
+        const { father: fatherRef, mother: motherRef } = fatherAndMother(p.parents);
         const father = fatherRef ? await q.getPerson(profileId, fatherRef.id) : null;
         const mother = motherRef ? await q.getPerson(profileId, motherRef.id) : null;
         result.person = {
@@ -845,10 +866,8 @@ export async function getActViewerContextAction(
       const profileId = u.profile_id;
       const p1 = u.partner1_id ? await q.getPerson(profileId, u.partner1_id) : null;
       const p2 = u.partner2_id ? await q.getPerson(profileId, u.partner2_id) : null;
-      const p1FatherRef = p1?.parents.find((parent) => parent.sex === "M");
-      const p1MotherRef = p1?.parents.find((parent) => parent.sex === "F");
-      const p2FatherRef = p2?.parents.find((parent) => parent.sex === "M");
-      const p2MotherRef = p2?.parents.find((parent) => parent.sex === "F");
+      const { father: p1FatherRef, mother: p1MotherRef } = fatherAndMother(p1?.parents ?? []);
+      const { father: p2FatherRef, mother: p2MotherRef } = fatherAndMother(p2?.parents ?? []);
 
       const p1Father = p1FatherRef ? await q.getPerson(profileId, p1FatherRef.id) : null;
       const p1Mother = p1MotherRef ? await q.getPerson(profileId, p1MotherRef.id) : null;
@@ -942,6 +961,8 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
   const spouseFatherOccupation = str(fd, "spouse_father_occupation");
   const spouseFatherBirthDateRaw = str(fd, "spouse_father_birth_date_raw");
   const spouseFatherBirthPlace = str(fd, "spouse_father_birth_place");
+  const spouseFatherDeathDateRaw = str(fd, "spouse_father_death_date_raw");
+  const spouseFatherDeathPlace = str(fd, "spouse_father_death_place");
 
   const spouseMotherIdParam = num(fd, "spouse_mother_id");
   const spouseMotherGivenNames = str(fd, "spouse_mother_given_names");
@@ -950,6 +971,8 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
   const spouseMotherOccupation = str(fd, "spouse_mother_occupation");
   const spouseMotherBirthDateRaw = str(fd, "spouse_mother_birth_date_raw");
   const spouseMotherBirthPlace = str(fd, "spouse_mother_birth_place");
+  const spouseMotherDeathDateRaw = str(fd, "spouse_mother_death_date_raw");
+  const spouseMotherDeathPlace = str(fd, "spouse_mother_death_place");
 
   const appendToNotes = str(fd, "append_to_notes") === "1" || str(fd, "append_to_notes") === "true";
   const transcriptionText = str(fd, "transcription_text");
@@ -1055,7 +1078,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
       if (hasFatherData) {
         let existingFatherId = fatherIdParam ?? null;
         if (!existingFatherId) {
-          const found = person.parents.find((p) => p.sex === "M") || (person.parents.length === 1 ? person.parents[0] : null);
+          const found = fatherAndMother(person.parents).father;
           if (found) existingFatherId = found.id;
         }
 
@@ -1141,7 +1164,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
       if (hasMotherData) {
         let existingMotherId = motherIdParam ?? null;
         if (!existingMotherId) {
-          const found = person.parents.find((p) => p.sex === "F") || (person.parents.length === 2 && !fatherIdParam ? person.parents[1] : null);
+          const found = fatherAndMother(person.parents).mother;
           if (found) existingMotherId = found.id;
         }
 
@@ -1329,13 +1352,15 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
             fatherIsDeceased ||
             fatherBirthDateRaw ||
             fatherBirthPlace ||
+            fatherDeathDateRaw ||
+            fatherDeathPlace ||
             createFather
           );
 
           if (hasP1FatherData) {
             let exFatherId = fatherIdParam ?? null;
             if (!exFatherId) {
-              const found = p1.parents.find((p) => p.sex === "M") || (p1.parents.length === 1 ? p1.parents[0] : null);
+              const found = fatherAndMother(p1.parents).father;
               if (found) exFatherId = found.id;
             }
 
@@ -1356,6 +1381,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 }
               }
               if (fatherBirthPlace) fUp.birth_place = normalizePlace(fatherBirthPlace);
+              Object.assign(fUp, deathPatch(fatherDeathDateRaw, fatherDeathPlace));
               if (Object.keys(fUp).length > 0) {
                 await q.updatePerson(exFatherId, fUp);
                 await q.checkAndUpdatePersonCompletion(exFatherId);
@@ -1370,6 +1396,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 is_living: fatherIsDeceased ? 0 : 1,
                 occupation: fatherOccupation || null,
                 birth_place: fatherBirthPlace ? normalizePlace(fatherBirthPlace) : null,
+                ...deathPatch(fatherDeathDateRaw, fatherDeathPlace),
               });
               if (fatherBirthDateRaw) {
                 const d = parseDateInput(fatherBirthDateRaw);
@@ -1396,13 +1423,15 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
             motherIsDeceased ||
             motherBirthDateRaw ||
             motherBirthPlace ||
+            motherDeathDateRaw ||
+            motherDeathPlace ||
             createMother
           );
 
           if (hasP1MotherData) {
             let exMotherId = motherIdParam ?? null;
             if (!exMotherId) {
-              const found = p1.parents.find((p) => p.sex === "F") || (p1.parents.length === 2 && !fatherIdParam ? p1.parents[1] : null);
+              const found = fatherAndMother(p1.parents).mother;
               if (found) exMotherId = found.id;
             }
 
@@ -1423,6 +1452,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 }
               }
               if (motherBirthPlace) mUp.birth_place = normalizePlace(motherBirthPlace);
+              Object.assign(mUp, deathPatch(motherDeathDateRaw, motherDeathPlace));
               if (Object.keys(mUp).length > 0) {
                 await q.updatePerson(exMotherId, mUp);
                 await q.checkAndUpdatePersonCompletion(exMotherId);
@@ -1437,6 +1467,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 is_living: motherIsDeceased ? 0 : 1,
                 occupation: motherOccupation || null,
                 birth_place: motherBirthPlace ? normalizePlace(motherBirthPlace) : null,
+                ...deathPatch(motherDeathDateRaw, motherDeathPlace),
               });
               if (motherBirthDateRaw) {
                 const d = parseDateInput(motherBirthDateRaw);
@@ -1526,13 +1557,15 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
             spouseFatherOccupation ||
             spouseFatherIsDeceased ||
             spouseFatherBirthDateRaw ||
-            spouseFatherBirthPlace
+            spouseFatherBirthPlace ||
+            spouseFatherDeathDateRaw ||
+            spouseFatherDeathPlace
           );
 
           if (hasP2FatherData) {
             let exFatherId = spouseFatherIdParam ?? null;
             if (!exFatherId) {
-              const found = p2.parents.find((p) => p.sex === "M") || (p2.parents.length === 1 ? p2.parents[0] : null);
+              const found = fatherAndMother(p2.parents).father;
               if (found) exFatherId = found.id;
             }
 
@@ -1553,6 +1586,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 }
               }
               if (spouseFatherBirthPlace) fUp.birth_place = normalizePlace(spouseFatherBirthPlace);
+              Object.assign(fUp, deathPatch(spouseFatherDeathDateRaw, spouseFatherDeathPlace));
               if (Object.keys(fUp).length > 0) {
                 await q.updatePerson(exFatherId, fUp);
                 await q.checkAndUpdatePersonCompletion(exFatherId);
@@ -1564,9 +1598,10 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 surname: spouseFatherSurname || p2.surname || "",
                 sex: "M",
                 status: "En recherche",
-                is_living: spouseFatherIsDeceased ? 0 : 1,
+                is_living: spouseFatherIsDeceased || spouseFatherDeathDateRaw || spouseFatherDeathPlace ? 0 : 1,
                 occupation: spouseFatherOccupation || null,
                 birth_place: spouseFatherBirthPlace ? normalizePlace(spouseFatherBirthPlace) : null,
+                ...deathPatch(spouseFatherDeathDateRaw, spouseFatherDeathPlace),
               });
               if (spouseFatherBirthDateRaw) {
                 const d = parseDateInput(spouseFatherBirthDateRaw);
@@ -1592,13 +1627,15 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
             spouseMotherOccupation ||
             spouseMotherIsDeceased ||
             spouseMotherBirthDateRaw ||
-            spouseMotherBirthPlace
+            spouseMotherBirthPlace ||
+            spouseMotherDeathDateRaw ||
+            spouseMotherDeathPlace
           );
 
           if (hasP2MotherData) {
             let exMotherId = spouseMotherIdParam ?? null;
             if (!exMotherId) {
-              const found = p2.parents.find((p) => p.sex === "F") || (p2.parents.length === 2 && !spouseFatherIdParam ? p2.parents[1] : null);
+              const found = fatherAndMother(p2.parents).mother;
               if (found) exMotherId = found.id;
             }
 
@@ -1619,6 +1656,7 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 }
               }
               if (spouseMotherBirthPlace) mUp.birth_place = normalizePlace(spouseMotherBirthPlace);
+              Object.assign(mUp, deathPatch(spouseMotherDeathDateRaw, spouseMotherDeathPlace));
               if (Object.keys(mUp).length > 0) {
                 await q.updatePerson(exMotherId, mUp);
                 await q.checkAndUpdatePersonCompletion(exMotherId);
@@ -1630,9 +1668,10 @@ export async function saveTranscriptionToRecordAction(fd: FormData): Promise<{
                 surname: spouseMotherSurname || "",
                 sex: "F",
                 status: "En recherche",
-                is_living: spouseMotherIsDeceased ? 0 : 1,
+                is_living: spouseMotherIsDeceased || spouseMotherDeathDateRaw || spouseMotherDeathPlace ? 0 : 1,
                 occupation: spouseMotherOccupation || null,
                 birth_place: spouseMotherBirthPlace ? normalizePlace(spouseMotherBirthPlace) : null,
+                ...deathPatch(spouseMotherDeathDateRaw, spouseMotherDeathPlace),
               });
               if (spouseMotherBirthDateRaw) {
                 const d = parseDateInput(spouseMotherBirthDateRaw);
