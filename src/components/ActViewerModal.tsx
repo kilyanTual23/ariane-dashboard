@@ -56,6 +56,10 @@ interface CropBox {
   height: number;
 }
 
+/** Nombre maximal de zones pour un même acte (fin de page de gauche + suite à droite, voire une page de plus). */
+const MAX_ZONES = 3;
+const isUsableZone = (c: CropBox) => c.width > 20 && c.height > 20;
+
 /** Ouvre ou referme le carnet sans quitter la visionneuse. */
 function NotebookButton({ compact = false }: { compact?: boolean }) {
   const open = useNotebookOpen();
@@ -130,7 +134,17 @@ export function ActViewerModal({
   // Outils OCR & Sélection
   const [ocrOpen, setOcrOpen] = useState(false);
   const [mode, setMode] = useState<"pan" | "select">("pan");
-  const [cropBox, setCropBox] = useState<CropBox | null>(null);
+  // Zones à transcrire, dans l'ordre de lecture : un acte peut commencer en bas de la page de gauche
+  // et continuer en haut de celle de droite. Le tracé en cours modifie la dernière zone.
+  const [cropBoxes, setCropBoxes] = useState<CropBox[]>([]);
+  // « Ajouter la suite » : le prochain tracé ajoute une zone au lieu de remplacer les précédentes.
+  const [addingZone, setAddingZone] = useState(false);
+  const cropBox = cropBoxes.length ? cropBoxes[cropBoxes.length - 1] : null;
+  const usableZones = cropBoxes.filter(isUsableZone);
+  const clearZones = () => {
+    setCropBoxes([]);
+    setAddingZone(false);
+  };
   const [isSelecting, setIsSelecting] = useState(false);
   const selectStartRef = useRef<{ clientX: number; clientY: number }>({ clientX: 0, clientY: 0 });
 
@@ -213,7 +227,6 @@ export function ActViewerModal({
 
   // État de la source épinglée (clic pour cibler et inspecter confortablement sans clignotement)
   const [pinnedSourceKey, setPinnedSourceKey] = useState<string | null>(null);
-  const [ocrCropRef, setOcrCropRef] = useState<CropBox | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -702,8 +715,8 @@ export function ActViewerModal({
       setGrayscale(false);
       setIsDragging(false);
       isDraggingRef.current = false;
-      setCropBox(null);
-      setOcrCropRef(null);
+      setCropBoxes([]);
+      setAddingZone(false);
       setPinnedSourceKey(null);
       setMode("pan");
       setSidebarTab("compare");
@@ -939,7 +952,12 @@ export function ActViewerModal({
       setIsSelecting(true);
       selectStartRef.current = { clientX: e.clientX, clientY: e.clientY };
       const startPt = screenToImage(e.clientX, e.clientY);
-      setCropBox({ x: startPt.x, y: startPt.y, width: 0, height: 0 });
+      const fresh = { x: startPt.x, y: startPt.y, width: 0, height: 0 };
+      setCropBoxes((prev) => {
+        const kept = prev.filter(isUsableZone);
+        return addingZone && kept.length && kept.length < MAX_ZONES ? [...kept, fresh] : [fresh];
+      });
+      setAddingZone(false);
     } else {
       isDraggingRef.current = true;
       setIsDragging(true);
@@ -965,7 +983,7 @@ export function ActViewerModal({
         const width = Math.abs(p2.x - p1.x);
         const height = Math.abs(p2.y - p1.y);
 
-        setCropBox({ x, y, width, height });
+        setCropBoxes((prev) => (prev.length ? [...prev.slice(0, -1), { x, y, width, height }] : [{ x, y, width, height }]));
       } else if (mode === "pan" && isDraggingRef.current) {
         const dx = e.clientX - dragStartRef.current.clientX;
         const dy = e.clientY - dragStartRef.current.clientY;
@@ -982,6 +1000,11 @@ export function ActViewerModal({
     const onMouseUp = () => {
       if (isSelecting) {
         setIsSelecting(false);
+        // Un simple clic sans tracé n'efface pas les zones déjà tracées.
+        setCropBoxes((prev) => {
+          const kept = prev.filter(isUsableZone);
+          return kept.length ? kept : prev;
+        });
       }
       if (isDraggingRef.current) {
         isDraggingRef.current = false;
@@ -1087,8 +1110,7 @@ export function ActViewerModal({
       }
     }, 1000);
 
-    const currentCrop = cropBox && cropBox.width > 20 && cropBox.height > 20 ? { ...cropBox } : null;
-    setOcrCropRef(currentCrop);
+    const zones = usableZones.map((c) => ({ ...c }));
     setPinnedSourceKey(null);
 
     try {
@@ -1098,7 +1120,7 @@ export function ActViewerModal({
         signal: ac.signal,
         body: JSON.stringify({
           imageUrl,
-          crop: currentCrop || undefined,
+          crops: zones.length ? zones : undefined,
           engine: ocrEngine,
           apiKey: geminiApiKey.trim() || undefined,
           language: "fra",
@@ -1322,17 +1344,19 @@ export function ActViewerModal({
     .filter(Boolean)
     .join(" ");
 
-  let screenCrop: { left: number; top: number; width: number; height: number } | null = null;
-  if (cropBox && cropBox.width > 0 && cropBox.height > 0) {
-    const pt1 = imageToScreen(cropBox.x, cropBox.y);
-    const pt2 = imageToScreen(cropBox.x + cropBox.width, cropBox.y + cropBox.height);
-    screenCrop = {
-      left: Math.min(pt1.x, pt2.x),
-      top: Math.min(pt1.y, pt2.y),
-      width: Math.abs(pt2.x - pt1.x),
-      height: Math.abs(pt2.y - pt1.y),
-    };
-  }
+  const screenCrops = cropBoxes
+    .filter((c) => c.width > 0 && c.height > 0)
+    .map((c) => {
+      const pt1 = imageToScreen(c.x, c.y);
+      const pt2 = imageToScreen(c.x + c.width, c.y + c.height);
+      return {
+        box: c,
+        left: Math.min(pt1.x, pt2.x),
+        top: Math.min(pt1.y, pt2.y),
+        width: Math.abs(pt2.x - pt1.x),
+        height: Math.abs(pt2.y - pt1.y),
+      };
+    });
 
 
   return (
@@ -1532,22 +1556,19 @@ export function ActViewerModal({
             className="w-full h-full block"
           />
 
-          {/* Cadre de la zone à transcrire */}
-          {screenCrop && (
+          {/* Cadres des zones à transcrire, numérotés dans l'ordre de lecture */}
+          {screenCrops.map((c, i) => (
             <div
-              style={{
-                left: screenCrop.left,
-                top: screenCrop.top,
-                width: screenCrop.width,
-                height: screenCrop.height,
-              }}
+              key={i}
+              style={{ left: c.left, top: c.top, width: c.width, height: c.height }}
               className="pointer-events-none absolute rounded-sm border-2 border-info-dot bg-info-dot/10"
             >
-              <span className="num absolute -top-6 left-0 rounded-md bg-info-dot px-1.5 py-0.5 text-2xs font-medium text-white shadow-xs">
-                {cropBox?.width} × {cropBox?.height} px
+              <span className="num absolute -top-6 left-0 whitespace-nowrap rounded-md bg-info-dot px-1.5 py-0.5 text-2xs font-medium text-white shadow-xs">
+                {screenCrops.length > 1 ? `Zone ${i + 1} · ` : ""}
+                {c.box.width} × {c.box.height} px
               </span>
             </div>
-          )}
+          ))}
 
 
           {/* Outils de la page : déplacer l'image ou tracer une zone à transcrire */}
@@ -1579,12 +1600,30 @@ export function ActViewerModal({
               <IconScan size={13} />
               Tracer une zone
             </button>
-            {cropBox && cropBox.width > 0 && (
+            {usableZones.length > 0 && usableZones.length < MAX_ZONES && (
               <button
                 type="button"
-                onClick={() => setCropBox(null)}
+                onClick={() => {
+                  setMode("select");
+                  setAddingZone(true);
+                  if (!ocrOpen) setOcrOpen(true);
+                }}
+                aria-pressed={addingZone}
+                title="L’acte continue ailleurs (page d’à côté) : tracez une zone de plus, lue à la suite"
+                className={`flex h-full items-center gap-1 rounded-lg px-2 text-xs transition-colors ${
+                  addingZone ? "bg-surface-2 font-medium text-fg" : "text-fg-muted hover:text-fg"
+                }`}
+              >
+                <IconPlus size={12} />
+                Ajouter la suite
+              </button>
+            )}
+            {cropBoxes.length > 0 && cropBox && cropBox.width > 0 && (
+              <button
+                type="button"
+                onClick={clearZones}
                 className="flex h-full items-center gap-1 rounded-lg px-2 text-xs text-fg-subtle transition-colors hover:text-fg"
-                title="Effacer la zone"
+                title={usableZones.length > 1 ? "Effacer les zones" : "Effacer la zone"}
               >
                 <IconX size={12} />
                 Effacer
@@ -1664,18 +1703,36 @@ export function ActViewerModal({
                 <div className="flex flex-col gap-6">
                   <section>
                     <h4 className="text-ui font-semibold">Zone à transcrire</h4>
-                    {cropBox && cropBox.width > 20 && cropBox.height > 20 ? (
-                      <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
-                        <span className="flex items-center gap-2 text-fg">
-                          <IconScan size={14} className="text-fg-subtle" />
-                          Zone tracée
-                          <span className="num text-xs text-fg-subtle">
-                            {cropBox.width} × {cropBox.height} px
+                    {usableZones.length > 0 ? (
+                      <div className="mt-2 flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
+                          <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-fg">
+                            <IconScan size={14} className="text-fg-subtle" />
+                            {usableZones.length > 1 ? `${usableZones.length} zones, lues à la suite` : "Zone tracée"}
+                            <span className="num text-xs text-fg-subtle">
+                              {usableZones.map((c) => `${c.width} × ${c.height}`).join(" + ")} px
+                            </span>
                           </span>
-                        </span>
-                        <button type="button" onClick={() => setCropBox(null)} className={buttonClass("quiet", "", "xs")}>
-                          Toute la page
-                        </button>
+                          <button type="button" onClick={clearZones} className={buttonClass("quiet", "", "xs")}>
+                            Toute la page
+                          </button>
+                        </div>
+                        {usableZones.length < MAX_ZONES && (
+                          <p className="text-xs text-fg-muted">
+                            L’acte continue sur la page d’à côté ?{" "}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMode("select");
+                                setAddingZone(true);
+                              }}
+                              className="font-medium text-accent hover:underline"
+                            >
+                              Ajouter la suite
+                            </button>{" "}
+                            : tracez la deuxième partie, elle sera lue après la première.
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <div className="mt-1.5 flex flex-col items-start gap-2.5">

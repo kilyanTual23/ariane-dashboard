@@ -221,19 +221,59 @@ async function getAvailableModelList(ai: GoogleGenAI): Promise<string[]> {
   return [...PREFERRED_PRIORITY];
 }
 
+type Crop = { x: number; y: number; width: number; height: number };
+
+/** Zone découpée dans les limites de l'image, ou null si elle est trop petite. */
+function clampCrop(crop: Crop, imgW: number, imgH: number) {
+  const left = Math.max(0, Math.min(imgW - 10, Math.round(crop.x)));
+  const top = Math.max(0, Math.min(imgH - 10, Math.round(crop.y)));
+  const width = Math.min(imgW - left, Math.round(crop.width));
+  const height = Math.min(imgH - top, Math.round(crop.height));
+  return width > 15 && height > 15 ? { left, top, width, height } : null;
+}
+
+/**
+ * Plusieurs zones d'un même acte (fin de la page de gauche, suite sur celle de droite) :
+ * on les assemble en une seule image, dans l'ordre de lecture. Des bandes larges et basses
+ * sont empilées l'une sous l'autre ; des colonnes hautes et étroites, mises côte à côte.
+ */
+async function stitchZones(parts: Buffer[]): Promise<Buffer> {
+  const metas = await Promise.all(parts.map((b) => sharp(b).metadata()));
+  const sizes = metas.map((m) => ({ w: m.width || 1, h: m.height || 1 }));
+  const gap = 24;
+  const tall = sizes.reduce((n, z) => n + z.h, 0) > sizes.reduce((n, z) => n + z.w, 0);
+  let x = 0;
+  let y = 0;
+  const composite = parts.map((input, i) => {
+    const pos = { input, left: x, top: y };
+    if (tall) x += sizes[i].w + gap;
+    else y += sizes[i].h + gap;
+    return pos;
+  });
+  const width = tall ? x - gap : Math.max(...sizes.map((z) => z.w));
+  const height = tall ? Math.max(...sizes.map((z) => z.h)) : y - gap;
+  return sharp({ create: { width, height, channels: 3, background: "#ffffff" } })
+    .composite(composite)
+    .jpeg({ quality: 92 })
+    .toBuffer();
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
       imageUrl,
       crop,
+      crops,
       engine = "tesseract",
       apiKey: rawApiKey,
       language = "fra",
       actKind,
     } = body as {
       imageUrl?: string;
-      crop?: { x: number; y: number; width: number; height: number };
+      crop?: Crop;
+      /** Zones dans l'ordre de lecture (un acte à cheval sur deux pages). Remplace `crop`. */
+      crops?: Crop[];
       engine?: "tesseract" | "ai" | "gemini";
       apiKey?: string;
       language?: string;
@@ -244,7 +284,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "URL de l'image requise" }, { status: 400 });
     }
 
-    const paleographyPrompt = buildPaleographyPrompt(actKind);
+    const zones = (Array.isArray(crops) && crops.length ? crops : crop ? [crop] : [])
+      .filter((c) => c && c.width > 15 && c.height > 15)
+      .slice(0, 4);
+    const paleographyPrompt =
+      buildPaleographyPrompt(actKind) +
+      (zones.length > 1
+        ? `\n\nATTENTION : l'image assemble ${zones.length} morceaux d'un MÊME acte, séparés par une bande blanche (par exemple la fin de la page de gauche puis le début de la page de droite). Lis-les dans l'ordre (de haut en bas, ou de gauche à droite) et transcris-les comme un seul texte continu, sans signaler la coupure.`
+        : "");
 
     // 1. Récupération du Buffer de l'image source
     let imageBuffer: Buffer;
@@ -280,21 +327,14 @@ export async function POST(req: NextRequest) {
 
     // 2. Découpe éventuelle de la zone sélectionnée (Crop)
     let processedBuffer = imageBuffer;
-    if (crop && crop.width > 15 && crop.height > 15) {
+    if (zones.length) {
       const meta = await sharp(imageBuffer).metadata();
       const imgW = meta.width || 0;
       const imgH = meta.height || 0;
-
-      const left = Math.max(0, Math.min(imgW - 10, Math.round(crop.x)));
-      const top = Math.max(0, Math.min(imgH - 10, Math.round(crop.y)));
-      const width = Math.min(imgW - left, Math.round(crop.width));
-      const height = Math.min(imgH - top, Math.round(crop.height));
-
-      if (width > 15 && height > 15) {
-        processedBuffer = await sharp(imageBuffer)
-          .extract({ left, top, width, height })
-          .toBuffer();
-      }
+      const rects = zones.map((z) => clampCrop(z, imgW, imgH)).filter((r): r is NonNullable<typeof r> => !!r);
+      const parts = await Promise.all(rects.map((r) => sharp(imageBuffer).extract(r).toBuffer()));
+      if (parts.length === 1) processedBuffer = parts[0];
+      else if (parts.length > 1) processedBuffer = await stitchZones(parts);
     }
 
     // 3. Moteur IA Paléographe (Gemini Vision / OpenAI / Groq)
@@ -319,7 +359,8 @@ export async function POST(req: NextRequest) {
 
       // Optimisation de l'image pour la vision par IA (1800px / q80 pour une transmission instantanée et netteté maximale)
       const aiBuffer = await sharp(processedBuffer)
-        .resize(1800, 1800, { fit: "inside", withoutEnlargement: true })
+        // Zones assemblées : image plus longue, on garde un peu plus de pixels pour que chaque morceau reste lisible.
+        .resize(zones.length > 1 ? 2400 : 1800, zones.length > 1 ? 2400 : 1800, { fit: "inside", withoutEnlargement: true })
         .jpeg({ quality: 80 })
         .toBuffer();
 
